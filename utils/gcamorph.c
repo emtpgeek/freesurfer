@@ -18735,30 +18735,59 @@ MRI *GCAMSreclassifyUsingGibbsPriors(MRI *mri_inputs,
 double GCAMMSgibbsImageLogPosterior(
     GCAM_MS *gcam_ms, MRI *mri_labels, MRI *mri_inputs, TRANSFORM *transform, MRI *mri_s_index)
 {
-  int x, y, z, width, depth, height, s;
-  double total_log_posterior, log_posterior;
-  GCA *gca;
+  int const width  = mri_labels->width;
+  int const height = mri_labels->height;
+  int const depth  = mri_labels->depth;
 
-  width = mri_labels->width;
-  height = mri_labels->height;
-  depth = mri_labels->depth;
+  double* const partial_sums_log_posterior = (double*)malloc(width * sizeof(double));
 
-  for (total_log_posterior = 0.0, x = 0; x < width; x++) {
-    for (y = 0; y < height; y++) {
-      for (z = 0; z < depth; z++) {
-        s = MRIgetVoxVal(mri_s_index, x, y, z, 0);
-        gca = gcam_ms->gcas[s];
-        log_posterior = GCAvoxelGibbsLogPosterior(gca, mri_labels, mri_inputs, x, y, z, transform, 1.0);
-        if (check_finite("gcaGibbsImageLogposterior", log_posterior) == 0) {
-          DiagBreak();
+  double total_log_posterior = 0.0;
+
+  fprintf(stderr, "%s:%d GCAMMSgibbsImageLogPosterior\n", __FILE__, __LINE__);
+
+  int trial;
+  for (trial = 0; trial < 2; trial++) {
+
+    int x;
+    #pragma omp parallel if(trial==0)  // second round do serial, just to compare the answers
+    for (x = 0; x < width; x++) {
+    
+      double partial_sum = 0.0;
+    
+      int y;
+      for (y = 0; y < height; y++) {
+        int z;
+        for (z = 0; z < depth; z++) {
+          int  const s   = MRIgetVoxVal(mri_s_index, x, y, z, 0);
+          GCA* const gca = gcam_ms->gcas[s];
+          double log_posterior = GCAvoxelGibbsLogPosterior(gca, mri_labels, mri_inputs, x, y, z, transform, 1.0);
+          if (check_finite("gcaGibbsImageLogposterior", log_posterior) == 0) {
+            DiagBreak();
+          }
+          partial_sum += log_posterior;
+          if (partial_sum > 1e10) {
+            DiagBreak();
+          }
         }
-        total_log_posterior += log_posterior;
-        if (total_log_posterior > 1e10) {
-          DiagBreak();
-        }
+      }
+    
+      partial_sums_log_posterior[x] = partial_sum;
+    }
+
+    double trial_total_log_posterior = 0.0;
+    for (x = 0; x < width; x++) trial_total_log_posterior += partial_sums_log_posterior[x];
+
+    if (trial == 0) {
+      total_log_posterior = trial_total_log_posterior;
+    } else {
+      if (total_log_posterior != trial_total_log_posterior) {
+        fprintf(stderr, "%s:%d %g != %g\n", __FILE__, __LINE__, total_log_posterior, trial_total_log_posterior);
       }
     }
   }
+  
+  free(partial_sums_log_posterior);
+  
   return (total_log_posterior);
 }
 
