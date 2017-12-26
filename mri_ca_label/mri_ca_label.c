@@ -4977,7 +4977,7 @@ GCArelabelUnlikely(GCA *gca,
         label = GCAgetMaxPriorLabelAtVoxel(gca, mri_dst_labeled, 
                                            x, y, z, transform, &prior) ;
         MRIsetVoxVal(mri_prior_labels, x, y, z, 0, label) ;
-        MRIsetVoxVal(mri_priors, x, y, z, 0, prior) ;
+        MRIsetVoxVal(mri_priors,       x, y, z, 0, prior) ;
       }
 
   nindices = mri_inputs->width * mri_inputs->height * mri_inputs->depth ;
@@ -4988,6 +4988,11 @@ GCArelabelUnlikely(GCA *gca,
   {
     nchanged = 0 ;
     MRIcomputeVoxelPermutation(mri_inputs, x_indices, y_indices, z_indices) ;
+    
+    // BEVIN THIS LOOP IS IMPORTANT
+    //
+    fprintf(stderr, "%s:%d nindices:%d\n", nindices);
+    
 #if 0 //def HAVE_OPENMP   doesn't work
 #pragma omp parallel for firstprivate(mri_independent_posterior, mri_inputs, gca, mri_prior_labels, whalf, prior_thresh, Ggca_x, Ggca_y, Ggca_z) shared(mri_unchanged, mri_priors,transform, x_indices,y_indices,z_indices, mri_dst_labeled) reduction(+:nchanged)
 #endif
@@ -5030,6 +5035,9 @@ GCArelabelUnlikely(GCA *gca,
         continue ;
       }
 #endif
+
+      // BEVIN ALMOST ALL THE TIME IS IN THIS CALL
+      
       posterior_before = 
         GCAwindowPosteriorLogProbability
         (gca, mri_dst_labeled, mri_inputs, transform, x, y, z,  whalf)  ;
