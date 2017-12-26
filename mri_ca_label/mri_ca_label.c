@@ -5069,27 +5069,17 @@ GCArelabelUnlikely_old(GCA *gca,
     nchanged = 0 ;
     MRIcomputeVoxelPermutation(mri_inputs, x_indices, y_indices, z_indices) ;
     
-    // BEVIN THIS LOOP IS IMPORTANT
+    // Doesn't work in parallel - see below
     //
-    fprintf(stderr, "%s:%d nindices:%d\n", __FILE__, __LINE__, nindices);
-    
-    ROMP_PF_begin
-    
-    // Doesn't work in parallel - reason not yet determined
-    //
-#pragma omp parallel for if_ROMP(serial) firstprivate(mri_independent_posterior, mri_inputs, gca, mri_prior_labels, whalf, prior_thresh, Ggca_x, Ggca_y, Ggca_z) shared(mri_unchanged, mri_priors,transform, x_indices,y_indices,z_indices, mri_dst_labeled) reduction(+:nchanged)
-
     for (index = 0 ; index < nindices ; index++)
     {
-      ROMP_PFLB_begin
-      
       double      posterior_before, posterior_after  ;
       int         label, x, y, z, nchanged_tmp, old_label = 0 ;
       VOXEL_LIST  *vl ;
 
       x = x_indices[index] ; y = y_indices[index] ; z = z_indices[index] ;
       if ((int)MRIgetVoxVal(mri_unchanged, x, y, z, 0) == 1)
-	ROMP_PFLB_continue ;  // this nbhd not changed from last call
+	continue ;  // this nbhd not changed from last call
 
       MRIsetVoxVal(mri_unchanged, x, y, z, 0, 1) ;
       label = MRIgetVoxVal(mri_dst_labeled, x, y, z, 0) ;
@@ -5097,14 +5087,14 @@ GCArelabelUnlikely_old(GCA *gca,
         DiagBreak() ;
 
       if (IS_WMSA(label))
-	ROMP_PFLB_continue ;
+	continue ;
 
       // don't process it if it the highest prior or the highest posterior
       if ((label == (int)MRIgetVoxVal(mri_prior_labels,x,y,z,0) &&
 	   (mri_independent_posterior && 
 	    label == (int)MRIgetVoxVal(mri_independent_posterior,x,y,z,0))))
       {
-        ROMP_PFLB_continue ;
+        continue ;
       }
 
 #if 0
@@ -5113,16 +5103,14 @@ GCArelabelUnlikely_old(GCA *gca,
           (GCAisPossible(gca, mri_inputs, Left_Putamen,
                          transform, x, y, z, 0) == 0))
       {
-        ROMP_PFLB_continue ;
+        continue ;
       }
       if (!IS_PUTAMEN(label))   // disable everything but putamen for now
       {
-        ROMP_PFLB_continue ;
+        continue ;
       }
 #endif
 
-      // BEVIN ALMOST ALL THE TIME IS IN THIS CALL
-      
       posterior_before = 
         GCAwindowPosteriorLogProbability
         (gca, mri_dst_labeled, mri_inputs, transform, x, y, z,  whalf)  ;
@@ -5176,9 +5164,7 @@ GCArelabelUnlikely_old(GCA *gca,
         DiagBreak() ;
       }
       VLSTfree(&vl) ;
-      ROMP_PFLB_end
     }
-    ROMP_PF_end
     
     total_changed += nchanged ;
     printf("%d voxels changed in iteration %d of "
@@ -5250,133 +5236,205 @@ GCArelabelUnlikely_new(
   int i;
   for (i = 0 ; i < 5 ; i++)
   {
-    int nchanged = 0 ;
     MRIcomputeVoxelPermutation(mri_inputs, x_indices, y_indices, z_indices) ;
     
-    // BEVIN THIS LOOP IS IMPORTANT
-    //
     fprintf(stderr, "%s:%d nindices:%d whalf:%d\n", __FILE__, __LINE__, nindices, whalf);
     
-    // Doesn't work in parallel - some of the reasons noted below
+    // Each iteration might, but probably doesn't, interact with the soon following iterations.
+    // This means that the iterations must be done in order, except that ones that are far enough apart can be done simultaneously.
     //
-#ifdef HAVE_OPENMP
-    ROMP_PF_begin
+    if (1) {
+        static int saved_whalf = 0, count = 0;
+        if (saved_whalf == whalf) {
+            count++;
+        } else {
+            if (count > 0) fprintf(stderr, "%s:%d whalf:%d count:%d\n", __FILE__, __LINE__, whalf, count);
+            saved_whalf = whalf;
+            count = 1;
+        }
+    }
     
-    int index;
-    #pragma omp parallel for if_ROMP(serial) reduction(+:nchanged)
-#endif
-    for (index = 0 ; index < nindices ; index++)
+    int nchanged = 0 ;
+
+#define BufferCapacity 16   // because of the O(N**2) comparisons to decide what can be buffered
+
+    int const safeDistance = whalf*2 + 2;  // so that the whalf neighborhoods don't overlap
+    
+    int buffer[BufferCapacity];
+    int bufferSize = 0;
+
+    int bufferSizeHistogram[BufferCapacity];
+    {  int i; for (i = 0; i < BufferCapacity; i++) bufferSizeHistogram[i] = 0;
+    }
+
+    int remainder = 0;
+    while (bufferSize || (remainder < nindices))
     {
-      ROMP_PFLB_begin
-      
-      int const x = x_indices[index] ; 
-      int const y = y_indices[index] ; 
-      int const z = z_indices[index] ;
-      
-      if ((int)MRIgetVoxVal(mri_unchanged, x, y, z, 0) == 1)
-	ROMP_PFLB_continue ;  // this nbhd not changed from last call
-
-      MRIsetVoxVal(mri_unchanged, x, y, z, 0, 1) ;
-      
-      int const label = MRIgetVoxVal(mri_dst_labeled, x, y, z, 0) ;
-      
-      if (x == Ggca_x && y == Ggca_y && z == Ggca_z)
-        DiagBreak() ;
-
-      if (IS_WMSA(label))
-	ROMP_PFLB_continue ;
-
-      // don't process it if it the highest prior or the highest posterior
+      // Append this one to the buffer if possible
       //
-      // BEVIN - the above comment and the following code disagree says "or", implements "and"
-      //
-      if ( label == (int)MRIgetVoxVal(mri_prior_labels,x,y,z,0) 
-        && mri_independent_posterior 
-        && label == (int)MRIgetVoxVal(mri_independent_posterior,x,y,z,0)
-         )
-      {
-        ROMP_PFLB_continue ;
+      if ((bufferSize < BufferCapacity) && (remainder < nindices)) {
+      
+        int const index = remainder;
+      
+        int const x = x_indices[index] ; 
+        int const y = y_indices[index] ; 
+        int const z = z_indices[index] ;
+    
+        if ((int)MRIgetVoxVal(mri_unchanged, x, y, z, 0) == 1) {
+          remainder++;      // ignore this one because
+	  continue;         // this nbhd not changed from last call
+        }
+
+        int bi;
+        for (bi = 0; bi < bufferSize; bi++) {
+          int dist;
+          dist = x - x_indices[remainder + bi]; if ( dist > safeDistance || -dist > safeDistance) break;
+          dist = y - y_indices[remainder + bi]; if ( dist > safeDistance || -dist > safeDistance) break;
+          dist = y - z_indices[remainder + bi]; if ( dist > safeDistance || -dist > safeDistance) break;
+        }
+        if (bi == bufferSize) { 
+            buffer[ bufferSize++ ] = index; 
+            remainder++; 
+            continue; 
+        }
+        // Could not buffer. Will reprocess this one after emptying the buffer
       }
+      
+      // Do the buffered ones in parallel
+      //
+      bufferSizeHistogram[bufferSize]++;
+
+      int bufferIndex;
+#ifdef HAVE_OPENMP
+      ROMP_PF_begin
+      #pragma omp parallel for if_ROMP(serial) reduction(+:nchanged)
+#endif
+      for (bufferIndex = 0; bufferIndex < bufferSize; bufferIndex++) {
+        ROMP_PFLB_begin
+            
+        int const index = buffer[bufferIndex];
+      
+        int const x = x_indices[index] ; 
+        int const y = y_indices[index] ; 
+        int const z = z_indices[index] ;
+
+        if ((int)MRIgetVoxVal(mri_unchanged, x, y, z, 0) == 1)
+	  ROMP_PFLB_continue ;  // this nbhd not changed from last call
+
+        MRIsetVoxVal(mri_unchanged, x, y, z, 0, 1) ;
+      
+        int const label = MRIgetVoxVal(mri_dst_labeled, x, y, z, 0) ;
+      
+        if (x == Ggca_x && y == Ggca_y && z == Ggca_z)
+          DiagBreak() ;
+
+        if (IS_WMSA(label))
+	  ROMP_PFLB_continue ;
+
+        // don't process it if it the highest prior or the highest posterior
+        //
+        // BEVIN - the above comment and the following code disagree says "or", implements "and"
+        //
+        if ( label == (int)MRIgetVoxVal(mri_prior_labels,x,y,z,0) 
+          && mri_independent_posterior 
+          && label == (int)MRIgetVoxVal(mri_independent_posterior,x,y,z,0)
+           )
+        {
+          ROMP_PFLB_continue ;
+        }
 
 #if 0
-      if ((GCAisPossible(gca, mri_inputs, Left_Putamen, transform, x, y, z, 0) == 0) &&
-          (GCAisPossible(gca, mri_inputs, Left_Putamen, transform, x, y, z, 0) == 0))
-      {
-        ROMP_PFLB_continue ;
-      }
+        if ((GCAisPossible(gca, mri_inputs, Left_Putamen, transform, x, y, z, 0) == 0) &&
+            (GCAisPossible(gca, mri_inputs, Left_Putamen, transform, x, y, z, 0) == 0))
+        {
+          ROMP_PFLB_continue ;
+        }
       
-      if (!IS_PUTAMEN(label))   // disable everything but putamen for now
-      {
-        ROMP_PFLB_continue ;
-      }
+        if (!IS_PUTAMEN(label))   // disable everything but putamen for now
+        {
+          ROMP_PFLB_continue ;
+        }
 #endif
 
-      // BEVIN ALMOST ALL THE TIME IS IN THIS CALL
+        // BEVIN ALMOST ALL THE TIME IS IN THIS CALL
       
-      double const posterior_before = 
-        GCAwindowPosteriorLogProbability(
-          gca, mri_dst_labeled, mri_inputs, transform, x, y, z,  whalf) ;
+        double const posterior_before = 
+          GCAwindowPosteriorLogProbability(
+            gca, mri_dst_labeled, mri_inputs, transform, x, y, z,  whalf) ;
 
-      VOXEL_LIST* vl =                                          // note: these might appear in the region around other x,y,z also!
-        find_unlikely_voxels_in_region(
-          gca, transform, mri_dst_labeled, prior_thresh, 
-          mri_prior_labels, mri_priors, x, y, z, whalf) ;
+        VOXEL_LIST* vl =                                          // note: these might appear in the region around other x,y,z also!
+          find_unlikely_voxels_in_region(
+            gca, transform, mri_dst_labeled, prior_thresh, 
+            mri_prior_labels, mri_priors, x, y, z, whalf) ;
 
-      if (vl == NULL)
-        ROMP_PFLB_continue;
+        if (vl == NULL)
+          ROMP_PFLB_continue;
         
-      int const old_label =
-        (Ggca_x < 0) ? 0 : MRIgetVoxVal(mri_src_labeled, Ggca_x, Ggca_y, Ggca_z, 0) ;
+        int const old_label =
+          (Ggca_x < 0) ? 0 : MRIgetVoxVal(mri_src_labeled, Ggca_x, Ggca_y, Ggca_z, 0) ;
 	
-      if (Ggca_x >= 0 && VLSTinList(vl, Ggca_x, Ggca_y, Ggca_z))
-      {
-        MRI *mri = VLSTtoMri(vl, NULL) ;
-        MRIwrite(mri, "vl.mgz") ;
-        MRIfree(&mri) ;
-        DiagBreak() ;
-      }
+        if (Ggca_x >= 0 && VLSTinList(vl, Ggca_x, Ggca_y, Ggca_z))
+        {
+          MRI *mri = VLSTtoMri(vl, NULL) ;
+          MRIwrite(mri, "vl.mgz") ;
+          MRIfree(&mri) ;
+          DiagBreak() ;
+        }
 
-      // Maybe here is why it can't be parallel
-      // Multiple loop bodies might change a voxel
-      //
-      int const nchanged_tmp = 
-        change_unlikely_voxels(
-          gca, mri_dst_labeled, mri_inputs, transform, 
-          vl, label, mri_prior_labels) ;
-          
-      double const posterior_after = 
-        GCAwindowPosteriorLogProbability(
-          gca, mri_dst_labeled, mri_inputs, transform, x, y, z,  whalf)  ;
-          
-      if (posterior_after <= posterior_before)
-      {
-        // Here is another reason why it can't be parallel
+        // Here is why the distance check above is needed
+        // Multiple loop bodies might change a voxel
         //
-        VLSTvsrcToMri(vl, mri_dst_labeled) ;  // undo label change, even though another thread might have used the changed values!
-      }
-      else
-      {
-	if (Ggca_x >= 0)
-	{
-	  int max_label = MRIgetVoxVal(mri_dst_labeled, Ggca_x, Ggca_y, Ggca_z, 0) ;
-	  if  (old_label != max_label && VLSTinList(vl, Ggca_x, Ggca_y, Ggca_z))
+        int const nchanged_tmp = 
+          change_unlikely_voxels(
+            gca, mri_dst_labeled, mri_inputs, transform, 
+            vl, label, mri_prior_labels) ;
+          
+        double const posterior_after = 
+          GCAwindowPosteriorLogProbability(
+            gca, mri_dst_labeled, mri_inputs, transform, x, y, z,  whalf)  ;
+          
+        if (posterior_after <= posterior_before)
+        {
+          // Here is another reason why it can't be parallel
+          //
+          VLSTvsrcToMri(vl, mri_dst_labeled) ;  // undo label change, even though another thread might have used the changed values!
+        }
+        else
+        {
+	  if (Ggca_x >= 0)
 	  {
-	    printf("iter = %d: change_unlikely_voxels: changing label at (%d, %d, %d) from %s to %s\n",
+	    int max_label = MRIgetVoxVal(mri_dst_labeled, Ggca_x, Ggca_y, Ggca_z, 0) ;
+	    if  (old_label != max_label && VLSTinList(vl, Ggca_x, Ggca_y, Ggca_z))
+	    {
+	      printf("iter = %d: change_unlikely_voxels: changing label at (%d, %d, %d) from %s to %s\n",
 		   i, Ggca_x, Ggca_y, Ggca_z, 
 		   cma_label_to_name(old_label),
 		   cma_label_to_name(max_label));
+	    }
 	  }
-	}
-	MRIsetVoxVal(mri_unchanged, x, y, z, 0, 0) ;
-        nchanged += nchanged_tmp ;
-        DiagBreak() ;
-      }
+	  MRIsetVoxVal(mri_unchanged, x, y, z, 0, 0) ;
+          nchanged += nchanged_tmp ;
+          DiagBreak() ;
+        }
       
-      VLSTfree(&vl) ;
-      ROMP_PFLB_end
+        VLSTfree(&vl) ;
+        ROMP_PFLB_end
+      }
+      ROMP_PF_end
+
+      // None are buffered
+      //      
+      bufferSize = 0;
     }
-    ROMP_PF_end
     
+    if (1) {
+      int i; 
+      for (i = 0; i < BufferCapacity; i++)
+        if (bufferSizeHistogram[i]) fprintf(stderr, "bufferSizeHistogram[%d]:%d\n", i, bufferSizeHistogram[i]);
+    }
+
+#undef BufferCapacity
+
     total_changed += nchanged ;
     printf("%d voxels changed in iteration %d of "
            "unlikely voxel relabeling\n", nchanged, i) ;
