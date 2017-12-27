@@ -5195,6 +5195,12 @@ GCArelabelUnlikely_new(
     double      prior_thresh,
     int         whalf)
 {
+  int const width  = mri_inputs->width;
+  int const height = mri_inputs->height;
+  int const depth  = mri_inputs->depth;
+  
+  int const nindices = width * height * depth ;
+  
   MRI* mri_prior_labels = MRIclone             (mri_dst_labeled, NULL) ;
   MRI* mri_priors       = MRIcloneDifferentType(mri_dst_labeled, MRI_FLOAT) ;
   MRI* mri_unchanged    = MRIcloneDifferentType(mri_dst_labeled, MRI_UCHAR) ;
@@ -5206,27 +5212,26 @@ GCArelabelUnlikely_new(
   }
 
   { int x;
-    for (x = 0 ; x < mri_inputs->width ; x++)
+    for (x = 0 ; x < width ; x++)
     { int y;
-      for (y = 0 ; y < mri_inputs->height ; y++)
+      for (y = 0 ; y < height ; y++)
       { int z;
-        for (z = 0 ; z < mri_inputs->depth ; z++)
+        for (z = 0 ; z < depth ; z++)
         {
           if (x == Ggca_x && y == Ggca_y && z == Ggca_z)
           {
             DiagBreak() ;
           }
+          
           double prior;
-          int label = GCAgetMaxPriorLabelAtVoxel(gca, mri_dst_labeled, 
-                                         x, y, z, transform, &prior) ;
+          int label = GCAgetMaxPriorLabelAtVoxel(gca, mri_dst_labeled, x, y, z, transform, &prior) ;
+          
           MRIsetVoxVal(mri_prior_labels, x, y, z, 0, label) ;
           MRIsetVoxVal(mri_priors,       x, y, z, 0, prior) ;
         }
       }
     }
   }
-  
-  int const nindices = mri_inputs->width * mri_inputs->height * mri_inputs->depth ;
   
   short* const x_indices = (short *)calloc(nindices, sizeof(short)) ;
   short* const y_indices = (short *)calloc(nindices, sizeof(short)) ;
@@ -5273,41 +5278,55 @@ GCArelabelUnlikely_new(
       // Append this one to the buffer if possible
       //
       if ((bufferSize < BufferCapacity) && (remainder < nindices)) {
-      
+        // There is room, and there is a candidate
+        
         int const index = remainder;
       
         int const x = x_indices[index] ; 
         int const y = y_indices[index] ; 
         int const z = z_indices[index] ;
     
+        if (remainder < 500) {
+            fprintf(stderr, "%s:%d x:%d y:%d z:%d\n", __FILE__, __LINE__, x,y,z);
+        }
+        
         if ((int)MRIgetVoxVal(mri_unchanged, x, y, z, 0) == 1) {
           remainder++;      // ignore this one because
 	  continue;         // this nbhd not changed from last call
         }
 
+        // See of the candidate is far from all the buffered candidates
+        //
         int bi;
         for (bi = 0; bi < bufferSize; bi++) {
+          int bufferedIndex = buffer[bi];
           int dist;
-          dist = x - x_indices[remainder + bi]; if ( dist > safeDistance || -dist > safeDistance) break;
-          dist = y - y_indices[remainder + bi]; if ( dist > safeDistance || -dist > safeDistance) break;
-          dist = y - z_indices[remainder + bi]; if ( dist > safeDistance || -dist > safeDistance) break;
+          dist = x - x_indices[bufferedIndex]; if ( dist > safeDistance || -dist > safeDistance) continue;
+          dist = y - y_indices[bufferedIndex]; if ( dist > safeDistance || -dist > safeDistance) continue;
+          dist = z - z_indices[bufferedIndex]; if ( dist > safeDistance || -dist > safeDistance) continue;
+          break;
         }
+        
+        // If it is, buffer it also
+        // An insertion sort could be used to make the above more efficient for larger buffer sizes
+        //
         if (bi == bufferSize) { 
             buffer[ bufferSize++ ] = index; 
             remainder++; 
             continue; 
         }
-        // Could not buffer. Will reprocess this one after emptying the buffer
+        
+        // Else could not buffer. Will reprocess this candidate after emptying the buffer
       }
       
-      // Do the buffered ones in parallel
+      // Empty the buffered indexs in parallel
       //
-      bufferSizeHistogram[bufferSize]++;
+      bufferSizeHistogram[bufferSize]++;    // tuning aid, to see how effective the above is...
 
       int bufferIndex;
 #ifdef HAVE_OPENMP
       ROMP_PF_begin
-      #pragma omp parallel for if_ROMP(serial) reduction(+:nchanged)
+      #pragma omp parallel for if_ROMP(fast) reduction(+:nchanged)
 #endif
       for (bufferIndex = 0; bufferIndex < bufferSize; bufferIndex++) {
         ROMP_PFLB_begin
@@ -5317,9 +5336,6 @@ GCArelabelUnlikely_new(
         int const x = x_indices[index] ; 
         int const y = y_indices[index] ; 
         int const z = z_indices[index] ;
-
-        if ((int)MRIgetVoxVal(mri_unchanged, x, y, z, 0) == 1)
-	  ROMP_PFLB_continue ;  // this nbhd not changed from last call
 
         MRIsetVoxVal(mri_unchanged, x, y, z, 0, 1) ;
       
