@@ -5200,11 +5200,35 @@ GCArelabelUnlikely_new(
   int const depth  = mri_inputs->depth;
   
   int const nindices = width * height * depth ;
-  
+
   MRI* mri_prior_labels = MRIclone             (mri_dst_labeled, NULL) ;
   MRI* mri_priors       = MRIcloneDifferentType(mri_dst_labeled, MRI_FLOAT) ;
+
+  size_t const bits_per_size_t   = 8 * sizeof(size_t);
+  size_t const size_ts_for_depth = ((depth + (bits_per_size_t-1)) / bits_per_size_t);
+  size_t const depth_rounded_up  = size_ts_for_depth * bits_per_size_t;
+
+  size_t const size_ts_for_unchanged_bitvector = (size_t)width*(size_t)height*size_ts_for_depth;
+
+#define XYZ_INDEX(X,Y,Z) \
+    ( (X)*height*depth_rounded_up + (Y)*depth_rounded_up + (Z) ) \
+    // end of macro
+
+#define BV_INDEX_AND_MASK(BV_INDEX,BV_MASK,XYZ_INDEX_IN) \
+    { size_t bv_xyz_index = (XYZ_INDEX_IN); \
+      (BV_INDEX) = bv_xyz_index/bits_per_size_t; \
+      (BV_MASK)  = ((size_t)1) << (bv_xyz_index % bits_per_size_t); \
+    } // end of macro
+ 
+  size_t * unchanged_bitvector_1 = calloc(unchanged_bitvector_capacity , sizeof(size_t));
+  size_t * unchanged_bitvector_2 = malloc(unchanged_bitvector_capacity * sizeof(size_t));
+  size_t * unchanged_bitvector   = unchanged_bitvector_1;
+  
+#define COMPARE_WITH_MRI_ERODE
+#ifdef  COMPARE_WITH_MRI_ERODE
   MRI* mri_unchanged    = MRIcloneDifferentType(mri_dst_labeled, MRI_UCHAR) ;
   MRI* mri_tmp          = MRIclone             (mri_unchanged,   NULL) ;
+#endif
 
   if (mri_dst_labeled == NULL)
   {
@@ -5268,9 +5292,12 @@ GCArelabelUnlikely_new(
     int buffer[BufferCapacity];
     int bufferSize = 0;
 
+//#define INSTRUMENT_GCArelabelUnlikely_new
+#ifdef INSTRUMENT_GCArelabelUnlikely_new
     int bufferSizeHistogram[BufferCapacity];
     {  int i; for (i = 0; i < BufferCapacity; i++) bufferSizeHistogram[i] = 0;
     }
+#endif
 
     int remainder = 0;
     while (bufferSize || (remainder < nindices))
@@ -5286,15 +5313,32 @@ GCArelabelUnlikely_new(
         int const y = y_indices[index] ; 
         int const z = z_indices[index] ;
     
+#ifdef INSTRUMENT_GCArelabelUnlikely_new
         if (remainder < 500) {
             fprintf(stderr, "%s:%d x:%d y:%d z:%d\n", __FILE__, __LINE__, x,y,z);
         }
+#endif
         
-        if ((int)MRIgetVoxVal(mri_unchanged, x, y, z, 0) == 1) {
-          remainder++;      // ignore this one because
-	  continue;         // this nbhd not changed from last call
-        }
+        {
+            size_t xyz = XYZ_INDEX(x,y,z);
+            size_t bv_index, bv_mask; BV_INDEX_AND_MASK(bv_index,bv_mask,xyz);
+            
+            size_t unchanged = unchanged_bitvector[bv_index] & bv_mask;
 
+#ifdef COMPARE_WITH_MRI_ERODE
+            size_t old_unchanged = (size_t)((int)MRIgetVoxVal(mri_unchanged, x, y, z, 0) == 1); 
+            if (unchanged != old_unchanged) {
+                fprintf(stderr, "%s:%d unchanged != old_unchanged", _FILE_, _LINE_);
+                exit(1);
+            }
+#endif
+            
+            if (unchanged) {
+                remainder++;      // ignore this one because
+	        continue;         // this nbhd not changed from last call
+            }
+        }
+        
         // See of the candidate is far from all the buffered candidates
         //
         int bi;
@@ -5313,6 +5357,18 @@ GCArelabelUnlikely_new(
         if (bi == bufferSize) { 
             buffer[ bufferSize++ ] = index; 
             remainder++; 
+
+            // To avoid sharing issues, this is outside the parallel loop
+            //
+            size_t xyz = XYZ_INDEX(x,y,z);
+            size_t bv_index, bv_mask; BV_INDEX_AND_MASK(bv_index,bv_mask,xyz);
+            
+            unchanged_bitvector[bv_index] |= bv_mask;
+            
+#ifdef  COMPARE_WITH_MRI_ERODE
+            MRIsetVoxVal(mri_unchanged, x, y, z, 0, 1) ;
+#endif
+      
             continue; 
         }
         
@@ -5321,7 +5377,9 @@ GCArelabelUnlikely_new(
       
       // Empty the buffered indexs in parallel
       //
+#ifdef INSTRUMENT_GCArelabelUnlikely_new
       bufferSizeHistogram[bufferSize]++;    // tuning aid, to see how effective the above is...
+#endif
 
       int bufferIndex;
 #ifdef HAVE_OPENMP
@@ -5337,8 +5395,6 @@ GCArelabelUnlikely_new(
         int const y = y_indices[index] ; 
         int const z = z_indices[index] ;
 
-        MRIsetVoxVal(mri_unchanged, x, y, z, 0, 1) ;
-      
         int const label = MRIgetVoxVal(mri_dst_labeled, x, y, z, 0) ;
       
         if (x == Ggca_x && y == Ggca_y && z == Ggca_z)
@@ -5428,7 +5484,19 @@ GCArelabelUnlikely_new(
 		   cma_label_to_name(max_label));
 	    }
 	  }
+          
+          size_t xyz = XYZ_INDEX(x,y,z);
+          size_t bv_index, bv_mask; BV_INDEX_AND_MASK(bv_index,bv_mask,xyz);
+          
+          bv_mask = ~bv_mask;
+
+          #pragma omp atomic
+          unchanged_bitvector[bv_index] &= bv_mask;
+          
+#ifdef  COMPARE_WITH_MRI_ERODE
 	  MRIsetVoxVal(mri_unchanged, x, y, z, 0, 0) ;
+#endif
+
           nchanged += nchanged_tmp ;
           DiagBreak() ;
         }
@@ -5443,11 +5511,14 @@ GCArelabelUnlikely_new(
       bufferSize = 0;
     }
     
+#ifdef INSTRUMENT_GCArelabelUnlikely_new
     if (1) {
       int i; 
       for (i = 0; i < BufferCapacity; i++)
         if (bufferSizeHistogram[i]) fprintf(stderr, "bufferSizeHistogram[%d]:%d\n", i, bufferSizeHistogram[i]);
     }
+#undef INSTRUMENT_GCArelabelUnlikely_new
+#endif
 
 #undef BufferCapacity
 
@@ -5456,13 +5527,31 @@ GCArelabelUnlikely_new(
            "unlikely voxel relabeling\n", nchanged, i) ;
     if (!nchanged)
       break ;
+
+    // if a cell is changed, then all its neighbors need to be marked as changed also
+    // where neighbors of (x,y,z) is defined as (x-whalf..x+whalf inclusive, y similarly, z similarly)
+    //
+    // this can be done in three steps.  
+    // First smear along the z dimension
+    //      Fetch the cell
+    //      Shift it left and right and mark
+    //      Repeat whalf times
+    // Then smear along the y dimension
+    // Then smear along the z dimension
+    // Our blocks are large enough that the 256x256x256 bits = 1/4 k x 1/4 k x 32 bytes = 2 MB >> 256 KB L2 cache
+    // and so this operation must be further tiled to get a good cache hit rate.
+
+    TBD;  shift this into bitvolume.{h,c}
     
+    
+#ifdef COMPARE_WITH_MRI_ERODE
     int w;
     for (w = 0 ; w < whalf ; w++)
     {
       MRIerode(mri_unchanged, mri_tmp) ;
       MRIcopy (mri_tmp, mri_unchanged) ;
     }
+#endif
     
   }
 
