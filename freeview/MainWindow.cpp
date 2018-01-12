@@ -586,6 +586,9 @@ void MainWindow::LoadSettings()
     m_settings["AutoReorientView"] = false;
   }
 
+  OnPreferences();
+  m_dlgPreferences->hide();
+
   for (int i = 0; i < 4; i++)
   {
     m_views[i]->SetBackgroundColor(m_settings["BackgroundColor"].value<QColor>());
@@ -6369,7 +6372,6 @@ void MainWindow::OnVolumeFilterErode()
   }
 }
 
-
 void MainWindow::OnVolumeFilterDilate()
 {
   LayerMRI* mri = (LayerMRI*)GetActiveLayer( "MRI" );
@@ -6380,7 +6382,6 @@ void MainWindow::OnVolumeFilterDilate()
     mri->ResetWindowLevel();
   }
 }
-
 
 void MainWindow::OnVolumeFilterOpen()
 {
