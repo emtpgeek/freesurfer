@@ -2585,18 +2585,18 @@ static int  MRIcomputeClassStatistics_mef(MRI *mri_T1_30, MRI *mri_T1_5,
 int MRISaverageMarkedValbaks(MRI_SURFACE *mris, int navgs) {
   int    i, vno, vnb, *pnb, vnum ;
   float  val, num ;
-  VERTEX *v, *vn ;
 
   for (i = 0 ; i < navgs ; i++) {
     for (vno = 0 ; vno < mris->nvertices ; vno++) {
-      v = &mris->vertices[vno] ;
+      VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+      VERTEX          const * const v  = &mris->vertices         [vno];
       if (v->ripflag || v->marked == 0)
         continue ;
       val = v->valbak ;
-      pnb = v->v ;
-      vnum = v->vnum ;
+      pnb = vt->v ;
+      vnum = vt->vnum ;
       for (num = 0.0f, vnb = 0 ; vnb < vnum ; vnb++) {
-        vn = &mris->vertices[*pnb++] ;    /* neighboring vertex pointer */
+        VERTEX const * const vn = &mris->vertices[*pnb++] ;    /* neighboring vertex pointer */
         if (vn->ripflag || vn->marked == 0 )
           continue ;
         num++ ;
@@ -2606,7 +2606,7 @@ int MRISaverageMarkedValbaks(MRI_SURFACE *mris, int navgs) {
       v->tdx = val / num ;
     }
     for (vno = 0 ; vno < mris->nvertices ; vno++) {
-      v = &mris->vertices[vno] ;
+      VERTEX * const v = &mris->vertices[vno] ;
       if (v->ripflag ||  v->marked == 0)
         continue ;
       v->valbak = v->tdx ;

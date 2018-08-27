@@ -238,24 +238,24 @@ int
 MRISinitWatershed(MRI_SURFACE *mris, MRI *mri) 
 {
   int     vno, local_min, n, label_no = 1 ;
-  VERTEX  *v, *vn ;
   float   val0, val ;
 
   for (vno = 0 ; vno < mris->nvertices ; vno++)
   {
-    v = &mris->vertices[vno] ;
+    VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+    VERTEX                * const v  = &mris->vertices         [vno];
     if (v->ripflag)
       continue ;
     if (vno == Gdiag_no)
       DiagBreak() ;
 
     val0 = MRIgetVoxVal(mri, vno, 0, 0, 0) ;
-    for (local_min = 1, n = 0 ; n < v->vtotal ; n++)
+    for (local_min = 1, n = 0 ; n < vt->vtotal ; n++)
     {
-      vn = &mris->vertices[v->v[n]] ;
+      VERTEX const * const vn = &mris->vertices[vt->v[n]] ;
       if (vn->ripflag)
 	continue ;
-      val = MRIgetVoxVal(mri, v->v[n], 0, 0, 0) ;
+      val = MRIgetVoxVal(mri, vt->v[n], 0, 0, 0) ;
       if (val <= val0)
       {
 	local_min = 0 ;
@@ -347,14 +347,14 @@ MRISfindMostSimilarBasin(MRI_SURFACE *mris, MRI *mri, int min_basin)
     VERTEX          const * const v  = &mris->vertices         [vno];
     if (v->ripflag || v->annotation != min_basin)
       continue ;
-    for (n = 0 ; n < v->vnum ; n++)
+    for (n = 0 ; n < vt->vnum ; n++)
     {
-      VERTEX const * const vn = &mris->vertices[v->v[n]] ;
+      VERTEX const * const vn = &mris->vertices[vt->v[n]] ;
       nbr_basin = vn->annotation ;
       if (vn->ripflag || nbr_basin == min_basin || nbr_basin == 0)
 	continue ;
       nbr_vertices[nbr_basin]++ ;
-      avg_grad[nbr_basin] += MRIgetVoxVal(mri, v->v[n], 0, 0, 0) ;
+      avg_grad[nbr_basin] += MRIgetVoxVal(mri, vt->v[n], 0, 0, 0) ;
       if (nbr_basin > max_basin)
 	max_basin = nbr_basin ;
     }
@@ -415,7 +415,7 @@ MRISfindMostSimilarBasins(MRI_SURFACE *mris, MRI *mri, int *pb2)
 	if (vn->ripflag || nbr_basin == basin1 || nbr_basin == 0)
 	  continue ;
 	nbr_vertices[nbr_basin]++ ;
-	avg_grad[nbr_basin] += MRIgetVoxVal(mri, v->v[n], 0, 0, 0) ;
+	avg_grad[nbr_basin] += MRIgetVoxVal(mri, vt->v[n], 0, 0, 0) ;
 	if (nbr_basin > max_basin)
 	  max_basin = nbr_basin ;
       }
@@ -563,7 +563,7 @@ MRISwatershed(MRI_SURFACE *mris, MRI *mri, int max_clusters, int merge_type)
 	{
 	  float val ;
 	  vn->annotation = v->annotation ;
-	  val = MRIgetVoxVal(mri, v->v[n], 0, 0, 0) ;
+	  val = MRIgetVoxVal(mri, vt->v[n], 0, 0, 0) ;
 	  if (val < min_nbr_val)
 	    min_nbr_val = val ;
 	}
