@@ -294,7 +294,6 @@ static VERTEX_VALUE *
 MRISgetSortedVertexValues(MRI_SURFACE *mris, MRI *mri, VERTEX_VALUE *vv, int *pnvert) 
 {
   int    label, vno, n ;
-  VERTEX *v, *vn ;
 
   if (vv == NULL)
   {
@@ -307,14 +306,15 @@ MRISgetSortedVertexValues(MRI_SURFACE *mris, MRI *mri, VERTEX_VALUE *vv, int *pn
   label = 0 ;
   for (vno = 0 ; vno < mris->nvertices ; vno++)
   {
-    v = &mris->vertices[vno] ;
+    VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+    VERTEX          const * const v  = &mris->vertices         [vno];
     if (v->ripflag)
       continue ;
     if (v->annotation > 0)
     {
-      for (n = 0 ; n < v->vnum ; n++)
+      for (n = 0 ; n < vt->vnum ; n++)
       {
-	vn = &mris->vertices[v->v[n]] ;
+	VERTEX const * const vn = &mris->vertices[vt->v[n]] ;
 	if (vn->annotation <= 0)  // only if at least one neighbor is unlabeled
 	{
 	  vv[label].vno = vno ;
@@ -335,7 +335,6 @@ static int
 MRISfindMostSimilarBasin(MRI_SURFACE *mris, MRI *mri, int min_basin) 
 {
   int    best_basin, vno, n, basin, *nbr_vertices, nbr_basin, max_basin ;
-  VERTEX *v, *vn ;
   double *avg_grad, min_grad ;
 
   nbr_vertices = (int *)calloc(mris->nvertices, sizeof(*nbr_vertices)) ;
@@ -344,12 +343,13 @@ MRISfindMostSimilarBasin(MRI_SURFACE *mris, MRI *mri, int min_basin)
   max_basin = 0 ;
   for (vno = 0 ;  vno < mris->nvertices ; vno++)
   {
-    v = &mris->vertices[vno] ;
+    VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+    VERTEX          const * const v  = &mris->vertices         [vno];
     if (v->ripflag || v->annotation != min_basin)
       continue ;
     for (n = 0 ; n < v->vnum ; n++)
     {
-      vn = &mris->vertices[v->v[n]] ;
+      VERTEX const * const vn = &mris->vertices[v->v[n]] ;
       nbr_basin = vn->annotation ;
       if (vn->ripflag || nbr_basin == min_basin || nbr_basin == 0)
 	continue ;
@@ -402,15 +402,15 @@ MRISfindMostSimilarBasins(MRI_SURFACE *mris, MRI *mri, int *pb2)
     for (vno = 0 ;  vno < mris->nvertices ; vno++)
     {
       ROMP_PFLB_begin
-      VERTEX *v, *vn ;
       int    n, nbr_basin ;
 
-      v = &mris->vertices[vno] ;
+      VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno] ;
+      VERTEX          const * const v  = &mris->vertices         [vno] ;
       if (v->ripflag || v->annotation != basin1)
 	continue ;
-      for (n = 0 ; n < v->vnum ; n++)
+      for (n = 0 ; n < vt->vnum ; n++)
       {
-	vn = &mris->vertices[v->v[n]] ;
+	VERTEX const * const vn = &mris->vertices[vt->v[n]] ;
 	nbr_basin = vn->annotation ;
 	if (vn->ripflag || nbr_basin == basin1 || nbr_basin == 0)
 	  continue ;
@@ -545,20 +545,20 @@ MRISwatershed(MRI_SURFACE *mris, MRI *mri, int max_clusters, int merge_type)
 //endif
     for (vno = 0 ; vno < nvert ; vno++)
     {
-      VERTEX       *v, *vn ;
       double       min_nbr_val ;
       int          n ;
 
-      v = &mris->vertices[vv[vno].vno] ;
+      VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vv[vno].vno] ;
+      VERTEX          const * const v  = &mris->vertices         [vv[vno].vno] ;
       if (v->ripflag)
 	continue ;
 
       if (vv[vno].val > max_val)
 	max_val = vv[vno].val ;   // new flooding height
       min_nbr_val = max_val+1 ;
-      for (n = 0 ; n < v->vnum ; n++)
+      for (n = 0 ; n < vt->vnum ; n++)
       {
-	vn = &mris->vertices[v->v[n]] ;
+	VERTEX * const vn = &mris->vertices[vt->v[n]] ;
 	if (vn->annotation <= 0)  
 	{
 	  float val ;
