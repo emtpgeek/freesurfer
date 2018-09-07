@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file  mrisurf.h
  * @brief MRI_SURFACE utilities.
@@ -24,9 +26,6 @@
  *
  */
 
-
-#ifndef MRISURF_H
-#define MRISURF_H
 
 #include "minc_volume_io.h"
 #include "const.h"
@@ -179,16 +178,18 @@ face_type, FACE ;
 
 
 #define LIST_OF_VERTEX_TOPOLOGY_ELTS \
-  ELTT(uchar,num) SEP           /* number neighboring faces */      	    	    	    \
+  /* put the pointers before the ints, before the shorts, before uchars, to reduce size  */ \
+  /* the whole fits in much less than one cache line, so further ordering is no use      */ \
   ELTP(int,f) SEP               /* array neighboring face numbers */        	    	    \
-  ELTP(uchar,n) SEP           	/* [0-3, num long] */       	    	    	    	    \
-  ELTT(uchar,vnum) SEP       	/* number neighboring vertices */    	    	    	    \
   ELTP(int,v) SEP               /* array neighboring vertex numbers, vnum long */    	    \
   ELTP(int,e) SEP               /* edge state for neighboring vertices */    	    	    \
-  ELTT(int,v2num) SEP         	/* number of 2-connected neighbors */       	    	    \
-  ELTT(int,v3num) SEP         	/* number of 3-connected neighbors */       	    	    \
-  ELTT(short,vtotal) SEP        /* total # of neighbors will be same as one of above*/      \
-  ELTT(uchar,nsize) 	        /* size of neighborhood (e.g. 1, 2, 3) */    	    	    \
+  ELTP(uchar,n) SEP           	/* [0-3, num long] TBD what it contains */    	    	    \
+  ELTT(const int,v2num) SEP     /* number of 2-connected neighbors */       	    	    \
+  ELTT(const int,v3num) SEP     /* number of 3-connected neighbors */       	    	    \
+  ELTT(const short,vtotal) SEP  /* total # of neighbors will be same as one of above*/      \
+  ELTT(const uchar,nsize) SEP	/* size of neighborhood stored in vtotal */    	    	    \
+  ELTT(const uchar,vnum)        /* number neighboring vertices, is v1num */    	    	    \
+  ELTT(uchar,num) SEP           /* number neighboring faces */      	    	    	    \
   // end of macro
 
 
@@ -198,10 +199,10 @@ face_type, FACE ;
 //  having the mris->vertices and the mris->vertices_topology be the same pointer
 // and this is what the code is doing until the separation is completed.
 //
-//#define SEPARATE_VERTEX_TOPOLOGY
+#define SEPARATE_VERTEX_TOPOLOGY
 #ifndef SEPARATE_VERTEX_TOPOLOGY
 
-#define LIST_OF_VERTEX_TOPOLOGY_ELTS_IN_VERTEX LIST_OF_VERTEX_TOPOLOGY_ELTS
+#define LIST_OF_VERTEX_TOPOLOGY_ELTS_IN_VERTEX LIST_OF_VERTEX_TOPOLOGY_ELTS SEP
 
 #else
 
@@ -472,11 +473,12 @@ typedef struct MRIS
 //
 #define LIST_OF_MRIS_ELTS_1     \
     \
-  ELTT(const int,nvertices) SEP      /* # of vertices on surface, SHOULD BE CONST AND change by calling MRISreallocVerticesAndFaces et al */    \
-  ELTT(const int,nfaces) SEP         /* # of faces on surface, change by calling MRISreallocVerticesAndFaces et al */    \
-  ELTT(int,nedges) SEP         /* # of edges on surface*/    \
+  ELTT(const int,nvertices) SEP                 /* # of vertices on surface, change by calling MRISreallocVerticesAndFaces et al */     \
+  ELTT(const int,nfaces) SEP                    /* # of faces on surface,    change by calling MRISreallocVerticesAndFaces et al */     \
+  ELTT(int,nedges) SEP                          /* # of edges on surface*/    \
   ELTT(int,nstrips) SEP    \
   ELTP(VERTEX_TOPOLOGY,vertices_topology) SEP    \
+  ELTT(const int,tempsAssigned) SEP             /* State of various temp fields that can be borrowed if not already in use   */    \
   ELTP(VERTEX,vertices) SEP    \
   ELTP(FACE,faces) SEP    \
   ELTP(MRI_EDGE,edges) SEP    \
@@ -599,6 +601,20 @@ LIST_OF_MRIS_ELTS ;
 
 }
 MRI_SURFACE, MRIS ;
+
+// There are various fields in the VERTEX and FACE and others that are used for many purposes at different
+// times, and clashing uses could cause a big problem.  Start working towards a reservation system.
+//
+typedef enum MRIS_TempAssigned {
+    MRIS_TempAssigned_Vertex_marked,
+    MRIS_TempAssigned_Vertex_marked2,
+    MRIS_TempAssigned__end
+} MRIS_TempAssigned;
+
+int  MRIS_acquireTemp      (MRIS* mris, MRIS_TempAssigned temp);                               // save the result to use later to ...
+void MRIS_checkAcquiredTemp(MRIS* mris, MRIS_TempAssigned temp, int MRIS_acquireTemp_result);  // ... check that you own it
+void MRIS_releaseTemp      (MRIS* mris, MRIS_TempAssigned temp, int MRIS_acquireTemp_result);  // ... be allowed to release it
+
 
 FaceNormCacheEntry const * getFaceNorm(MRIS const * const mris, int fno);
 void setFaceNorm(MRIS const * const mris, int fno, float nx, float ny, float nz);
@@ -2533,7 +2549,10 @@ MRISvertexNormalToVoxel(MRI_SURFACE *mris,
 			MRI *mri,
 			double *pnx, double *pny, double *pnz) ;
 MRI *MRIcomputeLaminarVolumeFractions(MRI_SURFACE *mris, double res, MRI *mri_src, MRI *mri_vfracs) ;
-int MRISfindNeighborsAtVertex(MRI_SURFACE *mris, int vno, int nlinks, int *vlist);
+
+#define MAX_NEIGHBORS 10000
+int MRISfindNeighborsAtVertex(MRI_SURFACE *mris, int acquiredMarked, int vno, int nlinks, int *vlist);
+
 int mrisFindNeighbors(MRI_SURFACE *mris);
 MRIS *MRIStessellate(MRI *mri,  int value, int all_flag);
 void TESSaddFace(MRI *mri, int imnr, int i, int j, int f, int prev_flag, int *pface_index, 
@@ -2575,4 +2594,27 @@ int CompareFaceVertices(const void *vf1, const void *vf2);
 // for making the surface deterministic after decimation
 MRIS *MRISsortVertices(MRIS *mris0);
 
-#endif // MRISURF_H
+
+// mrisurf_topology needed by more
+//
+static int  mrisVertexNeighborIndex (MRIS const * mris, int vno1, int vno2);
+static bool mrisVerticesAreNeighbors(MRIS const * mris, int vno1, int vno2);
+void mrisAddEdge   (MRIS* mris, int vno1, int vno2);
+
+
+// Static function implementations
+//
+static int mrisVertexNeighborIndex(MRIS const *mris, int vno1, int vno2) {
+  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno1];
+  int n;
+  for (n = 0; n < vt->vnum; n++) {
+    if (vt->v[n] == vno2) return n;
+  }
+  return -1;
+}
+
+
+static bool mrisVerticesAreNeighbors(MRIS const * const mris, int const vno1, int const vno2)
+{
+  return 0 <= mrisVertexNeighborIndex(mris, vno1, vno2);
+}

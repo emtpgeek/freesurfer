@@ -4775,7 +4775,13 @@ compute_white_target_locations(MRI_SURFACE *mris,
 
   num_in = num_out = 0 ;
   MRISsaveVertexPositions(mris, TARGET_VERTICES) ;
-  MRISclearMark2s(mris) ;
+  
+  int const acquiredMarked  = MRIS_acquireTemp(mris, MRIS_TempAssigned_Vertex_marked);
+  int const acquiredMarked2 = MRIS_acquireTemp(mris, MRIS_TempAssigned_Vertex_marked2);
+
+  MRISclearMarks (mris) ;       // MRISfindNeighborsAtVertex uses marked.  NOTE: This was missing!
+  MRISclearMark2s(mris) ;       // weird because MRISfindNeighborsAtVertex used marked, not marked2
+  
   for (vno = 0 ; vno < mris->nvertices ; vno++)
   {
     double dist_from_current_white, pin, pout, best_dist, best_dist_prelim ;
@@ -4798,7 +4804,7 @@ compute_white_target_locations(MRI_SURFACE *mris,
       continue ;
 
     d = 2*sample_dist ;
-    vnum = MRISfindNeighborsAtVertex(mris, vno, outer_nbhd_size, vlist);
+    vnum = MRISfindNeighborsAtVertex(mris, acquiredMarked, vno, outer_nbhd_size, vlist);
     for (n = 0 ; n < vnum ; n++)
     {
       vn = &mris->vertices[vlist[n]] ;
@@ -5004,6 +5010,10 @@ compute_white_target_locations(MRI_SURFACE *mris,
 
   MRIScopyMarked2ToMarked(mris) ;
   MRISwriteMarked(mris, "found.mgz") ;
+  
+  MRIS_releaseTemp(mris, MRIS_TempAssigned_Vertex_marked,  acquiredMarked);
+  MRIS_releaseTemp(mris, MRIS_TempAssigned_Vertex_marked2, acquiredMarked2);
+
   HISTOfree(&h_inside) ; HISTOfree(&h_outside) ; HISTOfree(&h_grad) ;
 
   printf("%d surface locations found to contain inconsistent values (%d in, %d out)\n",

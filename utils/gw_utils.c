@@ -45,7 +45,7 @@
 MRI_SURFACE *GWU_make_surface_from_lists(GWUTILS_VERTEX *vertices, int vertexcount, GWUTILS_FACE *faces, int facecount)
 {
   MRI_SURFACE *mris;
-  int vno, fno, n, vn, n1, n2;
+  int vno, fno, n, n1;
 
   mris = MRISoverAlloc(0, 0, vertexcount, facecount);
 
@@ -64,14 +64,14 @@ MRI_SURFACE *GWU_make_surface_from_lists(GWUTILS_VERTEX *vertices, int vertexcou
   // Read face data into mris, and count
   // # of faces each vertex is part of
   //-----------------------------------------
+  int* vnums = (int*)calloc(mris->nvertices, sizeof(int));
+  
   for (fno = 0; fno < facecount; fno++) {
     FACE* const f = &mris->faces[fno];
 
     for (n = 0; n < VERTICES_PER_FACE; n++) {
       f->v[n] = faces[fno].vno[n];  // already zero-based
-      VERTEX_TOPOLOGY* const vt = &mris->vertices_topology[f->v[n]];
-      vt->num++;
-      vt->vnum += 2;  // Not sure what the extra +2 is for...
+      vnums[f->v[n]] += 3; // Not sure what the extra +2 is for...
     }
   }
 
@@ -81,11 +81,12 @@ MRI_SURFACE *GWU_make_surface_from_lists(GWUTILS_VERTEX *vertices, int vertexcou
   //-----------------------------------------
   for (vno = 0; vno < vertexcount; vno++) {
     VERTEX_TOPOLOGY* const vt = &mris->vertices_topology[vno];
-    vt->v = (int *)calloc(vt->vnum / 2, sizeof(int));
+    vt->v = (int *)calloc(vnums[vno] / 2, sizeof(int));
     if (!vt->v) ErrorExit(ERROR_NOMEMORY, "%s: could not allocate %dth vertex list.", __func__, vno);
-    vt->vnum = 0;
   }
 
+  freeAndNULL(vnums);
+  
   //-----------------------------------------
   // For each face,
   //   for each vertex
@@ -95,25 +96,19 @@ MRI_SURFACE *GWU_make_surface_from_lists(GWUTILS_VERTEX *vertices, int vertexcou
     FACE* const f = &mris->faces[fno];
 
     for (n = 0; n < VERTICES_PER_FACE; n++) {
-      VERTEX_TOPOLOGY* const vt = &mris->vertices_topology[f->v[n]];
+      int const vno1 = f->v[n];
 
       // [sic] now add an edge to other 2 vertices if not already in list
       // [GW] Ie: tell each vertex about its neighbors from this face
+      //
       for (n1 = 0; n1 < VERTICES_PER_FACE; n1++) {
         if (n1 == n)  // don't connect vertex to itself
           continue;
-        vn = faces[fno].vno[n1];  // already zero-based
+        
+        int vno2 = faces[fno].vno[n1];  // already zero-based
 
-        // now check to make sure it's not a duplicate
-        for (n2 = 0; n2 < vt->vnum; n2++) {
-          if (vt->v[n2] == vn) {
-            vn = -1;  // mark it as a duplicate
-            break;
-          }
-        }
-
-        if (vn >= 0)  // add only non-duplicates
-          vt->v[vt->vnum++] = vn;
+        if (!mrisVerticesAreNeighbors(mris, vno1, vno2)) 
+          mrisAddEdge(mris, vno1, vno2);
       }
     }
   }
@@ -145,8 +140,6 @@ MRI_SURFACE *GWU_make_surface_from_lists(GWUTILS_VERTEX *vertices, int vertexcou
                 __func__,
                 vt->vnum,
                 vno);
-    vt->nsize = 1;
-    vt->vtotal = vt->vnum;
   }
 
   //---------------------------------------------

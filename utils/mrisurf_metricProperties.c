@@ -11386,7 +11386,7 @@ static int mrisDumpDefectiveEdge(MRI_SURFACE *mris, int vno1, int vno2)
       continue ;
     }
     fno = findFace(mris, vno1, vno2, v1->v[n]) ;
-    if ((fno >= 0) && vertexNeighbor(mris, vno2, v1->v[n]))
+    if ((fno >= 0) && mrisVerticesAreNeighbors(mris, vno2, v1->v[n]))
     {
       f = &mris->faces[fno] ;
       if (first)
@@ -11507,7 +11507,7 @@ int mrisCheckSurface(MRI_SURFACE *mris)
         if (vt->v[m] == vno2) {
           continue;
         }
-        if (vertexNeighbor(mris, vno2, vt->v[m]) && isFace(mris, vno, vno2, vt->v[m])) {
+        if (mrisVerticesAreNeighbors(mris, vno2, vt->v[m]) && isFace(mris, vno, vno2, vt->v[m])) {
           flist[nfaces] = findFace(mris, vno, vno2, vt->v[m]);
           nfaces++;
         }

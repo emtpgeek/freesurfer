@@ -76,7 +76,7 @@ static void insertIntoDefectFacesCache(DefectFacesCache* p, int fno) {
 
 
 
-static int mrisDumpDefectiveEdge(MRI_SURFACE *mris, int vno1, int vno2);
+static int mrisDumpDefectiveEdge(MRIS *mris, int vno1, int vno2);
 static SEGMENTATION *SEGMENTATIONalloc(int max_segments, int max_edges);
 static void SEGMENTATIONfree(SEGMENTATION **segmentation);
 static int findSegment(SEGMENTATION *segmentation);
@@ -107,25 +107,25 @@ static void computeDefectStatistics(MRI *mri,
 static void TPinit(TP *tp);
 static void TPfree(TP *tp);
 static void TPprint(TP *tp);
-static DEFECT_VERTEX_STATE *mrisRecordVertexState(MRI_SURFACE *mris, DEFECT *defect, int *vertex_trans);
-static int mrisRestoreFaceVertexState(MRI_SURFACE *mris, DEFECT_VERTEX_STATE *dvs);
-static int mrisRestoreVertexState(MRI_SURFACE *mris, DEFECT_VERTEX_STATE *dvs);
+static DEFECT_VERTEX_STATE *mrisRecordVertexState(MRIS *mris, DEFECT *defect, int *vertex_trans);
+static int mrisRestoreFaceVertexState(MRIS *mris, DEFECT_VERTEX_STATE *dvs);
+static int mrisRestoreVertexState(MRIS *mris, DEFECT_VERTEX_STATE *dvs);
 static int mrisFreeDefectVertexState(DEFECT_VERTEX_STATE *dvs);
-static int mrisAddAllDefectFaces(MRI_SURFACE *mris, DEFECT_LIST *dl, int *vertex_trans);
-static int mrisFindDefectConvexHull(MRI_SURFACE *mris, DEFECT *defect);
-static int mrisOrientRetessellatedSurface(MRI_SURFACE *mris, DEFECT_LIST *dl, int *vtrans);
-static int mrisMarkDefect(MRI_SURFACE *mris, DEFECT *defect, int mark);
-static int mrisMarkDefectBorder(MRI_SURFACE *mris, DEFECT *defect, int mark);
-static int mrisMarkDefectConvexHull(MRI_SURFACE *mris, DEFECT *defect, int mark);
+static int mrisAddAllDefectFaces(MRIS *mris, DEFECT_LIST *dl, int *vertex_trans);
+static int mrisFindDefectConvexHull(MRIS *mris, DEFECT *defect);
+static int mrisOrientRetessellatedSurface(MRIS *mris, DEFECT_LIST *dl, int *vtrans);
+static int mrisMarkDefect(MRIS *mris, DEFECT *defect, int mark);
+static int mrisMarkDefectBorder(MRIS *mris, DEFECT *defect, int mark);
+static int mrisMarkDefectConvexHull(MRIS *mris, DEFECT *defect, int mark);
 
-FACE_DEFECT_LIST *MRISmarkAmbiguousVertices(MRI_SURFACE *mris, int mark);
-DEFECT_LIST *MRISsegmentDefects(MRI_SURFACE *mris, int mark_ambiguous, int mark_segmented);
-static int mrisSegmentDefect(MRI_SURFACE *mris, int vno, DEFECT *defect, int mark_ambiguous, int mark_segmented);
+FACE_DEFECT_LIST *MRISmarkAmbiguousVertices(MRIS *mris, int mark);
+DEFECT_LIST *MRISsegmentDefects(MRIS *mris, int mark_ambiguous, int mark_segmented);
+static int mrisSegmentDefect(MRIS *mris, int vno, DEFECT *defect, int mark_ambiguous, int mark_segmented);
 //#if FIND_ENCLOSING_LOOP
-static int mrisSimplyConnectedDefect(MRI_SURFACE *mris, DEFECT *defect, int mark_ambiguous, int mark_segmented);
+static int mrisSimplyConnectedDefect(MRIS *mris, DEFECT *defect, int mark_ambiguous, int mark_segmented);
 static int mrisSegmentConnectedComponents(MRIS *mris);
 //#endif
-static int mrisMarkRetainedPartOfDefect(MRI_SURFACE *mris,
+static int mrisMarkRetainedPartOfDefect(MRIS *mris,
                                         DEFECT *defect,
                                         FACE_DEFECT_LIST *fdl,
                                         float area_threshold,
@@ -133,8 +133,8 @@ static int mrisMarkRetainedPartOfDefect(MRI_SURFACE *mris,
                                         int mark_discard,
                                         MHT *mht,
                                         int mode);
-static int mrisTessellateDefect(MRI_SURFACE *mris,
-                                MRI_SURFACE *mris_corrected,
+static int mrisTessellateDefect(MRIS *mris,
+                                MRIS *mris_corrected,
                                 DEFECT *defect,
                                 int *vertex_trans,
                                 MRI *mri,
@@ -148,9 +148,9 @@ static int mrisTessellateDefect(MRI_SURFACE *mris,
                                 MRI *mri_gray_white,
                                 HISTOGRAM *h_dot,
                                 TOPOLOGY_PARMS *parms);
-static int mrisDefectRemoveDegenerateVertices(MRI_SURFACE *mris, float min_sphere_dist, DEFECT *defect);
-static int mrisDefectRemoveProximalVertices(MRI_SURFACE *mris, float min_orig_dist, DEFECT *defect);
-static int mrisDefectRemoveNegativeVertices(MRI_SURFACE *mris, DEFECT *defect);
+static int mrisDefectRemoveDegenerateVertices(MRIS *mris, float min_sphere_dist, DEFECT *defect);
+static int mrisDefectRemoveProximalVertices(MRIS *mris, float min_orig_dist, DEFECT *defect);
+static int mrisDefectRemoveNegativeVertices(MRIS *mris, DEFECT *defect);
 
 static MRI *mriDefectVolume(MRIS *mris, EDGE_TABLE *etable, TOPOLOGY_PARMS *parms);
 static void defectVolumeLikelihood(MRI *mri,
@@ -163,7 +163,6 @@ static void defectVolumeLikelihood(MRI *mri,
                                    float gray_mean,
                                    int type,
                                    int contrast);
-static int vertexNeighbor(MRI_SURFACE *mris, int vno1, int vno2);
 static int isVertexInsideFace(MRIS *mris, int vno, int fno);
 static int isDiscarded(MRIS *mris, int vno1, int vno2);
 static void removeVertex(MRIS *mris, int vno);
@@ -171,18 +170,18 @@ static int updateVertexTriangle(MRIS *mris, int vno, int fno);
 // static void updateTriangle(MRIS *mris,int fno);
 static void possiblyAddNewFaces(MRIS *mris, int vno1, int vno2);
 static int possiblyAddEdgesAndFaces(MRIS *mris, int vno1, int vno2, int mode);
-static int retessellateDefect(MRI_SURFACE *mris, MRI_SURFACE *mris_corrected, DVS *dvs, DP *dp);
-static int mrisRetessellateDefect(MRI_SURFACE *mris,
-                                  MRI_SURFACE *mris_corrected,
+static int retessellateDefect(MRIS *mris, MRIS *mris_corrected, DVS *dvs, DP *dp);
+static int mrisRetessellateDefect(MRIS *mris,
+                                  MRIS *mris_corrected,
                                   DEFECT *defect,
                                   int *vertex_trans,
                                   EDGE *et,
                                   int nedges,
                                   int *ordering,
                                   EDGE_TABLE *etable);
-static void defectMatch(MRI *mri, MRI_SURFACE *mris, DP *dp, int smooth, int match);
-static void defectSmooth(MRI_SURFACE *mris, DP *dp, int niter, double alpha, int type);
-static void defectMaximizeLikelihood(MRI *mri, MRI_SURFACE *mris, DP *dp, int niter, double alpha);
+static void defectMatch(MRI *mri, MRIS *mris, DP *dp, int smooth, int match);
+static void defectSmooth(MRIS *mris, DP *dp, int niter, double alpha, int type);
+static void defectMaximizeLikelihood(MRI *mri, MRIS *mris, DP *dp, int niter, double alpha);
 static void detectDefectFaces(MRIS *mris, DEFECT_PATCH *dp);
 static int computePatchEulerNumber(MRIS *mris, DP *dp);
 static void orientDefectFaces(MRIS *mris, DP *dp);
@@ -191,14 +190,14 @@ static void orientDefectFaces(MRIS *mris, DP *dp);
 static void computeDefectFaceNormals(MRIS *mris, DP *dp, DefectFacesCache* dfc);
 static void computeDefectVertexNormals(MRIS *mris, DP *dp);
 static void printDefectStatistics(DP *dp);
-static void computeDisplacement(MRI_SURFACE *mris, DP *dp);
+static void computeDisplacement(MRIS *mris, DP *dp);
 static void updateVertexStatistics(
     MRIS *mris, MRIS *mris_corrected, DVS *dvs, RP *rp, DP *dp, int *vertex_trans, float fitness);
 static int deleteWorstVertices(MRIS *mris, RP *rp, DEFECT *defect, int *vertex_trans, float fraction, int count);
 static double mrisDefectPatchFitness(
     ComputeDefectContext* computeDefectContext,
-    MRI_SURFACE *mris,
-    MRI_SURFACE *mris_corrected,
+    MRIS *mris,
+    MRIS *mris_corrected,
     MRI *mri,
     DEFECT_PATCH *dp,
     int *vertex_trans,
@@ -220,8 +219,8 @@ static int mrisMutateDefectPatch(DEFECT_PATCH *dp, EDGE_TABLE *etable, double pm
 static int mrisCrossoverDefectPatches(DEFECT_PATCH *dp1, DEFECT_PATCH *dp2, DEFECT_PATCH *dp_dst, EDGE_TABLE *etable);
 static int defectPatchRank(DEFECT_PATCH *dps, int index, int npatches);
 static int mrisCopyDefectPatch(DEFECT_PATCH *dp_src, DEFECT_PATCH *dp_dst);
-static int mrisComputeOptimalRetessellation(MRI_SURFACE *mris,
-                                            MRI_SURFACE *mris_corrected,
+static int mrisComputeOptimalRetessellation(MRIS *mris,
+                                            MRIS *mris_corrected,
                                             MRI *mri,
                                             DEFECT *defect,
                                             int *vertex_trans,
@@ -239,8 +238,8 @@ static int mrisComputeOptimalRetessellation(MRI_SURFACE *mris,
                                             MRI *mri_gray_white,
                                             HISTOGRAM *h_dot,
                                             TOPOLOGY_PARMS *parms);
-static int mrisComputeRandomRetessellation(MRI_SURFACE *mris,
-                                           MRI_SURFACE *mris_corrected,
+static int mrisComputeRandomRetessellation(MRIS *mris,
+                                           MRIS *mris_corrected,
                                            MRI *mri,
                                            DEFECT *defect,
                                            int *vertex_trans,
@@ -260,7 +259,7 @@ static int mrisComputeRandomRetessellation(MRI_SURFACE *mris,
                                            TOPOLOGY_PARMS *parms);
 static OPTIMAL_DEFECT_MAPPING *mrisFindOptimalDefectMapping(MRIS *mris, DEFECT *defect);
 
-static int mrisComputeGrayWhiteBorderDistributions(MRI_SURFACE *mris,
+static int mrisComputeGrayWhiteBorderDistributions(MRIS *mris,
                                                    MRI *mri,
                                                    DEFECT *defect,
                                                    HISTOGRAM *h_white,
@@ -916,7 +915,7 @@ double MRIScomputeFitness(MRIS *mris, TOPOFIX_PARMS *parms, int verbose)
 }
 
 
-static int mrisCheckDefectFaces(MRI_SURFACE *mris, DEFECT_PATCH *dp)
+static int mrisCheckDefectFaces(MRIS *mris, DEFECT_PATCH *dp)
 {
   int fno, n1, n2, vno1, vno2, fshared;
 
@@ -934,7 +933,7 @@ static int mrisCheckDefectFaces(MRI_SURFACE *mris, DEFECT_PATCH *dp)
 }
 
 float mrisDefectFaceMRILogLikelihood(
-    MRI_SURFACE *mris, MRI *mri, TP *tp, HISTOGRAM *h_white, HISTOGRAM *h_gray, HISTOGRAM *h_grad, MRI *mri_gray_white)
+    MRIS *mris, MRI *mri, TP *tp, HISTOGRAM *h_white, HISTOGRAM *h_gray, HISTOGRAM *h_grad, MRI *mri_gray_white)
 {
   int n, vno0, vno1, vno2;
   double x, y, z, nx, ny, nz, xv, yv, zv, white_val, gray_val, val;
@@ -1240,7 +1239,7 @@ float mrisDefectFaceMRILogLikelihood(
 }
 
 float mrisDefectVertexMRILogLikelihood(
-    MRI_SURFACE *mris, MRI *mri, TP *tp, HISTOGRAM *h_white, HISTOGRAM *h_gray, HISTOGRAM *h_grad, MRI *mri_gray_white)
+    MRIS *mris, MRI *mri, TP *tp, HISTOGRAM *h_white, HISTOGRAM *h_gray, HISTOGRAM *h_grad, MRI *mri_gray_white)
 {
   int n;
   double x, y, z, nx, ny, nz, xv, yv, zv, white_val, gray_val, val;
@@ -1306,7 +1305,7 @@ float mrisDefectVertexMRILogLikelihood(
 }
 
 static double mrisComputeDefectMRILogLikelihood(
-    MRI_SURFACE *mris, MRI *mri, TP *tp, HISTOGRAM *h_white, HISTOGRAM *h_gray, HISTOGRAM *h_grad, MRI *mri_gray_white)
+    MRIS *mris, MRI *mri, TP *tp, HISTOGRAM *h_white, HISTOGRAM *h_gray, HISTOGRAM *h_grad, MRI *mri_gray_white)
 {
   double mll;
 
@@ -1318,7 +1317,7 @@ static double mrisComputeDefectMRILogLikelihood(
 
 double mrisComputeDefectLogLikelihood(
     ComputeDefectContext* computeDefectContext, 
-    MRI_SURFACE *mris,
+    MRIS *mris,
     MRI *mri,
     DEFECT_PATCH *dp,
     HISTOGRAM *h_k1,
@@ -1386,7 +1385,7 @@ double mrisComputeDefectLogLikelihood(
 }
 
 
-double mrisComputeDefectNormalDotLogLikelihood(MRI_SURFACE *mris, TP *tp, HISTOGRAM *h_dot)
+double mrisComputeDefectNormalDotLogLikelihood(MRIS *mris, TP *tp, HISTOGRAM *h_dot)
 {
   double v_ll, total_ll = 0.0, nx, ny, nz, x, y, z, dx, dy, dz, dot;
   int vno, n, i, bin;
@@ -1445,7 +1444,7 @@ double mrisComputeDefectNormalDotLogLikelihood(MRI_SURFACE *mris, TP *tp, HISTOG
 
 
 double mrisComputeDefectCurvatureLogLikelihood(
-    MRI_SURFACE *mris, TP *tp, HISTOGRAM *h_k1, HISTOGRAM *h_k2, MRI *mri_k1_k2)
+    MRIS *mris, TP *tp, HISTOGRAM *h_k1, HISTOGRAM *h_k2, MRI *mri_k1_k2)
 {
   double v_ll, total_ll = 0.0, new_total;
   int i, vno, bin, bink1, bink2;
@@ -1517,13 +1516,13 @@ static void get_origxyz(VERTEX const * vertex, float* x, float* y, float* z) {
 
 static double mrisComputeDefectMRILogUnlikelihood_wkr(
     ComputeDefectContext* computeDefectContext,
-    MRI_SURFACE  * const mris_nonconst, 			        // various subcomponents of these structures get updated
+    MRIS  * const mris_nonconst, 			        // various subcomponents of these structures get updated
     DEFECT_PATCH * const dp_nonconst, 
     HISTOGRAM    * const h_border_nonconst);
     
 double mrisComputeDefectMRILogUnlikelihood(
     ComputeDefectContext* computeDefectContext,
-    MRI_SURFACE  * const mris_nonconst, 			        // various subcomponents of these structures get updated
+    MRIS  * const mris_nonconst, 			        // various subcomponents of these structures get updated
     DEFECT_PATCH * const dp_nonconst, 
     HISTOGRAM    * const h_border_nonconst) {
 
@@ -1591,7 +1590,7 @@ static void freePerThreadVertexPseudoNormalCache(PerThreadVertexPseudoNormalCach
 
 static void cachedOrComputeVertexPseudoNormal(
   PerThreadVertexPseudoNormalCache** pp,
-  MRI_SURFACE const  * const mris,
+  MRIS const  * const mris,
   int                  const vno,
   float*               const norm,	    	    // output!
   DEFECT_PATCH const * const dp) {
@@ -1724,7 +1723,7 @@ static void useComputeDefectContextRealmTree(
 
 static double mrisComputeDefectMRILogUnlikelihood_wkr(
     ComputeDefectContext* computeDefectContext,
-    MRI_SURFACE  * const mris_nonconst, 			            	// various subcomponents of these structures get updated
+    MRIS  * const mris_nonconst, 			            	// various subcomponents of these structures get updated
     DEFECT_PATCH * const dp_nonconst, 
     HISTOGRAM    * const h_border_nonconst)
 {
@@ -1794,7 +1793,7 @@ static double mrisComputeDefectMRILogUnlikelihood_wkr(
   }
 #endif
 
-  MRI_SURFACE  const * const mris     = mris_nonconst;			// find where the modifiers are
+  MRIS  const * const mris     = mris_nonconst;			// find where the modifiers are
   DEFECT_PATCH const * const dp       = dp_nonconst;
   //HISTOGRAM  const * const h_border = h_border_nonconst;		// unused
 
@@ -3082,7 +3081,7 @@ static double mrisComputeDefectMRILogUnlikelihood_wkr(
 
   Description
   ------------------------------------------------------*/
-int MRISripDefectiveFaces(MRI_SURFACE *mris)
+int MRISripDefectiveFaces(MRIS *mris)
 {
   FACE *f;
   int fno, flist[MAX_INT_FACES], retained_i, i, j, nfaces, nripped, n;
@@ -3278,12 +3277,12 @@ typedef struct IntersectDefectEdgesContext {
 #endif
 } IntersectDefectEdgesContext;
 
-static int intersectDefectEdges          (MRI_SURFACE *mris, DEFECT *defect, EDGE *e, IntersectDefectEdgesContext* ctx, int *vertex_trans, int *v1, int *v2);
+static int intersectDefectEdges          (MRIS *mris, DEFECT *defect, EDGE *e, IntersectDefectEdgesContext* ctx, int *vertex_trans, int *v1, int *v2);
 
-static int intersectDefectConvexHullEdges(MRI_SURFACE *mris, DEFECT *defect, EDGE *e, IntersectDefectEdgesContext* ctx, int *vertex_trans, int *v1, int *v2);
+static int intersectDefectConvexHullEdges(MRIS *mris, DEFECT *defect, EDGE *e, IntersectDefectEdgesContext* ctx, int *vertex_trans, int *v1, int *v2);
 
 
-static void initIntersectDefectEdgesContext(IntersectDefectEdgesContext* ctx, MRI_SURFACE* mris) {
+static void initIntersectDefectEdgesContext(IntersectDefectEdgesContext* ctx, MRIS* mris) {
     ctx->entriesCapacity  = 0;
     ctx->entriesSize      = 0;
     ctx->entries          = NULL;
@@ -3313,7 +3312,7 @@ static void obsoleteIntersectDefectEdgesContext(IntersectDefectEdgesContext* ctx
 }
 
 
-DEFECT_LIST *mrisSegmentDefects(MRI_SURFACE *mris, int mark_ambiguous, int mark_segmented)
+DEFECT_LIST *mrisSegmentDefects(MRIS *mris, int mark_ambiguous, int mark_segmented)
 {
   DEFECT_LIST *dl;
   int vno, nadded;
@@ -3348,7 +3347,7 @@ DEFECT_LIST *mrisSegmentDefects(MRI_SURFACE *mris, int mark_ambiguous, int mark_
   return (dl);
 }
 
-static int mrisMarkAllDefects(MRI_SURFACE *mris, DEFECT_LIST *dl, int flag);
+static int mrisMarkAllDefects(MRIS *mris, DEFECT_LIST *dl, int flag);
 
 static DEFECT_LIST *mrisRemoveOverlappingDefects(MRIS *mris, DEFECT_LIST *dl)
 {
@@ -3433,8 +3432,8 @@ static DEFECT_LIST *mrisRemoveOverlappingDefects(MRIS *mris, DEFECT_LIST *dl)
   return dl;
 }
 
-static int mrisRipAllDefects(MRI_SURFACE *mris, DEFECT_LIST *dl, int ripflag);
-static int mrisRipDefect(MRI_SURFACE *mris, DEFECT *defect, int ripflag);
+static int mrisRipAllDefects(MRIS *mris, DEFECT_LIST *dl, int ripflag);
+static int mrisRipDefect(MRIS *mris, DEFECT *defect, int ripflag);
 
 void MRISidentifyDefects(MRIS *mris, TOPOFIX_PARMS *parms)
 {
@@ -3469,7 +3468,7 @@ void MRISidentifyDefects(MRIS *mris, TOPOFIX_PARMS *parms)
   parms->defect_list = (void *)dl;
 }
 
-static int mrisComputeJointGrayWhiteBorderDistributions(MRI_SURFACE *mris, MRI *mri, MRI *mri_gray_white, MRI *mri_wm)
+static int mrisComputeJointGrayWhiteBorderDistributions(MRIS *mris, MRI *mri, MRI *mri_gray_white, MRI *mri_wm)
 {
   int vno, x, y;
   VERTEX *v;
@@ -3550,7 +3549,7 @@ static int mrisComputeJointGrayWhiteBorderDistributions(MRI_SURFACE *mris, MRI *
   return (NO_ERROR);
 }
 
-static int mrisFindGrayWhiteBorderMean(MRI_SURFACE *mris, MRI *mri)
+static int mrisFindGrayWhiteBorderMean(MRIS *mris, MRI *mri)
 {
   double x, y, z, xv, yv, zv, gray_val, white_val, nx, ny, nz;
   int vno;
@@ -4044,7 +4043,7 @@ void MRIScomputeInitialFitness(MRIS *mris, TOPOFIX_PARMS *parms)
   //  MRIwrite(((DP*)parms->dp)->mri_defect_wm,"./mri_defect_wm.mgz");
 }
 
-static void MRISdefectMaximizeLikelihood(MRI *mri, MRI_SURFACE *mris, DP *dp, int niter, double alpha, int mode);
+static void MRISdefectMaximizeLikelihood(MRI *mri, MRIS *mris, DP *dp, int niter, double alpha, int mode);
 
 void MRISdefectMatch(MRIS *mris, TOPOFIX_PARMS *parms)
 {
@@ -6000,7 +5999,7 @@ static void computeDefectStatistics(MRI *mri,
 }
 
 /* call the right smoothing and matching functions */
-static void defectMatch(MRI *mri, MRI_SURFACE *mris, DP *dp, int smooth, int match)
+static void defectMatch(MRI *mri, MRIS *mris, DP *dp, int smooth, int match)
 {
   if (smooth) {
     defectSmooth(mris, dp, 25, 0.1, smooth);
@@ -6011,7 +6010,7 @@ static void defectMatch(MRI *mri, MRI_SURFACE *mris, DP *dp, int smooth, int mat
 }
 
 /* perform a light smoothing of the defect vertices */
-static void defectSmooth(MRI_SURFACE *mris, DP *dp, int niter, double alpha, int type)
+static void defectSmooth(MRIS *mris, DP *dp, int niter, double alpha, int type)
 {
   int i, n;
 
@@ -6355,7 +6354,7 @@ static void defectSmooth(MRI_SURFACE *mris, DP *dp, int niter, double alpha, int
   computeDefectVertexNormals(mris, dp);
 }
 
-static void MRISdefectMaximizeLikelihood(MRI *mri, MRI_SURFACE *mris, DP *dp, int niter, double alpha, int mode)
+static void MRISdefectMaximizeLikelihood(MRI *mri, MRIS *mris, DP *dp, int niter, double alpha, int mode)
 {
   float wm, gm, mean;
   int i, n, nvertices, *vertices;
@@ -6474,10 +6473,10 @@ static void MRISdefectMaximizeLikelihood(MRI *mri, MRI_SURFACE *mris, DP *dp, in
   }
 }
 
-static void defectMaximizeLikelihood_new(MRI *mri, MRI_SURFACE *mris, DP *dp, int niter, double alpha);
-static void defectMaximizeLikelihood_old(MRI *mri, MRI_SURFACE *mris, DP *dp, int niter, double alpha);
+static void defectMaximizeLikelihood_new(MRI *mri, MRIS *mris, DP *dp, int niter, double alpha);
+static void defectMaximizeLikelihood_old(MRI *mri, MRIS *mris, DP *dp, int niter, double alpha);
 
-static void defectMaximizeLikelihood(MRI *mri, MRI_SURFACE *mris, DP *dp, int niter, double alpha) {
+static void defectMaximizeLikelihood(MRI *mri, MRIS *mris, DP *dp, int niter, double alpha) {
     return
 #if 1
         defectMaximizeLikelihood_new
@@ -6487,7 +6486,7 @@ static void defectMaximizeLikelihood(MRI *mri, MRI_SURFACE *mris, DP *dp, int ni
             (mri, mris, dp, niter, alpha);
 }
 
-static void defectMaximizeLikelihood_new(MRI *mri, MRI_SURFACE *mris, DP *dp, int niter, double alpha)
+static void defectMaximizeLikelihood_new(MRI *mri, MRIS *mris, DP *dp, int niter, double alpha)
 {
   float const wm   = dp->defect->white_mean;
   float const gm   = dp->defect->gray_mean;
@@ -6578,7 +6577,7 @@ static void defectMaximizeLikelihood_new(MRI *mri, MRI_SURFACE *mris, DP *dp, in
   finiDefectFacesCache(&defectFacesCache);
 }
 
-static void defectMaximizeLikelihood_old(MRI *mri, MRI_SURFACE *mris, DP *dp, int niter, double alpha)
+static void defectMaximizeLikelihood_old(MRI *mri, MRIS *mris, DP *dp, int niter, double alpha)
 {
   float wm, gm, mean;
   int i, n, nvertices;
@@ -6725,7 +6724,7 @@ static void detectDefectFaces(MRIS *mris, DEFECT_PATCH *dp)
         }
 
         /* check if this set of vertices could constitue a face */
-        if (!vertexNeighbor(mris, vn1, vn2)) {
+        if (!mrisVerticesAreNeighbors(mris, vn1, vn2)) {
           continue;
         }
 
@@ -7081,7 +7080,7 @@ static void possiblyAddNewFaces(MRIS *mris, int vno1, int vno2)
     if (v->v[n] == vno2) {
       continue;
     }
-    if (vertexNeighbor(mris, vno2, v->v[n])) {
+    if (mrisVerticesAreNeighbors(mris, vno2, v->v[n])) {
       /* there is a triangle */
       vn = v->v[n];
       /* make sure this vertex is not outside : could happen if border <-> border edge */
@@ -7211,9 +7210,9 @@ typedef struct
   int vno1, vno2;
 } INTERSECTION_TABLE, IT;
 
-static int retessellateDefect_wkr(MRI_SURFACE *mris, MRI_SURFACE *mris_corrected, DVS *dvs, DP *dp);
+static int retessellateDefect_wkr(MRIS *mris, MRIS *mris_corrected, DVS *dvs, DP *dp);
 
-static int retessellateDefect(MRI_SURFACE *mris, MRI_SURFACE *mris_corrected, DVS *dvs, DP *dp)
+static int retessellateDefect(MRIS *mris, MRIS *mris_corrected, DVS *dvs, DP *dp)
 {
     int result;
     ROMP_SCOPE_begin
@@ -7222,13 +7221,13 @@ static int retessellateDefect(MRI_SURFACE *mris, MRI_SURFACE *mris_corrected, DV
     return result;
 }
 
-static int retessellateDefect_wkr(MRI_SURFACE *mris, MRI_SURFACE *mris_corrected, DVS *dvs, DP *dp)
+static int retessellateDefect_wkr(MRIS *mris, MRIS *mris_corrected, DVS *dvs, DP *dp)
 {
   static bool const showStats = false;
 
   double max_len;
   int i, j, max_i, max_added, nadded, index, ndiscarded;
-  int (*intersection_function)(MRI_SURFACE * mris, DEFECT * defect, EDGE * e, IntersectDefectEdgesContext* ctx, int *vertex_trans, int *v1, int *v2);
+  int (*intersection_function)(MRIS * mris, DEFECT * defect, EDGE * e, IntersectDefectEdgesContext* ctx, int *vertex_trans, int *v1, int *v2);
   int *vertex_trans;
   DEFECT *defect;
   EDGE *et;
@@ -7573,7 +7572,7 @@ static int retessellateDefect_wkr(MRI_SURFACE *mris, MRI_SURFACE *mris_corrected
   return (NO_ERROR);
 }
 
-static void computeDisplacement(MRI_SURFACE *mris, DP *dp)
+static void computeDisplacement(MRIS *mris, DP *dp)
 {
   DEFECT *defect;
   int p, vno;
@@ -7594,8 +7593,8 @@ static void computeDisplacement(MRI_SURFACE *mris, DP *dp)
 
 static double mrisDefectPatchFitness(
     ComputeDefectContext* computeDefectContext,
-    MRI_SURFACE *mris,
-    MRI_SURFACE *mris_corrected,
+    MRIS *mris,
+    MRIS *mris_corrected,
     MRI *mri,
     DEFECT_PATCH *dp,
     int *vertex_trans,
@@ -7701,7 +7700,7 @@ static int mrisFreeDefectVertexState(DEFECT_VERTEX_STATE *dvs)
   return (NO_ERROR);
 }
 
-static DEFECT_VERTEX_STATE *mrisRecordVertexState(MRI_SURFACE *mris, DEFECT *defect, int *vertex_trans)
+static DEFECT_VERTEX_STATE *mrisRecordVertexState(MRIS *mris, DEFECT *defect, int *vertex_trans)
 {
   DEFECT_VERTEX_STATE *dvs;
   int i, n, vno;
@@ -7793,7 +7792,7 @@ static DEFECT_VERTEX_STATE *mrisRecordVertexState(MRI_SURFACE *mris, DEFECT *def
   return (dvs);
 }
 
-static int mrisRestoreFaceVertexState(MRI_SURFACE *mris, DEFECT_VERTEX_STATE *dvs)
+static int mrisRestoreFaceVertexState(MRIS *mris, DEFECT_VERTEX_STATE *dvs)
 {
   int i, n, vno;
 
@@ -7830,7 +7829,7 @@ static int mrisRestoreFaceVertexState(MRI_SURFACE *mris, DEFECT_VERTEX_STATE *dv
   return (NO_ERROR);
 }
 
-static int mrisRestoreVertexState(MRI_SURFACE *mris, DEFECT_VERTEX_STATE *dvs)
+static int mrisRestoreVertexState(MRIS *mris, DEFECT_VERTEX_STATE *dvs)
 {
   int i, n, vno;
 
@@ -8095,7 +8094,7 @@ static DEFECT_LIST *mrisMergeNeighboringDefects(MRIS *mris, DEFECT_LIST *dl)
   return new_dl;
 }
 
-static int defectIdentifyDefectiveVertices(MRI_SURFACE *mris,
+static int defectIdentifyDefectiveVertices(MRIS *mris,
                                            DEFECT *defect,
                                            FACE_DEFECT_LIST *fdl,
                                            float area_threshold,
@@ -8210,8 +8209,8 @@ static int defectIdentifyDefectiveVertices(MRI_SURFACE *mris,
 int topology_fixing_exit_after_diag = 0;
 
 
-MRI_SURFACE *MRIScorrectTopology(
-    MRI_SURFACE *mris, MRI_SURFACE *mris_corrected, MRI *mri, MRI *mri_wm, int nsmooth, TOPOLOGY_PARMS *parms)
+MRIS *MRIScorrectTopology(
+    MRIS *mris, MRIS *mris_corrected, MRI *mri, MRI *mri_wm, int nsmooth, TOPOLOGY_PARMS *parms)
 {
   FACE_DEFECT_LIST *fdl;
   DEFECT_LIST *dl;
@@ -9380,7 +9379,7 @@ MRI_SURFACE *MRIScorrectTopology(
   return (mris_corrected_final);
 } // finished MRIScorrectTopology()
 
-static int mrisMarkAllDefects(MRI_SURFACE *mris, DEFECT_LIST *dl, int flag)
+static int mrisMarkAllDefects(MRIS *mris, DEFECT_LIST *dl, int flag)
 {
   int j;
 
@@ -9390,7 +9389,7 @@ static int mrisMarkAllDefects(MRI_SURFACE *mris, DEFECT_LIST *dl, int flag)
   return (NO_ERROR);
 }
 
-static int mrisRipAllDefects(MRI_SURFACE *mris, DEFECT_LIST *dl, int flag)
+static int mrisRipAllDefects(MRIS *mris, DEFECT_LIST *dl, int flag)
 {
   int j;
 
@@ -9411,7 +9410,7 @@ static int mrisRipAllDefects(MRI_SURFACE *mris, DEFECT_LIST *dl, int flag)
   regions in which the topology is broken as the spherical
   homeomorphism is non-invertible.
   ------------------------------------------------------*/
-FACE_DEFECT_LIST *MRISmarkAmbiguousVertices(MRI_SURFACE *mris, int mark)
+FACE_DEFECT_LIST *MRISmarkAmbiguousVertices(MRIS *mris, int mark)
 {
   FACE *f;
   VERTEX *v;
@@ -9582,7 +9581,7 @@ FACE_DEFECT_LIST *MRISmarkAmbiguousVertices(MRI_SURFACE *mris, int mark)
   - curv is used to save the marked flags during divideedge.
   - undefval and old_undefval are used to find the enclosing loop
   ------------------------------------------------------*/
-DEFECT_LIST *MRISsegmentDefects(MRI_SURFACE *mris, int mark_ambiguous, int mark_segmented)
+DEFECT_LIST *MRISsegmentDefects(MRIS *mris, int mark_ambiguous, int mark_segmented)
 {
   DEFECT_LIST *dl;
   int vno, nadded;
@@ -9660,7 +9659,7 @@ DEFECT_LIST *MRISsegmentDefects(MRI_SURFACE *mris, int mark_ambiguous, int mark_
   Segment the connected region of a defect, starting with vno
   and spreading outwards.
   ------------------------------------------------------*/
-static int mrisSegmentDefect(MRI_SURFACE *mris, int vno, DEFECT *defect, int mark_ambiguous, int mark_segmented)
+static int mrisSegmentDefect(MRIS *mris, int vno, DEFECT *defect, int mark_ambiguous, int mark_segmented)
 {
   int vlist[MAX_DEFECT_VERTICES], i, j, n, nfilled, nadded, vno1, m;
 
@@ -9904,7 +9903,7 @@ static int mrisSegmentConnectedComponents(MRIS *mris)
   - old_undefval are forbidden points (borders, inside)
   - undefval are flags for the segmentation into connected components
   ------------------------------------------------------*/
-static int mrisSimplyConnectedDefect(MRI_SURFACE *mris, DEFECT *defect, int mark_ambiguous, int mark_segmented)
+static int mrisSimplyConnectedDefect(MRIS *mris, DEFECT *defect, int mark_ambiguous, int mark_segmented)
 {
   int n, p, l, label, j, w;
   int nvertices, nedges, inside_face, outside_face;
@@ -10298,7 +10297,7 @@ static int mrisSimplyConnectedDefect(MRI_SURFACE *mris, DEFECT *defect, int mark
 #define MIN_ORIG_DIST .75
 
 #if 1
-int mrisMarkRetainedPartOfDefect(MRI_SURFACE *mris,
+int mrisMarkRetainedPartOfDefect(MRIS *mris,
                                  DEFECT *defect,
                                  FACE_DEFECT_LIST *fdl,
                                  float area_threshold,
@@ -10559,7 +10558,7 @@ int mrisMarkRetainedPartOfDefect(MRI_SURFACE *mris,
   return (NO_ERROR);
 }
 #else
-static int mrisMarkRetainedPartOfDefect(MRI_SURFACE *mris,
+static int mrisMarkRetainedPartOfDefect(MRIS *mris,
                                         DEFECT *defect,
                                         FACE_DEFECT_LIST *fdl,
                                         float area_threshold,
@@ -10857,7 +10856,7 @@ static int mrisMarkRetainedPartOfDefect(MRI_SURFACE *mris,
 }
 #endif
 
-static int mrisRipDefect(MRI_SURFACE *mris, DEFECT *defect, int ripflag)
+static int mrisRipDefect(MRIS *mris, DEFECT *defect, int ripflag)
 {
   int n;
 
@@ -10876,7 +10875,7 @@ static int mrisRipDefect(MRI_SURFACE *mris, DEFECT *defect, int ripflag)
   Description
   Mark all the vertices in the given defect.
   ------------------------------------------------------*/
-static int mrisMarkDefect(MRI_SURFACE *mris, DEFECT *defect, int mark)
+static int mrisMarkDefect(MRIS *mris, DEFECT *defect, int mark)
 {
   int n;
 
@@ -10894,7 +10893,7 @@ static int mrisMarkDefect(MRI_SURFACE *mris, DEFECT *defect, int mark)
   Description
   Mark all the border vertices in the given defect.
   ------------------------------------------------------*/
-static int mrisMarkDefectConvexHull(MRI_SURFACE *mris, DEFECT *defect, int mark)
+static int mrisMarkDefectConvexHull(MRIS *mris, DEFECT *defect, int mark)
 {
   int n;
 
@@ -10912,7 +10911,7 @@ static int mrisMarkDefectConvexHull(MRI_SURFACE *mris, DEFECT *defect, int mark)
   Description
   Mark all the border vertices in the given defect.
   ------------------------------------------------------*/
-static int mrisMarkDefectBorder(MRI_SURFACE *mris, DEFECT *defect, int mark)
+static int mrisMarkDefectBorder(MRIS *mris, DEFECT *defect, int mark)
 {
   int n;
 
@@ -12152,8 +12151,8 @@ static OPTIMAL_DEFECT_MAPPING *mrisFindOptimalDefectMapping(MRIS *mris_src, DEFE
   return o_d_m;
 }
 
-static int mrisTessellateDefect_wkr(MRI_SURFACE *mris,
-                                MRI_SURFACE *mris_corrected,
+static int mrisTessellateDefect_wkr(MRIS *mris,
+                                MRIS *mris_corrected,
                                 DEFECT *defect,
                                 int *vertex_trans,
                                 MRI *mri,
@@ -12168,8 +12167,8 @@ static int mrisTessellateDefect_wkr(MRI_SURFACE *mris,
                                 HISTOGRAM *h_dot,
                                 TOPOLOGY_PARMS *parms);
 				
-static int mrisTessellateDefect(MRI_SURFACE *mris,
-                                MRI_SURFACE *mris_corrected,
+static int mrisTessellateDefect(MRIS *mris,
+                                MRIS *mris_corrected,
                                 DEFECT *defect,
                                 int *vertex_trans,
                                 MRI *mri,
@@ -12223,8 +12222,8 @@ static int compare_edge_length(const void *pe0, const void *pe1)
   return(-1);
 }
 				
-static int mrisTessellateDefect_wkr(MRI_SURFACE *mris,
-                                MRI_SURFACE *mris_corrected,
+static int mrisTessellateDefect_wkr(MRIS *mris,
+                                MRIS *mris_corrected,
                                 DEFECT *defect,
                                 int *vertex_trans,
                                 MRI *mri,
@@ -12490,13 +12489,13 @@ static int mrisTessellateDefect_wkr(MRI_SURFACE *mris,
                 sqrt(SQR(v1->origx - v2->origx) + SQR(v1->origy - v2->origy) + SQR(v1->origz - v2->origz)));
         DiagBreak();
       }
-      if (edgeExists(mris_corrected, et[n].vno1, et[n].vno2)) {
+      if (mrisVerticesAreNeighbors(mris_corrected, et[n].vno1, et[n].vno2)) {
         et[n].used = USED_IN_TESSELLATION;
         if (Gdiag & DIAG_SHOW && DIAG_VERBOSE_ON)
           fprintf(stdout, "excluding existing edge %d <--> %d\n", vlist[i], vlist[j]);
       }
 
-      if (!edgeExists(mris, vlist[i], vlist[j])) {
+      if (!mrisVerticesAreNeighbors(mris, vlist[i], vlist[j])) {
         /* prioritize edges in original tessellation */
         et[n].len += 100; /*ASCENDING ORDER*/
       }
@@ -12951,8 +12950,8 @@ static int defectPatchRank(DEFECT_PATCH *dps, int index, int npatches)
 #define MAX_EDGES 1000
 
 static int tessellatePatch(MRI *mri,
-                           MRI_SURFACE *mris,
-                           MRI_SURFACE *mris_corrected,
+                           MRIS *mris,
+                           MRIS *mris_corrected,
                            DEFECT *defect,
                            int *vertex_trans,
                            EDGE *et,
@@ -13202,8 +13201,8 @@ static float fitness_values[11000];
 static float best_values[11000];
 #endif
 
-static int mrisComputeOptimalRetessellation_wkr(MRI_SURFACE *mris,
-                                            MRI_SURFACE *mris_corrected,
+static int mrisComputeOptimalRetessellation_wkr(MRIS *mris,
+                                            MRIS *mris_corrected,
                                             MRI *mri,
                                             DEFECT *defect,
                                             int *vertex_trans,
@@ -13223,8 +13222,8 @@ static int mrisComputeOptimalRetessellation_wkr(MRI_SURFACE *mris,
                                             TOPOLOGY_PARMS *parms);
 
 
-static int mrisComputeOptimalRetessellation(MRI_SURFACE *mris,
-                                            MRI_SURFACE *mris_corrected,
+static int mrisComputeOptimalRetessellation(MRIS *mris,
+                                            MRIS *mris_corrected,
                                             MRI *mri,
                                             DEFECT *defect,
                                             int *vertex_trans,
@@ -13268,8 +13267,8 @@ static int mrisComputeOptimalRetessellation(MRI_SURFACE *mris,
     return result;
 }
 
-static NOINLINE int mrisComputeOptimalRetessellation_wkr(MRI_SURFACE *mris,
-                                            MRI_SURFACE *mris_corrected,
+static NOINLINE int mrisComputeOptimalRetessellation_wkr(MRIS *mris,
+                                            MRIS *mris_corrected,
                                             MRI *mri,
                                             DEFECT *defect,
                                             int *vertex_trans,
@@ -14701,8 +14700,8 @@ debug_use_this_patch:
   return (NO_ERROR);
 }
 
-static int mrisComputeRandomRetessellation(MRI_SURFACE *mris,
-                                           MRI_SURFACE *mris_corrected,
+static int mrisComputeRandomRetessellation(MRIS *mris,
+                                           MRIS *mris_corrected,
                                            MRI *mri,
                                            DEFECT *defect,
                                            int *vertex_trans,
@@ -15152,8 +15151,8 @@ static int mrisComputeRandomRetessellation(MRI_SURFACE *mris,
   return (NO_ERROR);
 }
 
-static int mrisRetessellateDefect(MRI_SURFACE *mris,
-                                  MRI_SURFACE *mris_corrected,
+static int mrisRetessellateDefect(MRIS *mris,
+                                  MRIS *mris_corrected,
                                   DEFECT *defect,
                                   int *vertex_trans,
                                   EDGE *et,
@@ -15163,7 +15162,7 @@ static int mrisRetessellateDefect(MRI_SURFACE *mris,
 {
   double max_len;
   int i, j, max_i, max_added, nadded, index;
-  int (*intersection_function)(MRI_SURFACE * mris, DEFECT * defect, EDGE * e, IntersectDefectEdgesContext* ctx, int *vertex_trans, int *v1, int *v2);
+  int (*intersection_function)(MRIS * mris, DEFECT * defect, EDGE * e, IntersectDefectEdgesContext* ctx, int *vertex_trans, int *v1, int *v2);
 
   max_len = 0;
   max_i = 0;
@@ -15229,7 +15228,7 @@ static int mrisRetessellateDefect(MRI_SURFACE *mris,
 
 #if 0
 static int
-mrisCheckDefectEdges(MRI_SURFACE *mris, DEFECT *defect, int vno,
+mrisCheckDefectEdges(MRIS *mris, DEFECT *defect, int vno,
                      int *vertex_trans)
 {
   int    i, n1, n2, n3, vno2, fno1, fno2 ;
@@ -15301,7 +15300,7 @@ mrisCheckDefectEdges(MRI_SURFACE *mris, DEFECT *defect, int vno,
   See if the edge e intersects any edges in the defect or it's border.
   ------------------------------------------------------*/
 
-    static bool isHit(MRI_SURFACE * mris, int vno, DEFECT *defect, EDGE* e, int n, char* whyTracing) {
+    static bool isHit(MRIS * mris, int vno, DEFECT *defect, EDGE* e, int n, char* whyTracing) {
       bool result = false;
 
       if (vno == e->vno1 || vno == e->vno2 || vno < 0) {
@@ -15339,7 +15338,7 @@ mrisCheckDefectEdges(MRI_SURFACE *mris, DEFECT *defect, int vno,
     }  
 
     typedef struct PossiblyIntersectingGreatArcs_callback_context {
-      MRI_SURFACE*                  mris;
+      MRIS*                  mris;
       DEFECT*                       defect;
       EDGE*                         e;
       IntersectDefectEdgesContext*  ide_ctx;
@@ -15392,7 +15391,7 @@ mrisCheckDefectEdges(MRI_SURFACE *mris, DEFECT *defect, int vno,
       return false;
     }
 
-static int intersectDefectEdges(MRI_SURFACE *mris, DEFECT *defect, EDGE *e, IntersectDefectEdgesContext* ctx, int *vertex_trans, int *v1, int *v2)
+static int intersectDefectEdges(MRIS *mris, DEFECT *defect, EDGE *e, IntersectDefectEdgesContext* ctx, int *vertex_trans, int *v1, int *v2)
 {
   static long stats_count    = 0;
   static long stats_limit    = 1;
@@ -15812,7 +15811,7 @@ Done2:;
 }
 
 static int intersectDefectConvexHullEdges(
-    MRI_SURFACE *mris, DEFECT *defect, EDGE *e, IntersectDefectEdgesContext* ctx, int *vertex_trans, int *v1, int *v2)
+    MRIS *mris, DEFECT *defect, EDGE *e, IntersectDefectEdgesContext* ctx, int *vertex_trans, int *v1, int *v2)
 {
   int i, n, vno;
   EDGE edge2;
@@ -15856,7 +15855,7 @@ static int intersectDefectConvexHullEdges(
   Description
   Add the appropriate face to the tessellation.
   ------------------------------------------------------*/
-static int mrisAddAllDefectFaces(MRI_SURFACE *mris, DEFECT_LIST *dl, int *vertex_trans)
+static int mrisAddAllDefectFaces(MRIS *mris, DEFECT_LIST *dl, int *vertex_trans)
 {
   DEFECT *defect;
   int i, vno1, vno2, nfaces, n, m, dno;
@@ -15900,7 +15899,7 @@ static int mrisAddAllDefectFaces(MRI_SURFACE *mris, DEFECT_LIST *dl, int *vertex
           if (vt->v[n] == vno2) {
             continue;
           }
-          if (vertexNeighbor(mris, vno2, vt->v[n]) && !isFace(mris, vno1, vno2, vt->v[n]) &&
+          if (mrisVerticesAreNeighbors(mris, vno2, vt->v[n]) && !isFace(mris, vno1, vno2, vt->v[n]) &&
 #if SPHERE_INTERSECTION
               !containsAnotherVertexOnSphere(mris, vno1, vno2, vt->v[n], 0)) {
 #else
@@ -15933,7 +15932,7 @@ static int mrisAddAllDefectFaces(MRI_SURFACE *mris, DEFECT_LIST *dl, int *vertex
   surface).
   ------------------------------------------------------*/
 #if 1
-static int mrisOrientRetessellatedSurface(MRI_SURFACE *mris, DEFECT_LIST *dl, int *vtrans)
+static int mrisOrientRetessellatedSurface(MRIS *mris, DEFECT_LIST *dl, int *vtrans)
 {
   int vno, n, fno, m, vno0, vno1; /*n0, n1;*/
   FACE *f;
@@ -16021,7 +16020,7 @@ static int mrisOrientRetessellatedSurface(MRI_SURFACE *mris, DEFECT_LIST *dl, in
   return (NO_ERROR);
 }
 #else
-static int mrisOrientRetessellatedSurface(MRI_SURFACE *mris, DEFECT_LIST *dl, int *vtrans)
+static int mrisOrientRetessellatedSurface(MRIS *mris, DEFECT_LIST *dl, int *vtrans)
 {
 #if 1
   int dno, fno, vno, i, n, m, vno0, vno1, n0, n1, oriented, nreversed;
@@ -16499,7 +16498,7 @@ static int mrisOrientRetessellatedSurface(MRI_SURFACE *mris, DEFECT_LIST *dl, in
   find the convex hull of the defect on the sphere (actually,
   just a disk, but at least it's convex....)
   ------------------------------------------------------*/
-static int mrisFindDefectConvexHull(MRI_SURFACE *mris, DEFECT *defect)
+static int mrisFindDefectConvexHull(MRIS *mris, DEFECT *defect)
 {
 #if SMALL_CONVEX_HULL
   int chull[MAX_DEFECT_VERTICES], nfound, n, i, vno;
@@ -16616,7 +16615,7 @@ static int mrisFindDefectConvexHull(MRI_SURFACE *mris, DEFECT *defect)
 }
 
 
-static int mrisDefectRemoveNegativeVertices(MRI_SURFACE *mris, DEFECT *defect)
+static int mrisDefectRemoveNegativeVertices(MRIS *mris, DEFECT *defect)
 {
   int i, n;
   for (i = 0; i < defect->nvertices; i++) {
@@ -16638,7 +16637,7 @@ static int mrisDefectRemoveNegativeVertices(MRI_SURFACE *mris, DEFECT *defect)
 
   Description
   ------------------------------------------------------*/
-static int mrisDefectRemoveDegenerateVertices(MRI_SURFACE *mris, float min_sphere_dist, DEFECT *defect)
+static int mrisDefectRemoveDegenerateVertices(MRIS *mris, float min_sphere_dist, DEFECT *defect)
 {
   float dx, dy, dz, dist;
   int i, j;
@@ -16686,7 +16685,7 @@ static int mrisDefectRemoveDegenerateVertices(MRI_SURFACE *mris, float min_spher
 
   Description
   ------------------------------------------------------*/
-static int mrisDefectRemoveProximalVertices(MRI_SURFACE *mris, float min_orig_dist, DEFECT *defect)
+static int mrisDefectRemoveProximalVertices(MRIS *mris, float min_orig_dist, DEFECT *defect)
 {
   float dx, dy, dz, dist;
   int i, j;
@@ -16730,12 +16729,12 @@ static int mrisDefectRemoveProximalVertices(MRI_SURFACE *mris, float min_orig_di
 }
 
 /*!
-  \fn int MRISsegmentMarked(MRI_SURFACE *mris, LABEL ***plabel_array, int *pnlabels, float min_label_area)
+  \fn int MRISsegmentMarked(MRIS *mris, LABEL ***plabel_array, int *pnlabels, float min_label_area)
   \brief Appears to create a label for each connected component
   defined by v->marked=1; the surface area of the label must be >
   min_label_area.
 */
-int MRISsegmentMarked(MRI_SURFACE *mris, LABEL ***plabel_array, int *pnlabels, float min_label_area)
+int MRISsegmentMarked(MRIS *mris, LABEL ***plabel_array, int *pnlabels, float min_label_area)
 {
   int vno, nfound, n, nlabels, *marks;
   VERTEX *v;
@@ -16811,7 +16810,7 @@ int MRISsegmentMarked(MRI_SURFACE *mris, LABEL ***plabel_array, int *pnlabels, f
   return (NO_ERROR);
 }
 
-int MRISsegmentAnnotated(MRI_SURFACE *mris, LABEL ***plabel_array, int *pnlabels, float min_label_area)
+int MRISsegmentAnnotated(MRIS *mris, LABEL ***plabel_array, int *pnlabels, float min_label_area)
 {
   int vno, nfound, n, nlabels, last_vno;
   VERTEX *v;
@@ -16872,7 +16871,7 @@ int MRISsegmentAnnotated(MRI_SURFACE *mris, LABEL ***plabel_array, int *pnlabels
   return (NO_ERROR);
 }
 
-static int mrisComputeGrayWhiteBorderDistributions(MRI_SURFACE *mris,
+static int mrisComputeGrayWhiteBorderDistributions(MRIS *mris,
                                                    MRI *mri,
                                                    DEFECT *defect,
                                                    HISTOGRAM *h_white,
