@@ -7755,9 +7755,9 @@ MRI_SURFACE *ic2562_make_surface(int max_vertices, int max_faces)
     v->z = 100.0 * ic2562_vertices[vno].z;
   }
 
+  /* fill in faces, and count # of faces each vertex is part of */
   int* vnums = (int*)calloc(mris->nvertices,sizeof(int));
 
-  /* fill in faces, and count # of faces each vertex is part of */
   for (fno = 0; fno < ICO_NFACES; fno++) {
     FACE * const f = &mris->faces[fno];
     if (fno == 15) DiagBreak();
@@ -7780,13 +7780,13 @@ MRI_SURFACE *ic2562_make_surface(int max_vertices, int max_faces)
     FACE* const f = &mris->faces[fno];
     if (fno == 3) DiagBreak();
     for (n = 0; n < VERTICES_PER_FACE; n++) {
-      int vno1 = f->v[n];
+      int const vno1 = f->v[n];
 
       /* now add an edge to other 2 vertices if not already in list */
       for (n1 = 0; n1 < VERTICES_PER_FACE; n1++) {
         if (n1 == n) /* don't connect vertex to itself */
           continue;
-        int vno2 = ic2562_faces[fno].vno[n1] - 1; /* make it zero-based */
+        int const vno2 = ic2562_faces[fno].vno[n1] - 1; /* make it zero-based */
 
         if (!mrisVerticesAreNeighbors(mris, vno1, vno2)) 
           mrisAddEdge(mris, vno1, vno2);
