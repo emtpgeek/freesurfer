@@ -462,25 +462,6 @@ int MRISfree(MRIS **pmris)
 }
 
 
-int MRISfreeDists(MRIS *mris)
-{
-  int vno;
-
-  for (vno = 0; vno < mris->nvertices; vno++) {
-    if (mris->vertices[vno].dist) {
-      free(mris->vertices[vno].dist);
-    }
-    if (mris->vertices[vno].dist_orig) {
-      free(mris->vertices[vno].dist_orig);
-    }
-    mris->vertices         [vno].dist = mris->vertices[vno].dist_orig = NULL;
-    mris->vertices_topology[vno].vtotal = 0;
-  }
-
-  return (NO_ERROR);
-}
-
-
 char *mrisurf_surface_names[3] = {"inflated", "smoothwm", "smoothwm"};
 char *curvature_names[3] = {"inflated.H", "sulc", NULL};
 int MRISsetCurvatureName(int nth, char *name)

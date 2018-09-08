@@ -180,16 +180,16 @@ face_type, FACE ;
 #define LIST_OF_VERTEX_TOPOLOGY_ELTS \
   /* put the pointers before the ints, before the shorts, before uchars, to reduce size  */ \
   /* the whole fits in much less than one cache line, so further ordering is no use      */ \
-  ELTP(int,f) SEP               /* array neighboring face numbers */        	    	    \
-  ELTP(int,v) SEP               /* array neighboring vertex numbers, vnum long */    	    \
-  ELTP(int,e) SEP               /* edge state for neighboring vertices */    	    	    \
-  ELTP(uchar,n) SEP           	/* [0-3, num long] TBD what it contains */    	    	    \
-  ELTT(const int,v2num) SEP     /* number of 2-connected neighbors */       	    	    \
-  ELTT(const int,v3num) SEP     /* number of 3-connected neighbors */       	    	    \
-  ELTT(const short,vtotal) SEP  /* total # of neighbors will be same as one of above*/      \
-  ELTT(const uchar,nsize) SEP	/* size of neighborhood stored in vtotal */    	    	    \
-  ELTT(const uchar,vnum)        /* number neighboring vertices, is v1num */    	    	    \
-  ELTT(uchar,num) SEP           /* number neighboring faces */      	    	    	    \
+  ELTP(int,f) SEP                   /* array neighboring face numbers */        	    \
+  ELTP(/*const*/ int,v) SEP         /* array neighboring vertex numbers, vnum long */       \
+  ELTP(int,e) SEP                   /* edge state for neighboring vertices */    	    \
+  ELTP(uchar,n) SEP           	    /* [0-3, num long] TBD what it contains */    	    \
+  ELTT(/*const*/ int,v2num) SEP     /* number of 2-connected neighbors */       	    \
+  ELTT(/*const*/ int,v3num) SEP     /* number of 3-connected neighbors */       	    \
+  ELTT(/*const*/ short,vtotal) SEP  /* total # of neighbors will be same as one of above*/  \
+  ELTT(/*const*/ uchar,nsize) SEP   /* size of neighborhood stored in vtotal */    	    \
+  ELTT(/*const*/ uchar,vnum)        /* number neighboring vertices, is v1num */    	    \
+  ELTT(uchar,num) SEP               /* number neighboring faces */      	    	    \
   // end of macro
 
 
@@ -1175,7 +1175,6 @@ MRI_SURFACE* MRISoverAlloc              (                   int max_vertices, in
 MRI_SURFACE* MRISalloc                  (                                                    int nvertices, int nfaces) ;
 void         MRISreallocVerticesAndFaces(MRI_SURFACE *mris,                                  int nvertices, int nfaces) ;
     
-int          MRISfreeDists(MRI_SURFACE *mris) ;
 int          MRISfree(MRI_SURFACE **pmris) ;
 int   MRISintegrate(MRI_SURFACE *mris, INTEGRATION_PARMS *parms, int n_avgs);
 int   mrisLogIntegrationParms(FILE *fp, MRI_SURFACE *mris,
@@ -2554,6 +2553,8 @@ MRI *MRIcomputeLaminarVolumeFractions(MRI_SURFACE *mris, double res, MRI *mri_sr
 int MRISfindNeighborsAtVertex(MRI_SURFACE *mris, int acquiredMarked, int vno, int nlinks, int *vlist);
 
 int mrisFindNeighbors(MRI_SURFACE *mris);
+int mrisFindNeighbors2(MRI_SURFACE *mris);
+
 MRIS *MRIStessellate(MRI *mri,  int value, int all_flag);
 void TESSaddFace(MRI *mri, int imnr, int i, int j, int f, int prev_flag, int *pface_index, 
 		 tface_type *face, int *face_index_table0, int *face_index_table1);
