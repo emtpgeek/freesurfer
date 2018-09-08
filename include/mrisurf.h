@@ -2554,6 +2554,7 @@ int MRISfindNeighborsAtVertex(MRI_SURFACE *mris, int acquiredMarked, int vno, in
 
 int mrisFindNeighbors(MRI_SURFACE *mris);
 int mrisFindNeighbors2(MRI_SURFACE *mris);
+int mrisFindNeighbors3(MRI_SURFACE *mris);
 
 MRIS *MRIStessellate(MRI *mri,  int value, int all_flag);
 void TESSaddFace(MRI *mri, int imnr, int i, int j, int f, int prev_flag, int *pface_index, 
