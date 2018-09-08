@@ -59,11 +59,6 @@
 
 #define VERTEX_EDGE(vec, v0, v1)   VECTOR_LOAD(vec,v1->x-v0->x,v1->y-v0->y,v1->z-v0->z)
 
-#define MAX_4_NEIGHBORS     100
-#define MAX_3_NEIGHBORS     70
-#define MAX_2_NEIGHBORS     20
-#define MAX_1_NEIGHBORS     8
-#define MAX_NEIGHBORS       (400)
 #define REPULSE_K           1.0
 #define REPULSE_E           0.5
 #define MAX_MOMENTUM_MM     1
