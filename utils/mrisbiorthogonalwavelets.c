@@ -68,11 +68,11 @@ MRI_SURFACE *wavelet_analysis_curv(MRI_SURFACE *mris_out, int order)
   for (i = order; i > 0; i--) {
     MRIS* mris_high = ReadIcoByOrder(i, 100);  // higher order surface
     
-    int m;
-    for (m = 0; m < mris_high->nvertices; m++) mris_high->vertices_topology[m].nsize = 1;
     MRISsetNeighborhoodSize(mris_high, 3);
     
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
+
+    int m;
     for (m = number; m < mris_high->nvertices; m++) {
     
       VERTEX_TOPOLOGY const * const vmt_high = &mris_high->vertices_topology[m];
@@ -122,12 +122,12 @@ MRI_SURFACE *wavelet_analysis_curv(MRI_SURFACE *mris_out, int order)
   for (i = order; i > 0; i--) {
     MRIS* mris_high = ReadIcoByOrder(i, 100);  // higher order surface
     
-    int m;
-    for (m = 0; m < mris_high->nvertices; m++) mris_high->vertices_topology[m].nsize = 1;
     MRISsetNeighborhoodSize(mris_high, 3);
 
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
+
     /* compute Yj,m for each m vertices */
+    int m;
     for (m = number; m < mris_high->nvertices; m++) {
       VERTEX_TOPOLOGY const * const vmt_high = &mris_high->vertices_topology[m];
       VERTEX                * const vm_out   = &mris_out ->vertices         [m];
@@ -206,12 +206,12 @@ MRI_SURFACE *wavelet_analysis_vec(MRI_SURFACE *mris_out, int order)
   int i;
   for (i = order; i > 0; i--) {
     MRIS* mris_high = ReadIcoByOrder(i, 100);  // higher order surface
-    
-    int m;
-    for (m = 0; m < mris_high->nvertices; m++) mris_high->vertices_topology[m].nsize = 1;
-    
+
     MRISsetNeighborhoodSize(mris_high, 3);
+    
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
+
+    int m;
     for (m = number; m < mris_high->nvertices; m++) {
       VERTEX_TOPOLOGY const * const vmt_high = &mris_high->vertices_topology[m];
       VERTEX                * const vm_out   = &mris_out ->vertices         [m];
@@ -262,12 +262,12 @@ MRI_SURFACE *wavelet_analysis_vec(MRI_SURFACE *mris_out, int order)
   for (i = order; i > 0; i--) {
     MRIS* mris_high = ReadIcoByOrder(i, 100);  // higher order surface
     
-    int m;
-    for (m = 0; m < mris_high->nvertices; m++) mris_high->vertices_topology[m].nsize = 1;
     MRISsetNeighborhoodSize(mris_high, 3);
 
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
+
     /* compute Yj,m for each m vertices */
+    int m;
     for (m = number; m < mris_high->nvertices; m++) {
       VERTEX_TOPOLOGY const * const vmt_high = &mris_high->vertices_topology[m];
       VERTEX                * const vm_out   = &mris_out ->vertices         [m];
@@ -372,12 +372,11 @@ MRI_SURFACE *wavelet_synthesis_curv(MRI_SURFACE *mris_out, int order)
   for (i = order; i > 0; i--) {
     MRIS * mris_high = ReadIcoByOrder(i, 100);  // higher order surface
     
-    int m;
-    for (m = 0; m < mris_high->nvertices; m++) mris_high->vertices_topology[m].nsize = 1;
-    
     MRISsetNeighborhoodSize(mris_high, 3);
+
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
     
+    int m;
     for (m = number; m < mris_high->nvertices; m++) {
       VERTEX_TOPOLOGY const * const vmt_high = &mris_high->vertices_topology[m];
       VERTEX                * const vm_out   = &mris_out->vertices          [m];
@@ -423,14 +422,14 @@ MRI_SURFACE *wavelet_synthesis_curv(MRI_SURFACE *mris_out, int order)
 
   for (i = 1; i <= order; i++) {
     MRIS* mris_high = ReadIcoByOrder(i, 100);  // higher order surface
-    int m;
-    for (m = 0; m < mris_high->nvertices; m++) mris_high->vertices_topology[m].nsize = 1;
+
     MRISsetNeighborhoodSize(mris_high, 3);
     
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
 
     /* Synthesis Stage I */
     /* Compute Lamda(j+1,k) using the Yita(j,m) */
+    int m;
     for (m = number; m < mris_high->nvertices; m++) {
       VERTEX_TOPOLOGY const * const vmt_high = &mris_high->vertices_topology[m];
       VERTEX*                 const vm_out   = &mris_out ->vertices         [m];
@@ -508,12 +507,10 @@ MRI_SURFACE *wavelet_synthesis_vec(MRI_SURFACE *mris_out, int order)
   for (i = order; i > 0; i--) {
     MRIS * mris_high = ReadIcoByOrder(i, 100);  // higher order surface
     
-    int m;
-    for (m = 0; m < mris_high->nvertices; m++) mris_high->vertices_topology[m].nsize = 1;
-
     MRISsetNeighborhoodSize(mris_high, 3);
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
 
+    int m;
     for (m = number; m < mris_high->nvertices; m++) {
       VERTEX_TOPOLOGY * const vmt_high = &mris_high->vertices_topology[m];
       VERTEX          * const vm_out   = &mris_out ->vertices         [m];
@@ -562,14 +559,13 @@ MRI_SURFACE *wavelet_synthesis_vec(MRI_SURFACE *mris_out, int order)
   for (i = 1; i <= order; i++) {
     MRIS * mris_high = ReadIcoByOrder(i, 100);  // higher order surface
     
-    int m;
-    for (m = 0; m < mris_high->nvertices; m++) mris_high->vertices_topology[m].nsize = 1;
-    
     MRISsetNeighborhoodSize(mris_high, 3);
+
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
 
     /* Synthesis Stage I */
     /* Compute Lamda(j+1,k) using the Yita(j,m) */
+    int m;
     for (m = number; m < mris_high->nvertices; m++) {
       VERTEX_TOPOLOGY const * const vmt_high = &mris_high->vertices_topology[m];
       VERTEX          const * const vm_out   = &mris_out ->vertices         [m];

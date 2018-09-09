@@ -534,7 +534,7 @@ int mrisFlipPatch(MRI_SURFACE *mris)
   ------------------------------------------------------*/
 int MRISaverageVertexPositions(MRI_SURFACE *mris, int navgs)
 {
-  int i, vno, vnb, *pnb, vnum;
+  int i, vno, vnb, vnum;
   float x, y, z, num;
 
   for (i = 0; i < navgs; i++) {
@@ -547,7 +547,7 @@ int MRISaverageVertexPositions(MRI_SURFACE *mris, int navgs)
       x = v->x;
       y = v->y;
       z = v->z;
-      pnb  = vt->v;
+      int const * pnb  = vt->v;
       vnum = vt->vnum;
       for (num = 0.0f, vnb = 0; vnb < vnum; vnb++) {
         VERTEX * const vn = &mris->vertices[*pnb++]; /* neighboring vertex pointer */
@@ -585,7 +585,7 @@ int MRISaverageVertexPositions(MRI_SURFACE *mris, int navgs)
   ------------------------------------------------------*/
 int MRISaverageEveryOtherVertexPositions(MRI_SURFACE *mris, int navgs, int which)
 {
-  int i, vno, vnb, *pnb, vnum;
+  int i, vno, vnb, vnum;
   float x, y, z, num;
 
   which = ISODD(which);
@@ -599,7 +599,7 @@ int MRISaverageEveryOtherVertexPositions(MRI_SURFACE *mris, int navgs, int which
       x = v->x;
       y = v->y;
       z = v->z;
-      pnb  = vt->v;
+      int const * pnb  = vt->v;
       vnum = vt->vnum;
       for (num = 0.0f, vnb = 0; vnb < vnum; vnb++) {
         VERTEX const * const vn = &mris->vertices[*pnb++]; /* neighboring vertex pointer */
@@ -638,7 +638,7 @@ int MRISaverageEveryOtherVertexPositions(MRI_SURFACE *mris, int navgs, int which
   ------------------------------------------------------*/
 int MRISsequentialAverageVertexPositions(MRI_SURFACE *mris, int navgs)
 {
-  int i, vno, vnb, *pnb, vnum;
+  int i, vno, vnb, vnum;
   float x, y, z, num;
 
   for (i = 0; i < navgs; i++) {
@@ -651,7 +651,7 @@ int MRISsequentialAverageVertexPositions(MRI_SURFACE *mris, int navgs)
       x = v->x;
       y = v->y;
       z = v->z;
-      pnb  = vt->v;
+      int const * pnb  = vt->v;
       vnum = vt->vnum;
       for (num = 0.0f, vnb = 0; vnb < vnum; vnb++) {
         VERTEX const * const vn = &mris->vertices[*pnb++]; /* neighboring vertex pointer */
@@ -2623,7 +2623,7 @@ int mrisAverageSignedGradients(MRI_SURFACE *mris, int num_avgs)
         ROMP_PFLB_begin
 	
         double dx, dy, dz, dot;
-        int *pnb, vnum, num, vnb;
+        int vnum, num, vnb;
 
         VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
         VERTEX                * const v  = &mris->vertices         [vno];
@@ -2633,7 +2633,7 @@ int mrisAverageSignedGradients(MRI_SURFACE *mris, int num_avgs)
         dx = v->dx;
         dy = v->dy;
         dz = v->dz;
-        pnb = vt->v;
+        int const * pnb = vt->v;
         /*      vnum = v->v2num ? v->v2num : v->vnum ;*/
         vnum = vt->vnum;
         for (num = 0, vnb = 0; vnb < vnum; vnb++) {
@@ -13070,7 +13070,7 @@ int mrisSmoothBoundaryNormals(MRI_SURFACE *mris, int niter)
   ------------------------------------------------------*/
 int MRISsoapBubbleVertexPositions(MRI_SURFACE *mris, int navgs)
 {
-  int i, vno, vnb, *pnb, vnum, n;
+  int i, vno, vnb, vnum, n;
   float x, y, z, num;
   int nmarked;
 
@@ -13104,7 +13104,7 @@ int MRISsoapBubbleVertexPositions(MRI_SURFACE *mris, int navgs)
         z = v->z;
         num++; /* account for central vertex */
       }
-      pnb  = vt->v;
+      int const * pnb  = vt->v;
       vnum = vt->vnum;
       for (vnb = 0; vnb < vnum; vnb++) {
         VERTEX const * const vn = &mris->vertices[*pnb++]; /* neighboring vertex pointer */
@@ -13168,7 +13168,7 @@ int MRISsoapBubbleVertexPositions(MRI_SURFACE *mris, int navgs)
   ------------------------------------------------------*/
 int MRISweightedSoapBubbleVertexPositions(MRI_SURFACE *mris, int navgs)
 {
-  int i, vno, vnb, *pnb, vnum, n;
+  int i, vno, vnb, vnum, n;
   float x, y, z;
   int nmarked;
   double norm, total_norm;
@@ -13201,7 +13201,7 @@ int MRISweightedSoapBubbleVertexPositions(MRI_SURFACE *mris, int navgs)
       x = v->x;
       y = v->y;
       z = v->z;
-      pnb  = vt->v;
+      int const * pnb  = vt->v;
       vnum = vt->vnum;
       for (vnb = 0; vnb < vnum; vnb++) {
         norm = 1.0;
@@ -13268,7 +13268,7 @@ int MRISweightedSoapBubbleVertexPositions(MRI_SURFACE *mris, int navgs)
   ------------------------------------------------------*/
 int MRISsoapBubbleOrigVertexPositions(MRI_SURFACE *mris, int navgs)
 {
-  int i, vno, vnb, *pnb, vnum;
+  int i, vno, vnb, vnum;
   float x, y, z, num;
   int nmarked, num_none_marked = 0;
 
@@ -13296,7 +13296,7 @@ int MRISsoapBubbleOrigVertexPositions(MRI_SURFACE *mris, int navgs)
         z = v->origz;
         num++; /* account for central vertex */
       }
-      pnb  = vt->v;
+      int const * pnb  = vt->v;
       vnum = vt->vnum;
       for (vnb = 0; vnb < vnum; vnb++) {
         VERTEX const * const vn = &mris->vertices[*pnb++];                     /* neighboring vertex pointer */
@@ -13351,9 +13351,10 @@ int MRISsoapBubbleOrigVertexPositions(MRI_SURFACE *mris, int navgs)
   }
   return (NO_ERROR);
 }
+
 int MRISsoapBubbleTargetVertexPositions(MRI_SURFACE *mris, int navgs)
 {
-  int i, vno, vnb, *pnb, vnum;
+  int i, vno, vnb, vnum;
   float x, y, z, num;
   int nmarked, num_none_marked = 0;
 
@@ -13381,7 +13382,7 @@ int MRISsoapBubbleTargetVertexPositions(MRI_SURFACE *mris, int navgs)
         z = v->targz;
         num++; /* account for central vertex */
       }
-      pnb  = vt->v;
+      int const * pnb = vt->v;
       vnum = vt->vnum;
       for (vnb = 0; vnb < vnum; vnb++) {
         VERTEX const * const vn = &mris->vertices[*pnb++];                     /* neighboring vertex pointer */
@@ -13440,38 +13441,35 @@ int MRISsoapBubbleTargetVertexPositions(MRI_SURFACE *mris, int navgs)
 }
 
 
-/* extract the non-marked vertices from a surface */
+// Extract the non-marked vertices from a surface
+//
 MRIS *MRISextractMarkedVertices(MRIS *mris)
 {
-  MRIS *mris_corrected;
-  int *face_trans, *vertex_trans;
-  FACE *f, *fdst;
-  int vno, i, n, fno;
+  int* face_trans   = (int *)calloc(mris->nfaces,    sizeof(int));
+  int* vertex_trans = (int *)calloc(mris->nvertices, sizeof(int));
+  memset(face_trans,   -1,          mris->nfaces    *sizeof(int));
+  memset(vertex_trans, -1,          mris->nvertices *sizeof(int));
 
-  face_trans = (int *)calloc(mris->nfaces, sizeof(int));
-  vertex_trans = (int *)calloc(mris->nvertices, sizeof(int));
-  memset(vertex_trans, -1, mris->nvertices * sizeof(int));
-  memset(face_trans, -1, mris->nfaces * sizeof(int));
   // create a new surface
-  mris_corrected = MRISalloc(mris->nvertices, mris->nfaces);
+  MRIS *mris_corrected = MRISalloc(mris->nvertices, mris->nfaces);
+  mris_corrected->type = MRIS_TRIANGULAR_SURFACE;
+
   // keep the extra info into the new one
   mris_corrected->useRealRAS = mris->useRealRAS;
   copyVolGeom(&mris->vg, &mris_corrected->vg);
 
-  mris_corrected->type = MRIS_TRIANGULAR_SURFACE;
+  int newNVertices = 0;
 
-  int newNVertices;
-  for (newNVertices = vno = 0; vno < mris->nvertices; vno++) {
+  int vno;
+  for (vno = 0; vno < mris->nvertices; vno++) {
     VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
     VERTEX          const * const v  = &mris->vertices         [vno];
-    /* ignore the marked defect vertices but not the bordering ones */
-    if (v->marked) {
-      continue;
-    }
+    
+    if (v->marked) continue;    // ignore the marked defect vertices
+    
     VERTEX_TOPOLOGY * const vdstt = &mris_corrected->vertices_topology[newNVertices];
     VERTEX          * const vdst  = &mris_corrected->vertices         [newNVertices];
     
-    vdstt->nsize = vt->nsize;
     /* original vertices */
     vdst->x = v->x;
     vdst->y = v->y;
@@ -13512,14 +13510,17 @@ MRIS *MRISextractMarkedVertices(MRIS *mris)
   MRIStruncateNVertices(mris_corrected, newNVertices);
 
   int newNfaces = 0;
+
+  int fno;
   for (fno = 0; fno < mris->nfaces; fno++) {
-    f = &mris->faces[fno];
+    FACE* f = &mris->faces[fno];
     /* don't update triangle with marked vertices */
     if (triangleMarked(mris, fno)) {
       continue;
     }
     /* initialize face */
-    fdst = &mris_corrected->faces[newNfaces];
+    FACE* fdst = &mris_corrected->faces[newNfaces];
+    int n;
     for (n = 0; n < VERTICES_PER_FACE; n++) {
       fdst->v[n] = vertex_trans[f->v[n]];
     }
@@ -13532,9 +13533,8 @@ MRIS *MRISextractMarkedVertices(MRIS *mris)
     VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
     VERTEX          const * const v  = &mris->vertices         [vno];
 
-    if (v->marked) {
-      continue;
-    }
+    if (v->marked) continue;
+
     if (vertex_trans[vno] < 0 || vertex_trans[vno] >= mris_corrected->nvertices) {
       continue;
     }
@@ -13542,13 +13542,17 @@ MRIS *MRISextractMarkedVertices(MRIS *mris)
     VERTEX_TOPOLOGY * const vdstt = &mris_corrected->vertices_topology[vertex_trans[vno]];
 
     /* count # of good triangles attached to this vertex */
-    for (vdstt->num = n = 0; n < vt->num; n++)
+    vdstt->num = 0;
+    int n;
+    for (n = 0; n < vt->num; n++)
       if (triangleMarked(mris, vt->f[n]) == 0) {
         vdstt->num++;
       }
     vdstt->f = (int *)calloc(vdstt->num, sizeof(int));
     vdstt->n = (uchar *)calloc(vdstt->num, sizeof(uchar));
-    for (i = n = 0; n < vt->num; n++) {
+    
+    int i = 0;
+    for (n = 0; n < vt->num; n++) {
       if (triangleMarked(mris, vt->f[n])) {
         continue;
       }
@@ -13558,13 +13562,16 @@ MRIS *MRISextractMarkedVertices(MRIS *mris)
     }
 
     /* count # of valid neighbors */
-    for (n = vdstt->vnum = 0; n < vt->vnum; n++)
+    vdstt->vnum = 0;
+    for (n = 0; n < vt->vnum; n++)
       if (mris->vertices[vt->v[n]].marked == 0) {
         vdstt->vnum++;
       }
     vdstt->vtotal = vdstt->vnum;
     vdstt->v = (int *)calloc(vdstt->vnum, sizeof(int));
-    for (i = n = 0; n < vt->vnum; n++)
+    
+    i = 0;
+    for (n = 0; n < vt->vnum; n++)
       if (mris->vertices[vt->v[n]].marked == 0) {
         vdstt->v[i++] = vertex_trans[vt->v[n]];
       }
@@ -14705,7 +14712,7 @@ int MRISremoveIntersections(MRI_SURFACE *mris)
   ------------------------------------------------------*/
 int MRISaverageMarkedVertexPositions(MRI_SURFACE *mris, int navgs)
 {
-  int i, vno, vnb, *pnb, vnum;
+  int i, vno, vnb, vnum;
   float x, y, z, num;
   int nmarked;
 
@@ -14722,7 +14729,7 @@ int MRISaverageMarkedVertexPositions(MRI_SURFACE *mris, int navgs)
       y = v->y;
       z = v->z;
       num++; /* account for central vertex */
-      pnb = vt->v;
+      int const * pnb = vt->v;
       vnum = vt->vnum;
       for (vnb = 0; vnb < vnum; vnb++) {
         VERTEX const * const vn = &mris->vertices[*pnb++]; /* neighboring vertex pointer */

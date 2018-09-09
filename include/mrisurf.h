@@ -176,22 +176,24 @@ face_type, FACE ;
 
 #include "colortab.h" // 'COLOR_TABLE'
 
+#define BEVIN_SOMETIMES_CONST
+    // Bevin is using this to find where various fields are written
+    // so he can consolidate their modifications into a few places to keep the surface consistent
 
 #define LIST_OF_VERTEX_TOPOLOGY_ELTS \
   /* put the pointers before the ints, before the shorts, before uchars, to reduce size  */ \
   /* the whole fits in much less than one cache line, so further ordering is no use      */ \
   ELTP(int,f) SEP                   /* array neighboring face numbers */        	    \
-  ELTP(/*const*/ int,v) SEP         /* array neighboring vertex numbers, vnum long */       \
+  ELTP(BEVIN_SOMETIMES_CONST int,v) SEP         /* array neighboring vertex numbers, vnum long */       \
   ELTP(int,e) SEP                   /* edge state for neighboring vertices */    	    \
   ELTP(uchar,n) SEP           	    /* [0-3, num long] TBD what it contains */    	    \
-  ELTT(/*const*/ int,v2num) SEP     /* number of 2-connected neighbors */       	    \
-  ELTT(/*const*/ int,v3num) SEP     /* number of 3-connected neighbors */       	    \
-  ELTT(/*const*/ short,vtotal) SEP  /* total # of neighbors will be same as one of above*/  \
-  ELTT(/*const*/ uchar,nsize) SEP   /* size of neighborhood stored in vtotal */    	    \
-  ELTT(/*const*/ uchar,vnum)        /* number neighboring vertices, is v1num */    	    \
+  ELTT(BEVIN_SOMETIMES_CONST int,v2num) SEP     /* number of 2-connected neighbors */       	    \
+  ELTT(BEVIN_SOMETIMES_CONST int,v3num) SEP     /* number of 3-connected neighbors */       	    \
+  ELTT(BEVIN_SOMETIMES_CONST short,vtotal) SEP  /* total # of neighbors will be same as one of above*/  \
+  ELTT(BEVIN_SOMETIMES_CONST uchar,nsize) SEP   /* size of neighborhood stored in vtotal */    	    \
+  ELTT(BEVIN_SOMETIMES_CONST uchar,vnum)        /* number neighboring vertices, is v1num */    	    \
   ELTT(uchar,num) SEP               /* number neighboring faces */      	    	    \
   // end of macro
-
 
 // The above elements historically were in the VERTEX
 // and can still be there by

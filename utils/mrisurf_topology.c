@@ -2012,7 +2012,7 @@ static int mrisInitializeNeighborhood(MRIS *mris, int vno)
   vt->v = (int *)calloc(neighbors, sizeof(int));
   if (!vt->v)
     ErrorExit(ERROR_NO_MEMORY,
-              "MRISsetNeighborhoodSize: could not allocate list of %d "
+              "mrisInitializeNeighborhood: could not allocate list of %d "
               "nbrs at v=%d",
               neighbors,
               vno);
@@ -2032,14 +2032,14 @@ static int mrisInitializeNeighborhood(MRIS *mris, int vno)
   v->dist = (float *)calloc(neighbors, sizeof(float));
   if (!v->dist)
     ErrorExit(ERROR_NOMEMORY,
-              "MRISsetNeighborhoodSize: could not allocate list of %d "
+              "mrisInitializeNeighborhood: could not allocate list of %d "
               "dists at v=%d",
               neighbors,
               vno);
   v->dist_orig = (float *)calloc(neighbors, sizeof(float));
   if (!v->dist_orig)
     ErrorExit(ERROR_NOMEMORY,
-              "MRISsetNeighborhoodSize: could not allocate list of %d "
+              "mrisInitializeNeighborhood: could not allocate list of %d "
               "dists at v=%d",
               neighbors,
               vno);
