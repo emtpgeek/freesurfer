@@ -1,3 +1,6 @@
+add_test_executable(topology_test EXCLUDE_FROM_ALL topology_test.cpp)
+target_link_libraries(utils)
+
 add_executable(testcolortab EXCLUDE_FROM_ALL testcolortab.c)
 target_link_libraries(testcolortab utils)
 
