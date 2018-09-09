@@ -361,6 +361,7 @@ void MRISctr(MRIS *mris, int max_vertices, int max_faces, int nvertices, int nfa
   //
   bzero(mris, sizeof(MRIS));
   MRISoverAllocVerticesAndFaces(mris, nvertices, nfaces, nvertices, nfaces);
+  mris->nsize = 1;
 }
 
 void MRISdtr(MRIS *mris) {

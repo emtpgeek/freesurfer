@@ -78,6 +78,7 @@ bool mrisCheckVertexVertexTopology(MRIS const *mris)
 void mrisAddEdge(MRIS *mris, int vno1, int vno2)
 {
   cheapAssert(vno1 >= 0 && vno2 >= 0);
+  cheapAssert(vno1 < mris->nvertices && vno2 < mris->nvertices);
   costlyAssert(!mrisVerticesAreNeighbors(mris, vno1, vno2));
 
   if (Gdiag & DIAG_SHOW && DIAG_VERBOSE_ON) {
@@ -93,7 +94,8 @@ void mrisAddEdge(MRIS *mris, int vno1, int vno2)
   v1->v[v1->vnum++] = vno2;
   v2->v[v2->vnum++] = vno1;
   
-  cheapAssert(mris->nsize == 1);
+  cheapAssert(mris->nsize <= 1);
+  
   v1->nsize = 1; v1->vtotal = v1->vnum;
   v2->nsize = 1; v2->vtotal = v2->vnum;
 }
@@ -221,7 +223,7 @@ MRIS* MRIScreateWithSimilarTopologyAsSubset(
     for (srcFno = 0; srcFno < src->nfaces; srcFno++) {
         int const dstFno = mapToDstFno[srcFno];
         if (dstFno < 0) continue;
-        cheapAssert(dstFno < nvertices);
+        cheapAssert(dstFno < nfaces);
    
         FACE const * const srcF = &src->faces[srcFno];
         FACE       * const dstF = &dst->faces[dstFno];
