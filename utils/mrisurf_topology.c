@@ -209,7 +209,7 @@ MRIS* MRIScreateWithSimilarTopologyAsSubset(
                 if (pass) dstV->v[dstVnum] = dstNeighborVno;
                 dstVnum++;
             }
-            dstV->vtotal = dstV->vnum = dstVnum;
+            dstV->nsize = 1; dstV->vtotal = dstV->vnum = dstVnum;
             if (!pass) dstV->v = (int*)malloc(dstVnum * sizeof(int));
         }
     }

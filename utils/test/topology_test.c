@@ -50,6 +50,8 @@ int main(int argc, char *argv[])
   int const* dst_mapToDstFno;
 
   MRIS* dst;
+
+  MRIS_HASH srcHash, dstHash;
   
   MRIScreateSimilarTopologyMapsForNonripped(
     src,
@@ -67,7 +69,7 @@ int main(int argc, char *argv[])
   free((void*)dst_mapToDstVno);
   free((void*)dst_mapToDstFno);
   
-  MRIS_HASH srcHash, dstHash;
+  mris_print_diff(stdout, src, dst);
   mris_hash_init(&srcHash, src);
   mris_hash_init(&dstHash, dst);
   CHECK(srcHash.hash == dstHash.hash);
@@ -93,6 +95,7 @@ int main(int argc, char *argv[])
   free((void*)dst_mapToDstVno);
   free((void*)dst_mapToDstFno);
 
+  mris_print_diff(stdout, src, dst);
   mris_hash_init(&srcHash, src);
   mris_hash_init(&dstHash, dst);
   CHECK(srcHash.hash != dstHash.hash);

@@ -692,6 +692,7 @@ void mris_hash_init (MRIS_HASH* hash, MRIS const * mris);
 void mris_hash_add  (MRIS_HASH* hash, MRIS const * mris);
 void mris_hash_print(MRIS_HASH const* hash, FILE* file);
 void mris_print_hash(FILE* file, MRIS const * mris, const char* prefix, const char* suffix);
+void mris_print_diff(FILE* file, MRIS const * lhs, MRIS const * rhs);
 
 // This structs are used with the TESS functions
 typedef struct tface_type_
