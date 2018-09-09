@@ -66,15 +66,17 @@ int MRISsetInflatedFileName(char *inflated_name)
 
   mrisurf_surface_names[0] = inflated_name;
   sprintf(fname, "%s.H", inflated_name);
-  curvature_names[0] = (char *)calloc(strlen(fname) + 1, sizeof(char));
-  strcpy(curvature_names[0], fname);
+  char * copy = calloc(strlen(fname) + 1, sizeof(char));
+  strcpy(copy, fname);
+  curvature_names[0] = copy;
   return (NO_ERROR);
 }
 
 int MRISsetSulcFileName(const char *sulc_name)
 {
-  curvature_names[1] = (char *)calloc(strlen(sulc_name) + 1, sizeof(char));
-  strcpy(curvature_names[1], sulc_name);
+  char * copy = (char *)calloc(strlen(sulc_name) + 1, sizeof(char));
+  strcpy(copy, sulc_name);
+  curvature_names[1] = copy;
   return (NO_ERROR);
 }
 
@@ -191,17 +193,39 @@ void notifyActiveRealmTreesChangedNFacesNVertices(MRIS const * const mris) {
 }
 
 
+// VERTEX, FACE, EDGE primitives
+//
+static void VERTEX_TOPOLOGYdtr(VERTEX_TOPOLOGY* v) {
+  freeAndNULL(v->v);
+  freeAndNULL(v->f);
+  freeAndNULL(v->n);
+}
 
-/*-----------------------------------------------------
-  Parameters:
+static void VERTEXdtr(VERTEX* v) {
+  freeAndNULL(v->dist);
+  freeAndNULL(v->dist_orig);
+}
 
-  Returns value:
+static void FACEdtr(FACE* f) {
+  if (f->norm) DMatrixFree(&f->norm);
+  int k;
+  for (k=0; k < 3; k++){
+    if (f->gradNorm[k]) DMatrixFree(&f->gradNorm[k]);
+  }
+}
 
-  Description
-  ------------------------------------------------------*/
+static void MRIS_EDGEdtr(MRI_EDGE* e) {
+  int k;
+  for (k=0; k<4; k++){
+    if (e->gradDot[k]) DMatrixFree(&e->gradDot[k]);
+  }
+}
 
+
+// MRIS 
+//
 static void MRISchangedNFacesNVertices(MRIS * mris, bool scrambled) {
-    // useful for debugging
+  // useful for debugging
 }
 
 bool MRISreallocVertices(MRIS * mris, int max_vertices, int nvertices) {
@@ -251,6 +275,8 @@ void MRISremovedVertices(MRIS * mris, int nvertices) {
   MRISchangedNFacesNVertices(mris, true);
   *(int*)(&mris->nvertices) = nvertices;  // get around const
 }
+
+
 
 bool MRISreallocFaces(MRIS * mris, int max_faces, int nfaces) {
   cheapAssert(nfaces >= 0);
@@ -330,108 +356,43 @@ void MRISreallocVerticesAndFaces(MRIS *mris, int nvertices, int nfaces) {
 }
 
 
-/*-----------------------------------------------------
-  Parameters:
-
-  Returns value:
-
-  Description
-  ------------------------------------------------------*/
-MRIS *MRISoverAlloc(int max_vertices, int max_faces, int nvertices, int nfaces)
-{
-  // This should be the ONLY place where an MRIS is created.
+void MRISctr(MRIS *mris, int max_vertices, int max_faces, int nvertices, int nfaces) {
+  // This should be the ONLY place where an MRIS is constructed
   //
-  MRIS* mris = (MRIS *)calloc(1, sizeof(MRIS));
-  if (!mris) ErrorExit(ERROR_NO_MEMORY, 
-                "MRISalloc(%d, %d): could not allocate mris structure", max_vertices, max_faces);
-
-  MRISoverAllocVerticesAndFaces(mris, max_vertices, max_faces, nvertices, nfaces);
-
-  return (mris);
+  bzero(mris, sizeof(MRIS));
+  MRISoverAllocVerticesAndFaces(mris, nvertices, nfaces, nvertices, nfaces);
 }
 
-
-MRIS* MRISalloc(int nvertices, int nfaces)
-{
-  return MRISoverAlloc(nvertices, nfaces, nvertices, nfaces);
-}
-
-/*-----------------------------------------------------
-  Parameters:
-
-  Returns value:
-
-  Description
-  ------------------------------------------------------*/
-void MRISfree(MRIS **pmris)
-{
-  MRIS *mris;
-  int vno,e,k,faceno;
-
-  mris = *pmris;
-  *pmris = NULL;
-
-  if (mris->dx2) {
-    free(mris->dx2);
-  }
-  if (mris->dy2) {
-    free(mris->dy2);
-  }
-  if (mris->dz2) {
-    free(mris->dz2);
-  }
-  if (mris->labels) {
-    free(mris->labels);
-  }
-  if (mris->ct) {
-    CTABfree(&mris->ct);
-  }
-  for (vno = 0; vno < mris->nvertices; vno++) {
-    if (mris->vertices_topology[vno].f) {
-      free(mris->vertices_topology[vno].f);
-      mris->vertices_topology[vno].f = NULL;
-    }
-    if (mris->vertices_topology[vno].n) {
-      free(mris->vertices_topology[vno].n);
-      mris->vertices_topology[vno].n = NULL;
-    }
-    if (mris->vertices[vno].dist) {
-      free(mris->vertices[vno].dist);
-      mris->vertices[vno].dist = NULL;
-    }
-    if (mris->vertices[vno].dist_orig) {
-      free(mris->vertices[vno].dist_orig);
-      mris->vertices[vno].dist_orig = NULL;
-    }
-    if (mris->vertices_topology[vno].v) {
-      free(mris->vertices_topology[vno].v);
-      mris->vertices_topology[vno].v = NULL;
-    }
-  }
-
-  free(mris->faceNormDeferredEntries);
-  free(mris->faceNormCacheEntries);
+void MRISdtr(MRIS *mris) {
+  freeAndNULL(mris->dx2);
+  freeAndNULL(mris->dy2);
+  freeAndNULL(mris->dz2);
+  freeAndNULL(mris->labels);
   
-  if (mris->vertices) {
-    free(mris->vertices);
+  if (mris->ct) CTABfree(&mris->ct);
+  
+  int vno;
+  for (vno = 0; vno < mris->nvertices; vno++) {
+    VERTEX_TOPOLOGYdtr(&mris->vertices_topology[vno]);
+    VERTEXdtr         (&mris->vertices         [vno]);
   }
-  if(mris->faces) {
-    for(faceno = 0; faceno < mris->nfaces; faceno++){
-      if(mris->faces[faceno].norm) DMatrixFree(&mris->faces[faceno].norm);
-      for(k=0; k < 3; k++){
-	if(mris->faces[faceno].gradNorm[k]) DMatrixFree(&mris->faces[faceno].gradNorm[k]);
-      }
-    }
-    free(mris->faces);
+  freeAndNULL(mris->vertices);
+
+  freeAndNULL(mris->faceNormDeferredEntries);
+  freeAndNULL(mris->faceNormCacheEntries);
+  
+  int faceno;
+  for(faceno = 0; faceno < mris->nfaces; faceno++){
+    FACEdtr(&mris->faces[faceno]);
   }
-  if(mris->edges) {
-    for(e=0; e < mris->nedges; e++){
-      for(k=0; k<4; k++){
-	if(mris->edges[e].gradDot[k]) DMatrixFree(&mris->edges[e].gradDot[k]);
-      }
-    }
-    free(mris->edges);
+  freeAndNULL(mris->faces);
+
+  int edgeNo;
+  for (edgeNo=0; edgeNo < mris->nedges; edgeNo++) {
+    MRIS_EDGEdtr(&mris->edges[edgeNo]);
   }
+  freeAndNULL(mris->edges);
+
   if (mris->free_transform) {
     if (mris->SRASToTalSRAS_) {
       MatrixFree(&(mris->SRASToTalSRAS_));
@@ -444,24 +405,51 @@ void MRISfree(MRIS **pmris)
     }
   }
 
-  {
-    int i;
-    for (i = 0; i < mris->ncmds; i++) {
-      free(mris->cmdlines[i]);
-    }
+  int i;
+  for (i = 0; i < mris->ncmds; i++) {
+    freeAndNULL(mris->cmdlines[i]);
   }
+
   if (mris->m_sras2vox) {
     MatrixFree(&mris->m_sras2vox);
   }
 
-  free(mris);
-  return (NO_ERROR);
 }
 
 
-char *mrisurf_surface_names[3] = {"inflated", "smoothwm", "smoothwm"};
-char *curvature_names[3] = {"inflated.H", "sulc", NULL};
-int MRISsetCurvatureName(int nth, char *name)
+// Heap allocators are simply malloc and ctr the object, freeing is the opposite
+//
+MRIS *MRISoverAlloc(int max_vertices, int max_faces, int nvertices, int nfaces)
+{
+  MRIS* mris = (MRIS *)malloc(sizeof(MRIS));
+  if (!mris) ErrorExit(ERROR_NO_MEMORY, 
+                "MRISalloc(%d, %d): could not allocate mris structure", max_vertices, max_faces);
+
+  MRISctr(mris, max_vertices, max_faces, nvertices, nfaces);
+
+  return (mris);
+}
+
+MRIS* MRISalloc(int nvertices, int nfaces)
+{
+  return MRISoverAlloc(nvertices, nfaces, nvertices, nfaces);
+}
+
+void MRISfree(MRIS **pmris)
+{
+  MRIS *mris = *pmris;
+  *pmris = NULL;
+  MRISdtr(mris);
+  free(mris);
+}
+
+
+//
+//
+char const * mrisurf_surface_names[3] = {"inflated", "smoothwm", "smoothwm"};
+char const * curvature_names      [3] = {"inflated.H", "sulc", NULL};
+
+int MRISsetCurvatureName(int nth, char const *name)
 {
   if (nth > 2) {
     printf("ERROR: MRISsetCurvatureName() nth=%d > 2\n", nth);
@@ -470,6 +458,7 @@ int MRISsetCurvatureName(int nth, char *name)
   curvature_names[nth] = strcpyalloc(name);
   return (0);
 }
+
 int MRISprintCurvatureNames(FILE *fp)
 {
   int k;

@@ -607,16 +607,21 @@ MRI_SURFACE, MRIS ;
 typedef const MRIS MRIS_const;
     // Ideally the MRIS and all the things it points to would be unchangeable via this object but C can't express this concept esaily.
 
-MRI_SURFACE* MRISoverAlloc              (                   int max_vertices, int max_faces, int nvertices, int nfaces) ;
-MRI_SURFACE* MRISalloc                  (                                                    int nvertices, int nfaces) ;
+void MRISctr(MRIS *mris, int max_vertices, int max_faces, int nvertices, int nfaces);
+void MRISdtr(MRIS *mris);
     //
-    // These are only way to create a surface.
-    // All other information is 0's and nullptrs
+    // These are only way to create a surface and destroy a surface.
+    // The destruction frees any child structures.
     //
     // There are functions below for editing the surface by adding vertex positions, edges, face information, etc.
     // There is even one for creating one similar to a subset of another's vertices and faces - MRIScreateWithSimilarTopologyAsSubset
 
-void MRISfree(MRI_SURFACE **pmris) ;
+MRI_SURFACE* MRISoverAlloc              (                   int max_vertices, int max_faces, int nvertices, int nfaces) ;
+MRI_SURFACE* MRISalloc                  (                                                    int nvertices, int nfaces) ;
+    //
+    // Allocates an MRIS then calls MRISctr
+
+void MRISfree(MRIS **pmris) ;
     //
     // The only way to delete a surface.  All the substructures are also freed, and the *pmris set to nullptr
     
@@ -624,29 +629,41 @@ void MRISreallocVerticesAndFaces(MRI_SURFACE *mris, int nvertices, int nfaces) ;
     //
     // Used by code that is deforming the surface
 
+// The following create a copy of a surface, whilest deleteing some vertices and some faces
+// The faces that are kept must not reference any vertices which are not kept.
+// There is a function to help generate such a mapping...
+//
 MRIS* MRIScreateWithSimilarTopologyAsSubset(
     MRIS_const * src,
-    size_t       nvertices,     // the mapToNewVno entries must each be less than this
-    int const*   mapToNewVno,   // src->nvertices entries, with the entries being -1 (vertex should be ignored) or the vno within the new surface the face maps to
-    size_t       nfaces,        // the mapToNewFno entries must each be less than this
-    int const*   mapToNewFno);  // src->nfaces entries, with the entries being -1 (face should be ignored) or the fno within the new surface the face maps to
+    size_t       nvertices,     // the mapToDstVno entries must each be less than this
+    int const*   mapToDstVno,   // src->nvertices entries, with the entries being -1 (vertex should be ignored) or the vno within the dst surface the face maps to
+    size_t       nfaces,        // the mapToDstFno entries must each be less than this
+    int const*   mapToDstFno);  // src->nfaces entries, with the entries being -1 (face should be ignored) or the fno within the dst surface the face maps to
     //
     // Used to extract some of the vertices, some of the faces, and to renumber them.
     // mrisurf_deform uses this for several purposes.
 
 MRIS* MRIScreateWithSimilarXYZAsSubset(
     MRIS_const * src,
-    size_t       nvertices,
-    int const*   mapToNewVno,
-    size_t       nfaces,
-    int const*   mapToNewFno);
+    size_t       nvertices,     // the mapToDstVno entries must each be less than this
+    int const*   mapToDstVno,   // src->nvertices entries, with the entries being -1 (vertex should be ignored) or the vno within the dst surface the face maps to
+    size_t       nfaces,        // the mapToDstFno entries must each be less than this
+    int const*   mapToDstFno);  // src->nfaces entries, with the entries being -1 (face should be ignored) or the fno within the dst surface the face maps to
 
 MRIS* MRIScreateWithSimilarPropertiesAsSubset(
     MRIS_const * src,
-    size_t       nvertices,
-    int const*   mapToNewVno,
-    size_t       nfaces,
-    int const*   mapToNewFno);
+    size_t       nvertices,     // the mapToDstVno entries must each be less than this
+    int const*   mapToDstVno,   // src->nvertices entries, with the entries being -1 (vertex should be ignored) or the vno within the dst surface the face maps to
+    size_t       nfaces,        // the mapToDstFno entries must each be less than this
+    int const*   mapToDstFno);  // src->nfaces entries, with the entries being -1 (face should be ignored) or the fno within the dst surface the face maps to
+
+void MRIScreateSimilarTopologyMapsForNonripped(
+    MRIS_const * src,
+    size_t     * pnvertices,     // the mapToDstVno entries must each be less than this
+    int const* * pmapToDstVno,   // src->nvertices entries, with the entries being -1 (vertex should be ignored) or the vno within the dst surface the face maps to
+    size_t     * pnfaces,        // the mapToDstFno entries must each be less than this
+    int const* * pmapToDstFno);  // src->nfaces entries, with the entries being -1 (face should be ignored) or the fno within the dst surface the face maps to
+    // The caller should free the * pmapToDstVno and * pmapToDstFno
 
 // There are various fields in the VERTEX and FACE and others that are used for many purposes at different
 // times, and clashing uses could cause a big problem.  Start working towards a reservation system.
@@ -1898,7 +1915,7 @@ int MRISdivideEdges(MRI_SURFACE *mris, int npoints) ;
 int MRISremoveTriangleLinks(MRI_SURFACE *mris) ;
 int MRISsetOriginalFileName(char *orig_name) ;
 int MRISsetSulcFileName(const char *sulc_name) ;
-int MRISsetCurvatureName(int nth, char *name);
+int MRISsetCurvatureName(int nth, const char *name);
 int MRISprintCurvatureNames(FILE *fp);
 int MRISsetInflatedFileName(char *inflated_name) ;
 int MRISsetRegistrationSigmas(float *sigmas, int nsigmas) ;

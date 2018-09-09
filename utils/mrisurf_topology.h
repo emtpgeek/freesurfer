@@ -26,7 +26,7 @@
 
 // Vertex-only properties
 //
-void mrisCheckVertexVertexTopology(MRIS const * mris);
+bool mrisCheckVertexVertexTopology(MRIS const * mris);
 
 
 void mrisRemoveEdge(MRIS *mris, int vno1, int vno2);

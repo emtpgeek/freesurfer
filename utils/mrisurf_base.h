@@ -361,7 +361,6 @@ extern int noteVnoMovedInActiveRealmTreesCount;
 void noteVnoMovedInActiveRealmTrees              (MRIS const * const mris, int vno);
 void notifyActiveRealmTreesChangedNFacesNVertices(MRIS const * const mris);
 
-extern char *mrisurf_surface_names[3];
-extern char *curvature_names[3];
-int MRISsetCurvatureName(int nth, char *name);
+extern const char *mrisurf_surface_names[3];
+extern const char *curvature_names[3];
 int MRISprintCurvatureNames(FILE *fp);

@@ -22,34 +22,56 @@
 // MRIS code dealing with the existence and connectedness of the vertices, edges, and faces
 //                   and with their partitioning into sets (ripped, marked, ...)
 //                   but not with their placement in the xyz coordinate space
-
-
-void mrisCheckVertexVertexTopology(MRIS const *mris)
+bool mrisCheckVertexVertexTopology(MRIS const *mris)
 {
   int vno1;
   for (vno1 = 0; vno1 < mris->nvertices; vno1++) {
-    VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno1];
+    VERTEX_TOPOLOGY const * const v = &mris->vertices_topology[vno1];
 
     int n;
-    for (n = 0; n < vt->vnum; n++) {
-      int vno2 = vt->v[n];
+    for (n = 0; n < v->vnum; n++) {
+      int vno2 = v->v[n];
 
       // neighborlyness is commutative
       if (!mrisVerticesAreNeighbors(mris, vno2, vno1)) {
           fprintf(stdout, "[vno1:%d].v[%d] not found in [vno2:%d].v[*]\n", vno1, n, vno2);
           DiagBreak();
+          return false;
       }
       
       // neighbors should only appear once
       int i;
       for (i = 0; i < n; i++) {
-        if (vno2 == vt->v[i]) {
-          fprintf(stdout, "[vno1:%d].v[%d]:%d same as [vno1:%d].v[%d]", vno1, n, vno2, i, vt->v[i]);
+        if (vno2 == v->v[i]) {
+          fprintf(stdout, "[vno1:%d].v[%d]:%d same as [vno1:%d].v[%d]", vno1, n, vno2, i, v->v[i]);
           DiagBreak();
+          return false;
         }
       }
     }
+    
+    if (!mris->vertices[vno1].ripflag) {
+      int vtotalExpected = 0;
+      switch (v->nsize) {
+      case 1: vtotalExpected = v->vnum;  break;
+      case 2: vtotalExpected = v->v2num; break;
+      case 3: vtotalExpected = v->v3num; break;
+      default: break;
+      }
+      if (mris->nsize > 0 && mris->nsize != v->nsize) {
+        fprintf(stdout, "[vno1:%d].nsize:%d differs from mris->nsize[%d]", vno1, v->nsize, mris->nsize);
+        DiagBreak();
+        return false;
+      }
+      if (v->nsize > 0 && v->vtotal != vtotalExpected) {
+        fprintf(stdout, "[vno1:%d].vtotal:%d differs from expected:%d for nsize:%d", vno1, v->vtotal, vtotalExpected, v->nsize);
+        DiagBreak();
+        return false;
+      }
+    }
   }
+  
+  return true;
 }
 
 
@@ -109,6 +131,114 @@ void mrisRemoveEdge(MRIS *mris, int vno1, int vno2)
 }
 
 
+void MRIScreateSimilarTopologyMapsForNonripped(
+    MRIS_const * src,
+    size_t     * pnvertices,     // the mapToDstVno entries must each be less than this
+    int const* * pmapToDstVno,   // src->nvertices entries, with the entries being -1 (vertex should be ignored) or the vno within the dst surface the face maps to
+    size_t     * pnfaces,        // the mapToDstFno entries must each be less than this
+    int const* * pmapToDstFno    // src->nfaces entries, with the entries being -1 (face should be ignored) or the fno within the dst surface the face maps to
+    ) {
+    // The caller should free the * pmapToDstVno and * pmapToDstFno
+
+    int  nvertices   = 0;    
+    int* mapToDstVno = (int*)malloc(src->nvertices*sizeof(int)); 
+    int  nfaces      = 0;    
+    int* mapToDstFno = (int*)malloc(src->nfaces*sizeof(int));
+     
+    int srcVno;
+    for (srcVno = 0; srcVno < src->nvertices; srcVno++) {
+        VERTEX const * const srcV = &src->vertices[srcVno];    
+        mapToDstVno[srcVno] = srcV->ripflag ? -1 : nvertices++;
+    }    
+
+    int srcFno;
+    for (srcFno = 0; srcFno < src->nfaces; srcFno++) {
+        FACE const * const srcF = &src->faces[srcFno];
+
+        bool elided = false;
+        int i;
+        for (i = 0; i < VERTICES_PER_FACE; i++) {
+            int srcVno = srcF->v[i];
+            int dstVno = mapToDstVno[srcVno];
+            elided |= (dstVno < 0);
+        }
+
+        mapToDstFno[srcVno] = elided ? -1 : nfaces++;
+    }
+
+    *pnvertices     = nvertices;
+    *pmapToDstVno   = mapToDstVno;
+    *pnfaces        = nfaces;
+    *pmapToDstFno   = mapToDstFno;
+}
+
+
+MRIS* MRIScreateWithSimilarTopologyAsSubset(
+    MRIS_const * src,
+    size_t       nvertices,     // the mapToDstVno entries must each be less than this
+    int const*   mapToDstVno,   // src->nvertices entries, with the entries being -1 (vertex should be ignored) or the vno within the dst surface the face maps to
+    size_t       nfaces,        // the mapToDstFno entries must each be less than this
+    int const*   mapToDstFno) { // src->nfaces entries, with the entries being -1 (face should be ignored) or the fno within the dst surface the face maps to
+
+    MRIS* const dst = MRISalloc(nvertices, nfaces);
+    
+    // Add the edges 
+    //
+    int srcVno;
+    for (srcVno = 0; srcVno < src->nvertices; srcVno++) {
+        int const dstVno = mapToDstVno[srcVno];
+        if (dstVno < 0) continue;
+        cheapAssert(dstVno < nvertices);
+        
+        VERTEX_TOPOLOGY const * const srcV = &src->vertices_topology[srcVno];    
+        VERTEX_TOPOLOGY       *       dstV = &dst->vertices_topology[dstVno];    
+        
+        // could just add any needed dst edges using mrisAddEdge()
+        // but this is much more efficient
+        //
+        int pass;
+        for (pass = 0; pass<2; pass++) {
+            int dstVnum = 0;
+            int i;
+            for (i = 0; i < srcV->vnum; i++) {
+                int const srcNeighborVno = srcV->v[i];
+                int const dstNeighborVno = mapToDstVno[srcNeighborVno];
+                if (dstNeighborVno < 0) continue;
+                if (pass) dstV->v[dstVnum] = dstNeighborVno;
+                dstVnum++;
+            }
+            dstV->vtotal = dstV->vnum = dstVnum;
+            if (!pass) dstV->v = (int*)malloc(dstVnum * sizeof(int));
+        }
+    }
+    dst->nsize = 1;
+
+    costlyAssert(mrisCheckVertexVertexTopology(dst));
+
+    // Add the faces
+    //
+    int srcFno;
+    for (srcFno = 0; srcFno < src->nfaces; srcFno++) {
+        int const dstFno = mapToDstFno[srcFno];
+        if (dstFno < 0) continue;
+        cheapAssert(dstFno < nvertices);
+   
+        FACE const * const srcF = &src->faces[srcFno];
+        FACE       * const dstF = &dst->faces[dstFno];
+
+        int i;
+        for (i = 0; i < VERTICES_PER_FACE; i++) {
+            int srcVno = srcF->v[i];
+            int dstVno = mapToDstVno[srcVno];
+            cheapAssert(0 <= dstVno);
+            cheapAssert(dstVno < nvertices);
+            dstF->v[i] = dstVno;
+        }
+    }
+   
+    return dst;
+}
+
 int MRISresetNeighborhoodSize(MRIS *mris, int nsize)
 {
   int vno;
@@ -163,6 +293,8 @@ int MRISresetNeighborhoodSize(MRIS *mris, int nsize)
   mris->nsize = nsize;  
     // note: it can be -1, which means that the vertices may have differing neighborhood sizes
   
+  costlyAssert(mrisCheckVertexVertexTopology(dst));
+
   return (NO_ERROR);
 }
 
