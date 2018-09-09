@@ -339,14 +339,11 @@ void MRISreallocVerticesAndFaces(MRIS *mris, int nvertices, int nfaces) {
   ------------------------------------------------------*/
 MRIS *MRISoverAlloc(int max_vertices, int max_faces, int nvertices, int nfaces)
 {
+  // This should be the ONLY place where an MRIS is created.
+  //
   MRIS* mris = (MRIS *)calloc(1, sizeof(MRIS));
   if (!mris) ErrorExit(ERROR_NO_MEMORY, 
                 "MRISalloc(%d, %d): could not allocate mris structure", max_vertices, max_faces);
-
-  mris->nsize = 1;      // only 1-connected neighbors initially
-
-  mris->useRealRAS = 0; // just initialize
-  mris->vg.valid = 0;   // mark as invalid
 
   MRISoverAllocVerticesAndFaces(mris, max_vertices, max_faces, nvertices, nfaces);
 
@@ -366,7 +363,7 @@ MRIS* MRISalloc(int nvertices, int nfaces)
 
   Description
   ------------------------------------------------------*/
-int MRISfree(MRIS **pmris)
+void MRISfree(MRIS **pmris)
 {
   MRIS *mris;
   int vno,e,k,faceno;

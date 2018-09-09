@@ -604,6 +604,50 @@ LIST_OF_MRIS_ELTS ;
 }
 MRI_SURFACE, MRIS ;
 
+typedef const MRIS MRIS_const;
+    // Ideally the MRIS and all the things it points to would be unchangeable via this object but C can't express this concept esaily.
+
+MRI_SURFACE* MRISoverAlloc              (                   int max_vertices, int max_faces, int nvertices, int nfaces) ;
+MRI_SURFACE* MRISalloc                  (                                                    int nvertices, int nfaces) ;
+    //
+    // These are only way to create a surface.
+    // All other information is 0's and nullptrs
+    //
+    // There are functions below for editing the surface by adding vertex positions, edges, face information, etc.
+    // There is even one for creating one similar to a subset of another's vertices and faces - MRIScreateWithSimilarTopologyAsSubset
+
+void MRISfree(MRI_SURFACE **pmris) ;
+    //
+    // The only way to delete a surface.  All the substructures are also freed, and the *pmris set to nullptr
+    
+void MRISreallocVerticesAndFaces(MRI_SURFACE *mris, int nvertices, int nfaces) ;
+    //
+    // Used by code that is deforming the surface
+
+MRIS* MRIScreateWithSimilarTopologyAsSubset(
+    MRIS_const * src,
+    size_t       nvertices,     // the mapToNewVno entries must each be less than this
+    int const*   mapToNewVno,   // src->nvertices entries, with the entries being -1 (vertex should be ignored) or the vno within the new surface the face maps to
+    size_t       nfaces,        // the mapToNewFno entries must each be less than this
+    int const*   mapToNewFno);  // src->nfaces entries, with the entries being -1 (face should be ignored) or the fno within the new surface the face maps to
+    //
+    // Used to extract some of the vertices, some of the faces, and to renumber them.
+    // mrisurf_deform uses this for several purposes.
+
+MRIS* MRIScreateWithSimilarXYZAsSubset(
+    MRIS_const * src,
+    size_t       nvertices,
+    int const*   mapToNewVno,
+    size_t       nfaces,
+    int const*   mapToNewFno);
+
+MRIS* MRIScreateWithSimilarPropertiesAsSubset(
+    MRIS_const * src,
+    size_t       nvertices,
+    int const*   mapToNewVno,
+    size_t       nfaces,
+    int const*   mapToNewFno);
+
 // There are various fields in the VERTEX and FACE and others that are used for many purposes at different
 // times, and clashing uses could cause a big problem.  Start working towards a reservation system.
 //
@@ -1173,11 +1217,6 @@ int          MRISaverageVertexPositions(MRI_SURFACE *mris, int navgs) ;
 int          MRIScomputeNormal(MRIS *mris, int which, int vno,
                                double *pnx, double *pny, double *pnz) ;
 
-MRI_SURFACE* MRISoverAlloc              (                   int max_vertices, int max_faces, int nvertices, int nfaces) ;
-MRI_SURFACE* MRISalloc                  (                                                    int nvertices, int nfaces) ;
-void         MRISreallocVerticesAndFaces(MRI_SURFACE *mris,                                  int nvertices, int nfaces) ;
-    
-int          MRISfree(MRI_SURFACE **pmris) ;
 int   MRISintegrate(MRI_SURFACE *mris, INTEGRATION_PARMS *parms, int n_avgs);
 int   mrisLogIntegrationParms(FILE *fp, MRI_SURFACE *mris,
 			      INTEGRATION_PARMS *parms) ;
