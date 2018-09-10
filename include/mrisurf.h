@@ -25,8 +25,6 @@
  * Reporting: freesurfer@nmr.mgh.harvard.edu
  *
  */
-
-
 #include "minc_volume_io.h"
 #include "const.h"
 #include "matrix.h"
@@ -127,8 +125,12 @@ typedef struct edge_type_
 
 typedef struct face_type_
 {
+#define BEVIN_SOMETIMES_CONST_F 
+    // Bevin is using this to find where various fields are written
+    // so he can consolidate their modifications into a few places to keep the surface consistent
+
 #define LIST_OF_FACE_ELTS_1    \
-  ELTT(vertices_per_face_t,v) SEP               /* vertex numbers of this face */    \
+  ELTT(BEVIN_SOMETIMES_CONST_F vertices_per_face_t,v) SEP               /* vertex numbers of this face */    \
   ELTT(float,area) SEP    \
   ELTT(angles_per_triangle_t,angle) SEP    \
   ELTT(angles_per_triangle_t,orig_angle) SEP    \
@@ -176,7 +178,7 @@ face_type, FACE ;
 
 #include "colortab.h" // 'COLOR_TABLE'
 
-#define BEVIN_SOMETIMES_CONST
+#define BEVIN_SOMETIMES_CONST_V
     // Bevin is using this to find where various fields are written
     // so he can consolidate their modifications into a few places to keep the surface consistent
 
@@ -184,14 +186,14 @@ face_type, FACE ;
   /* put the pointers before the ints, before the shorts, before uchars, to reduce size  */ \
   /* the whole fits in much less than one cache line, so further ordering is no use      */ \
   ELTP(int,f) SEP                   /* array neighboring face numbers */        	    \
-  ELTP(BEVIN_SOMETIMES_CONST int,v) SEP         /* array neighboring vertex numbers, vnum long */       \
+  ELTP(BEVIN_SOMETIMES_CONST_V int,v) SEP         /* array neighboring vertex numbers, vnum long */       \
   ELTP(int,e) SEP                   /* edge state for neighboring vertices */    	    \
   ELTP(uchar,n) SEP           	    /* [0-3, num long] TBD what it contains */    	    \
-  ELTT(BEVIN_SOMETIMES_CONST int,v2num) SEP     /* number of 2-connected neighbors */       	    \
-  ELTT(BEVIN_SOMETIMES_CONST int,v3num) SEP     /* number of 3-connected neighbors */       	    \
-  ELTT(BEVIN_SOMETIMES_CONST short,vtotal) SEP  /* total # of neighbors will be same as one of above*/  \
-  ELTT(BEVIN_SOMETIMES_CONST uchar,nsize) SEP   /* size of neighborhood stored in vtotal */    	    \
-  ELTT(BEVIN_SOMETIMES_CONST uchar,vnum)        /* number neighboring vertices, is v1num */    	    \
+  ELTT(BEVIN_SOMETIMES_CONST_V int,v2num) SEP     /* number of 2-connected neighbors */       	    \
+  ELTT(BEVIN_SOMETIMES_CONST_V int,v3num) SEP     /* number of 3-connected neighbors */       	    \
+  ELTT(BEVIN_SOMETIMES_CONST_V short,vtotal) SEP  /* total # of neighbors will be same as one of above*/  \
+  ELTT(BEVIN_SOMETIMES_CONST_V uchar,nsize) SEP   /* size of neighborhood stored in vtotal */    	    \
+  ELTT(BEVIN_SOMETIMES_CONST_V uchar,vnum)        /* number neighboring vertices, is v1num */    	    \
   ELTT(uchar,num) SEP               /* number neighboring faces */      	    	    \
   // end of macro
 
@@ -1661,7 +1663,7 @@ int   MRISsetMarks(MRI_SURFACE *mris, int mark) ;
 int   MRISsequentialAverageVertexPositions(MRI_SURFACE *mris, int navgs) ;
 int   MRISreverseCoords(MRI_SURFACE *mris, int which_direction, int reverse_face_order, int which_coords) ;
 int   MRISreverse(MRI_SURFACE *mris, int which, int reverse_face_order) ;
-int   MRISreverseFaceOrder(MRIS *mris);
+void  MRISreverseFaceOrder(MRIS *mris);
 int   MRISdisturbOriginalDistances(MRI_SURFACE *mris, double max_pct) ;
 double MRISstoreAnalyticDistances(MRI_SURFACE *mris, int which) ;
 int   MRISnegateValues(MRI_SURFACE *mris) ;
@@ -2658,14 +2660,26 @@ MRIS *MRISsortVertices(MRIS *mris0);
 
 // mrisurf_topology needed by more
 //
+//  Vertices, like Faces, come into existence when the surface is created with a vertex and face count.
+//  Edges are implicit (MRI_EDGE is more than just an edge), and are created by telling each of the end vertices that they are neighbors.
+//  Faces get associated with three edges associated with three vertices (VERTICES_PER_FACE is 3)
+//
+bool mrisCheckVertexVertexTopology(MRIS const * mris);
+bool mrisCheckVertexFaceTopology  (MRIS const * mris);  // includes a mrisCheckVertexVertexTopology check
+
 static int  mrisVertexNeighborIndex (MRIS const * mris, int vno1, int vno2);
 static bool mrisVerticesAreNeighbors(MRIS const * mris, int vno1, int vno2);
 void mrisAddEdge   (MRIS* mris, int vno1, int vno2);
 
+void mrisAttachFaceToEdges   (MRIS* mris, int fno, int vno1, int vno2, int vno3);   // edges must already exist
+void mrisAttachFaceToVertices(MRIS* mris, int fno, int vno1, int vno2, int vno3);   // adds any needed edges
+
+int mrisSetVertexFaceIndex(MRIS *mris, int vno, int fno);
 
 // Static function implementations
 //
 static int mrisVertexNeighborIndex(MRIS const *mris, int vno1, int vno2) {
+  cheapAssert(0 <= vno1 && vno1 < mris->nvertices);
   VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno1];
   int n;
   for (n = 0; n < vt->vnum; n++) {

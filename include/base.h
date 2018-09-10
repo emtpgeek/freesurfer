@@ -89,10 +89,16 @@ extern const char *Progname;
     static int omp_get_thread_num()  { return 0; }
 #endif
 
+
 // assertions
 //
 #define cheapAssert(TST)        { if (!(TST)) *(int*)-1 = 0; }
 #define costlyAssert(TST) //    { if (!(TST)) *(int*)-1 = 0; }
+
+#define cheapAssertValidFno(_MRIS, _FNO) cheapAssert((0 <= _FNO) && (_FNO < _MRIS->nfaces))
+#define cheapAssertValidVno(_MRIS, _VNO) cheapAssert((0 <= _VNO) && (_VNO < _MRIS->nvertices))
+
+
 
 // Regardless of whether the __real_malloc etc. or the __wrap_ ones, it is still desirable
 // to know where in the program the allocations are happening.  This mechanism allows that to happen.

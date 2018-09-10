@@ -74,13 +74,18 @@ bool mrisCheckVertexVertexTopology(MRIS const *mris)
   return true;
 }
 
+bool mrisCheckVertexFaceTopology(MRIS const * mris) {
+  if (!mrisCheckVertexVertexTopology(mris)) return false;
+  
+  // TODO
+  
+  return true;
+}
 
-void mrisAddEdge(MRIS *mris, int vno1, int vno2)
-{
-  cheapAssert(vno1 >= 0 && vno2 >= 0);
-  cheapAssert(vno1 < mris->nvertices && vno2 < mris->nvertices);
-  costlyAssert(!mrisVerticesAreNeighbors(mris, vno1, vno2));
-
+static void mrisAddEdgeWkr(MRIS *mris, int vno1, int vno2) {
+  cheapAssertValidVno(mris,vno1);
+  cheapAssertValidVno(mris,vno2);
+  
   if (Gdiag & DIAG_SHOW && DIAG_VERBOSE_ON) {
     fprintf(stdout, "adding edge %d <--> %d\n", vno1, vno2);
   }
@@ -100,9 +105,17 @@ void mrisAddEdge(MRIS *mris, int vno1, int vno2)
   v2->nsize = 1; v2->vtotal = v2->vnum;
 }
 
+void mrisAddEdge(MRIS *mris, int vno1, int vno2)
+{
+  costlyAssert(!mrisVerticesAreNeighbors(mris, vno1, vno2));
+  mrisAddEdgeWkr(mris, vno1, vno2);
+}
+
+
 void mrisRemoveEdge(MRIS *mris, int vno1, int vno2)
 {
-  cheapAssert(vno1 >= 0 && vno2 >= 0);
+  cheapAssertValidVno(mris,vno1);
+  cheapAssertValidVno(mris,vno2);
   costlyAssert(mrisVerticesAreNeighbors(mris, vno1, vno2));
 
   if (Gdiag & DIAG_SHOW && DIAG_VERBOSE_ON) {
@@ -130,7 +143,98 @@ void mrisRemoveEdge(MRIS *mris, int vno1, int vno2)
   cheapAssert(mris->nsize == 1);
   v1->vtotal = v1->vnum;
   v2->vtotal = v2->vnum;
+  
+  // TODO what about any faces that use this edge?
 }
+
+
+int mrisSetVertexFaceIndex(MRIS *mris, int vno, int fno)
+  // HACK - external usage of this should be eliminated!
+{
+  FACE *f;
+  int n, i;
+
+  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+  f = &mris->faces[fno];
+
+  for (n = 0; n < VERTICES_PER_FACE; n++) {
+    if (f->v[n] == vno) {
+      break;
+    }
+  }
+  if (n >= VERTICES_PER_FACE) {
+    return (ERROR_BADPARM);
+  }
+
+  for (i = 0; i < vt->num; i++)
+    if (vt->f[i] == fno) {
+      vt->n[i] = n;
+    }
+
+  return (n);
+}
+
+
+static void mrisAttachFaceWkr(MRIS* mris, int fno, int vno0, int vno1, int vno2, bool edgesMustExist) {
+  cheapAssertValidFno(mris,fno);
+  cheapAssertValidVno(mris,vno0);
+  cheapAssertValidVno(mris,vno1);
+  cheapAssertValidVno(mris,vno2);
+
+  int vno[4]; vno[0] = vno0; vno[1] = vno1;  vno[2] = vno2;  vno[3] = vno0;
+  if (edgesMustExist) {
+    int i; 
+    for (i = 0; i < 3; i++) {
+      costlyAssert(mrisVerticesAreNeighbors(mris, vno[i], vno[i+1]));
+    }
+  } else {
+    int i; 
+    for (i = 0; i < 3; i++) {
+        if (!mrisVerticesAreNeighbors(mris, vno[i], vno[i+1]))
+             mrisAddEdgeWkr          (mris, vno[i], vno[i+1]);
+    }
+  }
+  
+  FACE * const f = &mris->faces[fno];
+  cheapAssert((f->v[0]|f->v[1]|f->v[2]) == 0);  // not currently attached
+  f->v[0] = vno0;
+  f->v[1] = vno1;
+  f->v[2] = vno2;
+  mrisSetVertexFaceIndex(mris, vno0, fno);
+  mrisSetVertexFaceIndex(mris, vno1, fno);
+  mrisSetVertexFaceIndex(mris, vno2, fno);
+}
+
+void mrisAttachFaceToEdges   (MRIS* mris, int fno, int vno1, int vno2, int vno3) {
+  mrisAttachFaceWkr(mris, fno, vno1, vno2, vno3, true);
+}
+
+void mrisAttachFaceToVertices(MRIS* mris, int fno, int vno1, int vno2, int vno3) {
+  mrisAttachFaceWkr(mris, fno, vno1, vno2, vno3, false);
+}
+
+/*!
+  \fn void MRISreverseFaceOrder(MRIS *mris)
+  \brief Reverse order of the vertices in each face. This
+  is needed when changing the sign of the x surface coord.
+*/
+void MRISreverseFaceOrder(MRIS *mris)
+{
+  int fno;
+  for (fno = 0; fno < mris->nfaces; fno++) {
+    FACE* f = &mris->faces[fno];
+    int vno0 = f->v[0];
+    int vno1 = f->v[1];
+    int vno2 = f->v[2];
+    f->v[0] = vno2;
+    f->v[1] = vno1;
+    f->v[2] = vno0;
+    mrisSetVertexFaceIndex(mris, vno0, fno);
+    mrisSetVertexFaceIndex(mris, vno1, fno);
+    mrisSetVertexFaceIndex(mris, vno2, fno);
+  }
+}
+
 
 
 void MRIScreateSimilarTopologyMapsForNonripped(
@@ -140,7 +244,8 @@ void MRIScreateSimilarTopologyMapsForNonripped(
     size_t     * pnfaces,        // the mapToDstFno entries must each be less than this
     int const* * pmapToDstFno    // src->nfaces entries, with the entries being -1 (face should be ignored) or the fno within the dst surface the face maps to
     ) {
-    // The caller should free the * pmapToDstVno and * pmapToDstFno
+
+    // test: utils/test/topology_test
 
     int  nvertices   = 0;    
     int* mapToDstVno = (int*)malloc(src->nvertices*sizeof(int)); 
@@ -157,7 +262,7 @@ void MRIScreateSimilarTopologyMapsForNonripped(
     for (srcFno = 0; srcFno < src->nfaces; srcFno++) {
         FACE const * const srcF = &src->faces[srcFno];
 
-        bool elided = false;
+        bool elided = !!srcF->ripflag;
         int i;
         for (i = 0; i < VERTICES_PER_FACE; i++) {
             int srcVno = srcF->v[i];
@@ -165,7 +270,7 @@ void MRIScreateSimilarTopologyMapsForNonripped(
             elided |= (dstVno < 0);
         }
 
-        mapToDstFno[srcVno] = elided ? -1 : nfaces++;
+        mapToDstFno[srcFno] = elided ? -1 : nfaces++;
     }
 
     *pnvertices     = nvertices;
@@ -181,6 +286,8 @@ MRIS* MRIScreateWithSimilarTopologyAsSubset(
     int const*   mapToDstVno,   // src->nvertices entries, with the entries being -1 (vertex should be ignored) or the vno within the dst surface the face maps to
     size_t       nfaces,        // the mapToDstFno entries must each be less than this
     int const*   mapToDstFno) { // src->nfaces entries, with the entries being -1 (face should be ignored) or the fno within the dst surface the face maps to
+
+    // test: utils/test/topology_test, but does not yet check the faces
 
     MRIS* const dst = MRISalloc(nvertices, nfaces);
     
@@ -981,40 +1088,6 @@ int findFace(MRIS *mris, int vno0, int vno1, int vno2)
   return (-1);
 }
 
-/*-----------------------------------------------------
-  Parameters:
-
-  Returns value:
-
-  Description
-  Search the face for vno and set the v->n[] field
-  appropriately.
-  ------------------------------------------------------*/
-int mrisSetVertexFaceIndex(MRIS *mris, int vno, int fno)
-{
-  FACE *f;
-  int n, i;
-
-  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
-  f = &mris->faces[fno];
-
-  for (n = 0; n < VERTICES_PER_FACE; n++) {
-    if (f->v[n] == vno) {
-      break;
-    }
-  }
-  if (n >= VERTICES_PER_FACE) {
-    return (ERROR_BADPARM);
-  }
-
-  for (i = 0; i < vt->num; i++)
-    if (vt->f[i] == fno) {
-      vt->n[i] = n;
-    }
-
-  return (n);
-}
-
 int computeOrientation(MRIS *mris, int f, int v0, int v1)
 {
   FACE *face;
@@ -1802,32 +1875,6 @@ int mrisValidFaces(MRIS *mris)
     }
 
   return (nvalid);
-}
-
-/*-----------------------------------------------------*/
-/*!
-  \fn int MRISreverseFaceOrder(MRIS *mris)
-  \brief Reverse order of the vertices in each face. This
-  is needed when changing the sign of the x surface coord.
-*/
-int MRISreverseFaceOrder(MRIS *mris)
-{
-  int fno, vno0, vno1, vno2;
-  FACE *f;
-
-  for (fno = 0; fno < mris->nfaces; fno++) {
-    f = &mris->faces[fno];
-    vno0 = f->v[0];
-    vno1 = f->v[1];
-    vno2 = f->v[2];
-    f->v[0] = vno2;
-    f->v[1] = vno1;
-    f->v[2] = vno0;
-    mrisSetVertexFaceIndex(mris, vno0, fno);
-    mrisSetVertexFaceIndex(mris, vno1, fno);
-    mrisSetVertexFaceIndex(mris, vno2, fno);
-  }
-  return (NO_ERROR);
 }
 
 /*-----------------------------------------------------

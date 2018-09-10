@@ -24,18 +24,11 @@
 //                   and with their partitioning into sets (ripped, marked, ...)
 //                   but not with their placement in the xyz coordinate space
 
-// Vertex-only properties
-//
-bool mrisCheckVertexVertexTopology(MRIS const * mris);
 
 
 void mrisRemoveEdge(MRIS *mris, int vno1, int vno2);
 
 
-
-// Face-only properties
-//
-int mrisSetVertexFaceIndex(MRIS *mris, int vno, int fno);
 
 // Vertices and Faces interact via edges
 //
