@@ -37,7 +37,10 @@ int mrisCountValidLinks(MRIS *mris, int vno1, int vno2);
 int isFace(MRIS *mris, int vno0, int vno1, int vno2);
 int findFace(MRIS *mris, int vno0, int vno1, int vno2);
 int mrisValidFaces(MRIS *mris);
+
 int vertexInFace(MRIS *mris, int vno, int fno);
+int mrisVertexFaceIndex(MRIS *mris, int vno, int fno);
+
 int findOtherEdgeFace(MRIS const *mris, int fno, int vno, int vn1);
 int mrisRemoveLink(MRIS *mris, int vno1, int vno2);
 int findNonMarkedFace(MRIS *mris, int vno, int vn1);

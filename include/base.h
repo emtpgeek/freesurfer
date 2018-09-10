@@ -93,7 +93,7 @@ extern const char *Progname;
 // assertions
 //
 #define cheapAssert(TST)        { if (!(TST)) *(int*)-1 = 0; }
-#define costlyAssert(TST) //    { if (!(TST)) *(int*)-1 = 0; }
+#define costlyAssert(TST)       { if (!(TST)) *(int*)-1 = 0; }
 
 #define cheapAssertValidFno(_MRIS, _FNO) cheapAssert((0 <= _FNO) && (_FNO < _MRIS->nfaces))
 #define cheapAssertValidVno(_MRIS, _VNO) cheapAssert((0 <= _VNO) && (_VNO < _MRIS->nvertices))
@@ -122,7 +122,7 @@ int posix_memalignHere(void **memptr, size_t alignment, size_t size,const char* 
 
 #endif
 
-#define freeAndNULL(PTR) { free((PTR)); (PTR) = NULL; }
+#define freeAndNULL(PTR) { free((void*)(PTR)); (PTR) = NULL; }
 
 
 // Some trivial math functions needed lots

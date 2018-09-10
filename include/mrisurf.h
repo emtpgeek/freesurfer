@@ -185,16 +185,16 @@ face_type, FACE ;
 #define LIST_OF_VERTEX_TOPOLOGY_ELTS \
   /* put the pointers before the ints, before the shorts, before uchars, to reduce size  */ \
   /* the whole fits in much less than one cache line, so further ordering is no use      */ \
-  ELTP(int,f) SEP                   /* array neighboring face numbers */        	    \
-  ELTP(BEVIN_SOMETIMES_CONST_V int,v) SEP         /* array neighboring vertex numbers, vnum long */       \
-  ELTP(int,e) SEP                   /* edge state for neighboring vertices */    	    \
-  ELTP(uchar,n) SEP           	    /* [0-3, num long] TBD what it contains */    	    \
-  ELTT(BEVIN_SOMETIMES_CONST_V int,v2num) SEP     /* number of 2-connected neighbors */       	    \
-  ELTT(BEVIN_SOMETIMES_CONST_V int,v3num) SEP     /* number of 3-connected neighbors */       	    \
-  ELTT(BEVIN_SOMETIMES_CONST_V short,vtotal) SEP  /* total # of neighbors will be same as one of above*/  \
-  ELTT(BEVIN_SOMETIMES_CONST_V uchar,nsize) SEP   /* size of neighborhood stored in vtotal */    	    \
-  ELTT(BEVIN_SOMETIMES_CONST_V uchar,vnum)        /* number neighboring vertices, is v1num */    	    \
-  ELTT(uchar,num) SEP               /* number neighboring faces */      	    	    \
+  ELTP(int,f) SEP                                   /* array[v->num] the fno's of the neighboring faces     */ \
+  ELTP(uchar,n) SEP           	                    /* array[v->num] the face.v[*] index for this vertex    */ \
+  ELTP(BEVIN_SOMETIMES_CONST_V int,v) SEP           /* array[v->vnum] of immediate neighbor vno             */ \
+  ELTP(int,e) SEP                                   /* edge state for neighboring vertices                  */ \
+  ELTT(BEVIN_SOMETIMES_CONST_V short,vnum)          /* number neighboring vertices, is v1num                */ \
+  ELTT(BEVIN_SOMETIMES_CONST_V short,v2num) SEP     /* number of 2-connected neighbors                      */ \
+  ELTT(BEVIN_SOMETIMES_CONST_V short,v3num) SEP     /* number of 3-connected neighbors                      */ \
+  ELTT(BEVIN_SOMETIMES_CONST_V short,vtotal) SEP    /* total # of neighbors. copy of vnum.nsize             */ \
+  ELTT(BEVIN_SOMETIMES_CONST_V uchar,nsize) SEP     /* 0 or 123 vnum index stored in vtotal                 */ \
+  ELTT(uchar,num) SEP                               /* number neighboring faces                             */ \
   // end of macro
 
 // The above elements historically were in the VERTEX
@@ -2671,10 +2671,12 @@ static int  mrisVertexNeighborIndex (MRIS const * mris, int vno1, int vno2);
 static bool mrisVerticesAreNeighbors(MRIS const * mris, int vno1, int vno2);
 void mrisAddEdge   (MRIS* mris, int vno1, int vno2);
 
+void mrisSetVertexFaceIndex(MRIS *mris, int vno, int fno);
+    // is being used outside mrissurf_topology but shouldn't be
+    
 void mrisAttachFaceToEdges   (MRIS* mris, int fno, int vno1, int vno2, int vno3);   // edges must already exist
 void mrisAttachFaceToVertices(MRIS* mris, int fno, int vno1, int vno2, int vno3);   // adds any needed edges
 
-int mrisSetVertexFaceIndex(MRIS *mris, int vno, int fno);
 
 // Static function implementations
 //

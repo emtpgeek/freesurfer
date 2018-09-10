@@ -74,13 +74,51 @@ bool mrisCheckVertexVertexTopology(MRIS const *mris)
   return true;
 }
 
+
 bool mrisCheckVertexFaceTopology(MRIS const * mris) {
   if (!mrisCheckVertexVertexTopology(mris)) return false;
   
-  // TODO
+  int fno;
+  for (fno = 0; fno < mris->nfaces; fno++) {
+    FACE const * const f = &mris->faces[fno];
+
+    int n;
+    for (n = 0; n < VERTICES_PER_FACE; n++) {
+      int const vno = f->v[n];
+      VERTEX_TOPOLOGY const * const v = &mris->vertices_topology[vno];
+
+      int i = -1;
+
+      int iTrial;
+      for (iTrial = 0; iTrial < v->num; iTrial++) {
+        if (v->f[iTrial] == fno) {
+          if (i == v->num) {
+            fprintf(stdout, "fno:%d found twice in [vno:%d].f[i:%d && iTrial:%d]\n", fno, vno, i, iTrial);
+            DiagBreak();
+            return false;
+          }
+          i = iTrial;
+        }
+      }
+      if (i < 0) {
+        fprintf(stdout, "fno:%d not found in [vno:%d].f[*]\n", fno, vno);
+        DiagBreak();
+        return false;
+      }
+
+      if (v->n[i] != n) {
+        fprintf(stdout, "[fno:%d].v[n:%d] holds vno:%d but [vno:%d].n[i:%d]:%d != n:%d\n", 
+            fno, n, vno, vno, i, v->n[i], n);
+        DiagBreak();
+        return false;
+      }
+    }
+    
+  }
   
   return true;
 }
+
 
 static void mrisAddEdgeWkr(MRIS *mris, int vno1, int vno2) {
   cheapAssertValidVno(mris,vno1);
@@ -104,6 +142,7 @@ static void mrisAddEdgeWkr(MRIS *mris, int vno1, int vno2) {
   v1->nsize = 1; v1->vtotal = v1->vnum;
   v2->nsize = 1; v2->vtotal = v2->vnum;
 }
+
 
 void mrisAddEdge(MRIS *mris, int vno1, int vno2)
 {
@@ -148,31 +187,47 @@ void mrisRemoveEdge(MRIS *mris, int vno1, int vno2)
 }
 
 
-int mrisSetVertexFaceIndex(MRIS *mris, int vno, int fno)
+int mrisVertexFaceIndex(MRIS *mris, int vno, int fno) {
+  VERTEX_TOPOLOGY const * const v = &mris->vertices_topology[vno];
+  int i;
+  for (i = 0; i < v->num; i++) {
+    if (v->f[i] == fno) return i;
+  }
+  return -1;
+}
+
+
+void mrisSetVertexFaceIndex(MRIS *mris, int vno, int fno)
   // HACK - external usage of this should be eliminated!
 {
-  FACE *f;
-  int n, i;
+  FACE const *      const f = &mris->faces[fno];
+  VERTEX_TOPOLOGY * const v = &mris->vertices_topology[vno];
 
-  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
-  f = &mris->faces[fno];
-
+  int n;
   for (n = 0; n < VERTICES_PER_FACE; n++) {
-    if (f->v[n] == vno) {
-      break;
-    }
+    if (f->v[n] == vno) break;
   }
-  if (n >= VERTICES_PER_FACE) {
-    return (ERROR_BADPARM);
-  }
+  cheapAssert(n < VERTICES_PER_FACE);
 
-  for (i = 0; i < vt->num; i++)
-    if (vt->f[i] == fno) {
-      vt->n[i] = n;
-    }
-
-  return (n);
+  int i = mrisVertexFaceIndex(mris, vno, fno);
+  cheapAssert(0 <= i);
+  
+  v->n[i] = n;
 }
+
+
+static void mrisAddFaceToVertex(MRIS *mris, int vno, int fno, int n) {
+  costlyAssert(mrisVertexFaceIndex(mris, vno, fno) < 0);     // check not already added
+  FACE *            const f = &mris->faces[fno];
+  VERTEX_TOPOLOGY * const v = &mris->vertices_topology[vno];
+  f->v[n] = vno;
+  int const i = v->num++;
+  v->f = (int  *)realloc(v->f, v->num*sizeof(int));
+  v->n = (uchar*)realloc(v->n, v->num*sizeof(int));
+  v->f[i] = fno;
+  v->n[i] = n;
+}
+
 
 
 static void mrisAttachFaceWkr(MRIS* mris, int fno, int vno0, int vno1, int vno2, bool edgesMustExist) {
@@ -190,19 +245,16 @@ static void mrisAttachFaceWkr(MRIS* mris, int fno, int vno0, int vno1, int vno2,
   } else {
     int i; 
     for (i = 0; i < 3; i++) {
-        if (!mrisVerticesAreNeighbors(mris, vno[i], vno[i+1]))
-             mrisAddEdgeWkr          (mris, vno[i], vno[i+1]);
+      if (!mrisVerticesAreNeighbors(mris, vno[i], vno[i+1]))
+           mrisAddEdgeWkr          (mris, vno[i], vno[i+1]);
     }
   }
   
   FACE * const f = &mris->faces[fno];
   cheapAssert((f->v[0]|f->v[1]|f->v[2]) == 0);  // not currently attached
-  f->v[0] = vno0;
-  f->v[1] = vno1;
-  f->v[2] = vno2;
-  mrisSetVertexFaceIndex(mris, vno0, fno);
-  mrisSetVertexFaceIndex(mris, vno1, fno);
-  mrisSetVertexFaceIndex(mris, vno2, fno);
+  int i;
+  for (i = 0; i < 3; i++)
+    mrisAddFaceToVertex(mris, vno[i], fno, i);
 }
 
 void mrisAttachFaceToEdges   (MRIS* mris, int fno, int vno1, int vno2, int vno3) {
@@ -212,6 +264,7 @@ void mrisAttachFaceToEdges   (MRIS* mris, int fno, int vno1, int vno2, int vno3)
 void mrisAttachFaceToVertices(MRIS* mris, int fno, int vno1, int vno2, int vno3) {
   mrisAttachFaceWkr(mris, fno, vno1, vno2, vno3, false);
 }
+
 
 /*!
   \fn void MRISreverseFaceOrder(MRIS *mris)
@@ -322,8 +375,6 @@ MRIS* MRIScreateWithSimilarTopologyAsSubset(
     }
     dst->nsize = 1;
 
-    costlyAssert(mrisCheckVertexVertexTopology(dst));
-
     // Add the faces
     //
     int srcFno;
@@ -335,16 +386,23 @@ MRIS* MRIScreateWithSimilarTopologyAsSubset(
         FACE const * const srcF = &src->faces[srcFno];
         FACE       * const dstF = &dst->faces[dstFno];
 
+        int dstVno[VERTICES_PER_FACE];
         int i;
         for (i = 0; i < VERTICES_PER_FACE; i++) {
             int srcVno = srcF->v[i];
-            int dstVno = mapToDstVno[srcVno];
-            cheapAssert(0 <= dstVno);
-            cheapAssert(dstVno < nvertices);
-            dstF->v[i] = dstVno;
+            dstVno[i] = mapToDstVno[srcVno];
+            cheapAssert(0 <= dstVno[i]);
+            cheapAssert(dstVno[i] < nvertices);
         }
+        cheapAssert(VERTICES_PER_FACE == 3); 
+        mrisAttachFaceToVertices(
+          dst, dstFno, dstVno[0],dstVno[1],dstVno[2]);
     }
-   
+
+    // Check
+    //   
+    costlyAssert(mrisCheckVertexFaceTopology(dst));
+
     return dst;
 }
 
@@ -402,8 +460,6 @@ int MRISresetNeighborhoodSize(MRIS *mris, int nsize)
   mris->nsize = nsize;  
     // note: it can be -1, which means that the vertices may have differing neighborhood sizes
   
-  costlyAssert(mrisCheckVertexVertexTopology(dst));
-
   return (NO_ERROR);
 }
 
