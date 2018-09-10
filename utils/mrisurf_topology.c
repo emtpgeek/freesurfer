@@ -312,12 +312,12 @@ int MRISfindNeighborsAtVertex(MRIS *mris, int acquiredMarked, int vno, int nlink
             
             if (pass == 0) {
               if (vCandidate->marked) continue;                 // in a ring or already counted in this ring
-              vCandidate->marked = nlinks+1;                    // mark it so don't count it again, and do process it in next pass
+              vCandidate->marked = nlinks + 1;                  // mark it so don't count it again, and do process it in next pass
               addedEnd++;                                       // make space for it
             } else {
               cheapAssert(vCandidate->marked);
-              if (vCandidate->marked != nlinks+1) continue;     // already processed
-              vCandidate->marked = ringLinks;                   // don't process it again
+              if (vCandidate->marked != nlinks + 1) continue;   // already processed
+              vCandidate->marked = ringLinks + 1;               // don't process it again, mark it as being in the next ring
               vt->v[addedEnd++] = vnoCandidate;                 // store it
             }
           }
@@ -327,8 +327,8 @@ int MRISfindNeighborsAtVertex(MRIS *mris, int acquiredMarked, int vno, int nlink
           vt->v = (int*)realloc(vt->v, addedEnd*sizeof(int));
         } else {
           switch (ringLinks) {
-          case 1: vt->v2num = addedEnd; vt->nsize = 2; vt->nsizeClock = mris->nsizeClock; break;
-          case 2: vt->v3num = addedEnd; vt->nsize = 3; vt->nsizeClock = mris->nsizeClock; break;
+          case 1: vnums[2] = vt->v2num = addedEnd; vt->nsize = 2; vt->nsizeClock = mris->nsizeClock; break;
+          case 2: vnums[3] = vt->v3num = addedEnd; vt->nsize = 3; vt->nsizeClock = mris->nsizeClock; break;
           default: cheapAssert(false);
           }
         }
