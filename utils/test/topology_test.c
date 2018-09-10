@@ -124,12 +124,13 @@ int main(int argc, char *argv[])
 
   // TODO verify the shape
   //
-  mris_print_diff(stdout, src, dst);
-  
-  MRISfree(&dst);
+
+  // TODO neighbourhood check
+  //
 
   // Done
   //  
+  MRISfree(&dst);
   MRISdtr(src);
   
   return fails;

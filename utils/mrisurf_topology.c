@@ -22,6 +22,10 @@
 // MRIS code dealing with the existence and connectedness of the vertices, edges, and faces
 //                   and with their partitioning into sets (ripped, marked, ...)
 //                   but not with their placement in the xyz coordinate space
+
+
+// Vertexs and edges
+//
 bool mrisCheckVertexVertexTopology(MRIS const *mris)
 {
   int vno1;
@@ -75,6 +79,282 @@ bool mrisCheckVertexVertexTopology(MRIS const *mris)
 }
 
 
+static void mrisAddEdgeWkr(MRIS *mris, int vno1, int vno2) {
+  cheapAssertValidVno(mris,vno1);
+  cheapAssertValidVno(mris,vno2);
+  
+  mris->nsizeClock++;   // the v->v[23]num fields are now invalid
+    
+  if (Gdiag & DIAG_SHOW && DIAG_VERBOSE_ON) {
+    fprintf(stdout, "adding edge %d <--> %d\n", vno1, vno2);
+  }
+
+  VERTEX_TOPOLOGY * const v1 = &mris->vertices_topology[vno1];
+  VERTEX_TOPOLOGY * const v2 = &mris->vertices_topology[vno2];
+  
+  v1->v = (int*)realloc(v1->v, sizeof(int)*(v1->vnum + 1));
+  v2->v = (int*)realloc(v2->v, sizeof(int)*(v2->vnum + 1)); 
+    // other places grow this out beyond vnum to v2num or v3num
+  
+  // Add this to the vnum vertexs and force recompute of the v2num and v3num vertexs
+  //
+  v1->v[v1->vnum++] = vno2;
+  v2->v[v2->vnum++] = vno1;
+    
+  v1->nsize = 1; v1->vtotal = v1->vnum; v1->nsizeClock = mris->nsizeClock;
+  v2->nsize = 1; v2->vtotal = v2->vnum; v2->nsizeClock = mris->nsizeClock;
+}
+
+
+void mrisAddEdge(MRIS *mris, int vno1, int vno2)
+{
+  costlyAssert(!mrisVerticesAreNeighbors(mris, vno1, vno2));
+  mrisAddEdgeWkr(mris, vno1, vno2);
+}
+
+
+void mrisRemoveEdge(MRIS *mris, int vno1, int vno2)
+{
+  mris->nsizeClock++;   // the v->v[23]num fields are now invalid
+
+  cheapAssertValidVno(mris,vno1);
+  cheapAssertValidVno(mris,vno2);
+  costlyAssert(mrisVerticesAreNeighbors(mris, vno1, vno2));
+
+  if (Gdiag & DIAG_SHOW && DIAG_VERBOSE_ON) {
+    fprintf(stdout, "removing edge %d <--> %d\n", vno1, vno2);
+  }
+
+  VERTEX_TOPOLOGY * const v1 = &mris->vertices_topology[vno1];
+  VERTEX_TOPOLOGY * const v2 = &mris->vertices_topology[vno2];
+
+  int i,last;
+  
+  i    = v1->vnum - 1;
+  last = v1->v[i];
+  while (last != vno2) { int vi = v1->v[i]; v1->v[i] = last; i--; last = vi; }
+  cheapAssert(i >= 0);
+    
+  i    = v2->vnum - 1;
+  last = v2->v[i];
+  while (last != vno1) { int vi = v2->v[i]; v2->v[i] = last; i--; last = vi; }
+  cheapAssert(i >= 0);
+
+  v1->vnum--;
+  v2->vnum--;
+
+  v1->nsize = 1; v1->vtotal = v1->vnum; v1->nsizeClock = mris->nsizeClock;
+  v1->nsize = 1; v2->vtotal = v2->vnum; v2->nsizeClock = mris->nsizeClock;
+  
+  // TODO what about any faces that use this edge?
+}
+
+
+// Neighbourhoods
+//
+// These are the vertexs that can be reached by following vno = mris->vertex_topology[vno]->v[<all>] nsize hops.
+// They are stored, sorted, in the v->v vector with the vnum, v2num, and v3num storing where the hop count changes.
+//
+// Obviously adding or removing edges invalids v2num and v3num.
+//      mris->vnumClock changes to help detect this bug, but it wraps so is not a guarantee.
+//      Here it is checked to assert vtotal is valid.
+//
+int MRISresetNeighborhoodSize(MRIS *mris, int nsize)
+{
+  int vno;
+  switch (nsize) {
+    default:  cheapAssert(false);
+    case -1:  // set to whatever is stored in vt->nsize
+    
+      for (vno = 0; vno < mris->nvertices; vno++) {
+        VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];    
+        VERTEX          * const v  = &mris->vertices         [vno];
+        if (v->ripflag) continue;
+        if (vno == Gdiag_no) DiagBreak();
+
+        cheapAssert(vt->nsize == 1 || vt->nsizeClock == mris->nsizeClock);
+        
+        switch (vt->nsize) {
+          default:  cheapAssert(false);
+          case 1:   vt->vtotal = vt->vnum;  break;
+          case 2:   vt->vtotal = vt->v2num; break;
+          case 3:   vt->vtotal = vt->v3num; break;
+        }
+      }
+      
+      break;
+      
+    case 1:
+      for (vno = 0; vno < mris->nvertices; vno++) {
+        VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];    
+        VERTEX          * const v  = &mris->vertices         [vno];
+        if (v->ripflag) continue;
+        vt->vtotal = vt->vnum;
+      }
+      break;
+      
+    case 2:
+      for (vno = 0; vno < mris->nvertices; vno++) {
+        VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];    
+        VERTEX          * const v  = &mris->vertices         [vno];
+        if (v->ripflag) continue;
+        cheapAssert(vt->nsize >= 2);
+        cheapAssert(vt->nsizeClock == mris->nsizeClock);
+        vt->vtotal = vt->v2num;
+      }
+      break;
+    
+    case 3:
+      for (vno = 0; vno < mris->nvertices; vno++) {
+        VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];    
+        VERTEX          * const v  = &mris->vertices         [vno];
+        if (v->ripflag) continue;
+        cheapAssert(vt->nsize >= 3);
+        cheapAssert(vt->nsizeClock == mris->nsizeClock);
+        vt->vtotal = vt->v3num;
+      }
+      break;
+  }
+
+  mris->nsize = nsize;
+    // note: it can be -1, which means that the vertices may have differing neighborhood sizes
+  
+  return (NO_ERROR);
+}
+
+
+/*
+  fills the vlist parameter with the indices of the vertices up to and include
+  nlinks distances in terms of number of edges. Each vertex->marked field will be
+  set to the number of edges between it and the central vertex.
+  
+  There are two issues here
+    1) adding or removing an edge should invalidate the cached vertex.v#num info
+    2) changing a ripflag should invalidate the cached vertex.v#num info
+    
+  The old code did not detect either case and used the invalid cache entry for the answer.
+  
+  The new code usually asserts in when the edges have changed, and always asserts if a ripped vertex is encountered.
+    In the future it may need to recompute if a ripped vertex is encountered.
+*/
+int MRISfindNeighborsAtVertex(MRIS *mris, int acquiredMarked, int vno, int nlinks, int *vlist)
+{
+  MRIS_checkAcquiredTemp(mris, MRIS_TempAssigned_Vertex_marked, acquiredMarked);
+
+  VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];    
+  VERTEX          * const v  = &mris->vertices         [vno];
+
+  cheapAssert(!v->ripflag);
+
+  // Mark all the known ones
+  // Note: this code assumes all the v.marked are zero initially
+  //
+  v->marked = -1;
+
+  // Get all that are immediately available.
+  // The vno itself is not included in the list - surprise :-)
+  //
+  if (nlinks == 0) return 0;
+  
+  // The following is easier with these in an array
+  //
+  int vnums[4]; vnums[0] = 0; vnums[1] = vt->vnum; vnums[2] = vt->v2num; vnums[3] = vt->v3num;
+  
+  // Start with the hops=1 ring, which is always available
+  //
+  int ringLinks = 1;
+
+  // mark this ring, and then expand if more rings needed
+  //
+  for (;;) {
+    int ringBegin = vnums[ringLinks-1];
+    int ringEnd   = vnums[ringLinks  ];
+
+    // mark all the elements in the ring
+    int n;
+    for (n = ringBegin; n < ringEnd; n++) {
+      int vnoRing = vt->v[n];
+      VERTEX* vr = &mris->vertices[vnoRing];
+      cheapAssert(!vr->ripflag);
+      cheapAssert(!vr->marked || (vr->marked == ringLinks));    // some got marked below, but cached ones won't have been
+      vr->marked = ringLinks;
+    }
+
+    // marked enough?
+    if (ringLinks == nlinks) break;
+
+    // Build the next ring
+    // It might be available, or it might have to be found by expanding this ring.
+    // If by expansion, then it will be available...
+    //
+    if (ringLinks + 1 > vt->nsize) {
+    
+      // Need to create the next ring and store it in the vertex and in the vnums above
+      //
+      // This takes two passes - one to calculate the number of vertices to add, then a second to add them
+      // Must mark during the first pass, to avoid adding twice! 
+      //
+      int pass;
+      for (pass = 0; pass < 2; pass++) {
+        
+        //t const addedBegin = ringEnd;
+        int       addedEnd   = ringEnd;
+        
+        for (n = ringBegin; n < ringEnd; n++) {
+          int vnoRing = vt->v[n];
+          VERTEX_TOPOLOGY const * const vtRing = &mris->vertices_topology[vnoRing];    
+          int m;
+          for (m = 0; m < vtRing->vnum; m++) {
+            int const vnoCandidate = vtRing->v[m];
+            VERTEX * const vCandidate  = &mris->vertices         [vnoCandidate];
+
+            cheapAssert(!vCandidate->ripflag);
+            
+            if (pass == 0) {
+              if (vCandidate->marked) continue;                 // in a ring or already counted in this ring
+              vCandidate->marked = nlinks+1;                    // mark it so don't count it again, and do process it in next pass
+              addedEnd++;                                       // make space for it
+            } else {
+              cheapAssert(vCandidate->marked);
+              if (vCandidate->marked != nlinks+1) continue;     // already processed
+              vCandidate->marked = ringLinks;                   // don't process it again
+              vt->v[addedEnd++] = vnoCandidate;                 // store it
+            }
+          }
+        }
+        
+        if (pass == 0) {
+          vt->v = (int*)realloc(vt->v, addedEnd*sizeof(int));
+        } else {
+          switch (ringLinks) {
+          case 1: vt->v2num = addedEnd; vt->nsize = 2; vt->nsizeClock = mris->nsizeClock; break;
+          case 2: vt->v3num = addedEnd; vt->nsize = 3; vt->nsizeClock = mris->nsizeClock; break;
+          default: cheapAssert(false);
+          }
+        }
+      } 
+    }
+    
+    // Use the next ring
+    //
+    ringLinks++;
+  }
+  
+  // Copy all the elements from the v to the vlist
+  //
+  int const result = vnums[ringLinks];
+  int n;
+  for (n = 0; n < result; n++) {
+    int vno = vt->v[n];
+    vlist[n] = vno;
+  }
+
+  return result;
+}
+
+
+// Faces
+//
 bool mrisCheckVertexFaceTopology(MRIS const * mris) {
   if (!mrisCheckVertexVertexTopology(mris)) return false;
   
@@ -113,77 +393,9 @@ bool mrisCheckVertexFaceTopology(MRIS const * mris) {
         return false;
       }
     }
-    
   }
   
   return true;
-}
-
-
-static void mrisAddEdgeWkr(MRIS *mris, int vno1, int vno2) {
-  cheapAssertValidVno(mris,vno1);
-  cheapAssertValidVno(mris,vno2);
-  
-  if (Gdiag & DIAG_SHOW && DIAG_VERBOSE_ON) {
-    fprintf(stdout, "adding edge %d <--> %d\n", vno1, vno2);
-  }
-
-  VERTEX_TOPOLOGY * const v1 = &mris->vertices_topology[vno1];
-  VERTEX_TOPOLOGY * const v2 = &mris->vertices_topology[vno2];
-  
-  v1->v = (int*)realloc(v1->v, sizeof(int)*(v1->vnum + 1));
-  v2->v = (int*)realloc(v2->v, sizeof(int)*(v2->vnum + 1));
-  
-  v1->v[v1->vnum++] = vno2;
-  v2->v[v2->vnum++] = vno1;
-  
-  cheapAssert(mris->nsize <= 1);
-  
-  v1->nsize = 1; v1->vtotal = v1->vnum;
-  v2->nsize = 1; v2->vtotal = v2->vnum;
-}
-
-
-void mrisAddEdge(MRIS *mris, int vno1, int vno2)
-{
-  costlyAssert(!mrisVerticesAreNeighbors(mris, vno1, vno2));
-  mrisAddEdgeWkr(mris, vno1, vno2);
-}
-
-
-void mrisRemoveEdge(MRIS *mris, int vno1, int vno2)
-{
-  cheapAssertValidVno(mris,vno1);
-  cheapAssertValidVno(mris,vno2);
-  costlyAssert(mrisVerticesAreNeighbors(mris, vno1, vno2));
-
-  if (Gdiag & DIAG_SHOW && DIAG_VERBOSE_ON) {
-    fprintf(stdout, "removing edge %d <--> %d\n", vno1, vno2);
-  }
-
-  VERTEX_TOPOLOGY * const v1 = &mris->vertices_topology[vno1];
-  VERTEX_TOPOLOGY * const v2 = &mris->vertices_topology[vno2];
-
-  int i,last;
-  
-  i    = v1->vnum - 1;
-  last = v1->v[i];
-  while (last != vno2) { int vi = v1->v[i]; v1->v[i] = last; i--; last = vi; }
-  cheapAssert(i >= 0);
-    
-  i    = v2->vnum - 1;
-  last = v2->v[i];
-  while (last != vno1) { int vi = v2->v[i]; v2->v[i] = last; i--; last = vi; }
-  cheapAssert(i >= 0);
-
-  v1->vnum--;
-  v2->vnum--;
-
-  cheapAssert(mris->nsize == 1);
-  v1->vtotal = v1->vnum;
-  v2->vtotal = v2->vnum;
-  
-  // TODO what about any faces that use this edge?
 }
 
 
@@ -384,7 +596,6 @@ MRIS* MRIScreateWithSimilarTopologyAsSubset(
         cheapAssert(dstFno < nfaces);
    
         FACE const * const srcF = &src->faces[srcFno];
-        FACE       * const dstF = &dst->faces[dstFno];
 
         int dstVno[VERTICES_PER_FACE];
         int i;
@@ -405,130 +616,6 @@ MRIS* MRIScreateWithSimilarTopologyAsSubset(
     costlyAssert(mrisCheckVertexFaceTopology(dst));
 
     return dst;
-}
-
-int MRISresetNeighborhoodSize(MRIS *mris, int nsize)
-{
-  int vno;
-  switch (nsize) {
-    default:  cheapAssert(false);
-    case -1:  // set to whatever is stored in vt->nsize
-    
-      for (vno = 0; vno < mris->nvertices; vno++) {
-        VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];    
-        VERTEX          * const v  = &mris->vertices         [vno];
-        if (v->ripflag) continue;
-        if (vno == Gdiag_no) DiagBreak();
-        
-        switch (vt->nsize) {
-          default:  cheapAssert(false);
-          case 1:   vt->vtotal = vt->vnum;  break;
-          case 2:   vt->vtotal = vt->v2num; break;
-          case 3:   vt->vtotal = vt->v3num; break;
-        }
-      }
-      
-      break;
-      
-    case 1:
-      for (vno = 0; vno < mris->nvertices; vno++) {
-        VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];    
-        VERTEX          * const v  = &mris->vertices         [vno];
-        if (v->ripflag) continue;
-        vt->vtotal = vt->vnum;
-      }
-      break;
-      
-    case 2:
-      for (vno = 0; vno < mris->nvertices; vno++) {
-        VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];    
-        VERTEX          * const v  = &mris->vertices         [vno];
-        if (v->ripflag) continue;
-        vt->vtotal = vt->v2num;
-      }
-      break;
-    
-    case 3:
-      for (vno = 0; vno < mris->nvertices; vno++) {
-        VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];    
-        VERTEX          * const v  = &mris->vertices         [vno];
-        if (v->ripflag) continue;
-        vt->vtotal = vt->v3num;
-      }
-      break;
-  }
-  
-  mris->nsize = nsize;  
-    // note: it can be -1, which means that the vertices may have differing neighborhood sizes
-  
-  return (NO_ERROR);
-}
-
-/*
-  fills the vlist parameter with the indices of the vertices up to and include
-  nlinks distances in terms of number of edges. Each vertex->marked field will be
-  set to the number of edges between it and the central vertex.
-*/
-int MRISfindNeighborsAtVertex(MRIS *mris, int acquiredMarked, int vno, int nlinks, int *vlist)
-{
-  VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];    
-  VERTEX          * const v  = &mris->vertices         [vno];
-
-  if (v->ripflag) return 0;
-
-  MRIS_checkAcquiredTemp(mris, MRIS_TempAssigned_Vertex_marked, acquiredMarked);
-
-  int m, n, vtotal = 0, link_dist, ring_total;
-
-  v->marked = -1;
-  for (n = 0; n < vt->vtotal; n++) {
-    vlist[n] = vt->v[n];
-    mris->vertices[vt->v[n]].marked = n < vt->vnum ? 1 : (n < vt->v2num ? 2 : 3);
-  }
-  if (nlinks < mris->nsize) {
-    switch (nlinks) {
-      case 1:
-        vtotal = vt->vnum;
-        break;
-      case 2:
-        vtotal = vt->v2num;
-        break;
-      case 3:
-        vt->vtotal = vt->v3num;
-        break;
-      default:
-        vtotal = 0;
-        ErrorExit(ERROR_BADPARM, "MRISfindNeighborsAtVertex: nlinks=%d invalid", nlinks);
-        break;
-    }
-  }
-  else  // bigger than biggest neighborhood held at each vertex
-  {
-    v->marked = mris->nsize;
-    link_dist = mris->nsize;
-    vtotal = vt->vtotal;
-    // at each iteration mark one more ring with the ring distance
-    do {
-      link_dist++;
-      ring_total = 0;
-      for (n = 0; n < vtotal; n++) {
-        VERTEX_TOPOLOGY const * const vnt = &mris->vertices_topology[vlist[n]];    
-        VERTEX          const * const vn  = &mris->vertices         [vlist[n]];
-        if (vn->ripflag) continue;
-        for (m = 0; m < vnt->vnum; m++)  // one more ring out
-        {
-          if (mris->vertices[vnt->v[m]].marked == 0) {
-            vlist[vtotal + ring_total] = vnt->v[m];
-            mris->vertices[vnt->v[m]].marked = link_dist;
-            ring_total++;
-          }
-        }
-      }
-      vtotal += ring_total;
-    } while (link_dist < nlinks);  // expand by one
-  }
-
-  return (vtotal);
 }
 
 

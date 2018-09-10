@@ -126,6 +126,7 @@ static bool vertix_n_hash_add(size_t vectorSize, MRIS_HASH* hashVector, MRIS con
     int i;
     #define SEP
     #define ELTP(TARGET, MBR) // don't hash pointers.   Sometime may implement hashing their target
+    #define ELTX(TYPE,   MBR) // don't hash excluded elements
 #ifdef SEPARATE_VERTEX_TOPOLOGY
     #define ELTT(TYPE,   MBR) \
         for (i = 0; i < vectorSize; i++) {                                                              \
@@ -155,6 +156,7 @@ static bool vertix_n_hash_add(size_t vectorSize, MRIS_HASH* hashVector, MRIS con
         }                                                                                               \
         // end of macro
     #undef ELTT
+    #undef ELTX
     #undef ELTP
     #undef SEP
     return true;

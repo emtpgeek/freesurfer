@@ -185,16 +185,17 @@ face_type, FACE ;
 #define LIST_OF_VERTEX_TOPOLOGY_ELTS \
   /* put the pointers before the ints, before the shorts, before uchars, to reduce size  */ \
   /* the whole fits in much less than one cache line, so further ordering is no use      */ \
-  ELTP(int,f) SEP                                   /* array[v->num] the fno's of the neighboring faces     */ \
-  ELTP(uchar,n) SEP           	                    /* array[v->num] the face.v[*] index for this vertex    */ \
-  ELTP(BEVIN_SOMETIMES_CONST_V int,v) SEP           /* array[v->vnum] of immediate neighbor vno             */ \
-  ELTP(int,e) SEP                                   /* edge state for neighboring vertices                  */ \
-  ELTT(BEVIN_SOMETIMES_CONST_V short,vnum)          /* number neighboring vertices, is v1num                */ \
-  ELTT(BEVIN_SOMETIMES_CONST_V short,v2num) SEP     /* number of 2-connected neighbors                      */ \
-  ELTT(BEVIN_SOMETIMES_CONST_V short,v3num) SEP     /* number of 3-connected neighbors                      */ \
-  ELTT(BEVIN_SOMETIMES_CONST_V short,vtotal) SEP    /* total # of neighbors. copy of vnum.nsize             */ \
-  ELTT(BEVIN_SOMETIMES_CONST_V uchar,nsize) SEP     /* 0 or 123 vnum index stored in vtotal                 */ \
-  ELTT(uchar,num) SEP                               /* number neighboring faces                             */ \
+  ELTP(int,f) SEP                                       /* array[v->num] the fno's of the neighboring faces     */ \
+  ELTP(uchar,n) SEP           	                        /* array[v->num] the face.v[*] index for this vertex    */ \
+  ELTP(int,e) SEP                                       /* edge state for neighboring vertices                  */ \
+  ELTP(BEVIN_SOMETIMES_CONST_V int,v) SEP               /* array[v->vtotal] of sorted by hops neighbor vno      */ \
+  ELTT(BEVIN_SOMETIMES_CONST_V short,vnum)              /* number of 1-hop neighbots                            */ \
+  ELTT(BEVIN_SOMETIMES_CONST_V short,v2num) SEP         /* number of 1, or 2-hop neighbors                      */ \
+  ELTT(BEVIN_SOMETIMES_CONST_V short,v3num) SEP         /* number of 1,2,or 3-hop neighbors                     */ \
+  ELTT(BEVIN_SOMETIMES_CONST_V short,vtotal) SEP        /* total # of neighbors. copy of vnum.nsize             */ \
+  ELTX(BEVIN_SOMETIMES_CONST_V short,nsizeClock) SEP    /* copy of mris->nsizeClock when v#num                  */ \
+  ELTT(BEVIN_SOMETIMES_CONST_V uchar,nsize) SEP         /* index of the largest valid v#num                     */ \
+  ELTT(uchar,num) SEP                                   /* number of neighboring faces                          */ \
   // end of macro
 
 // The above elements historically were in the VERTEX
@@ -218,11 +219,13 @@ typedef struct VERTEX_TOPOLOGY {
     //
 
 #define SEP
+#define ELTX(TYPE,NAME) TYPE NAME ;
 #define ELTT(TYPE,NAME) TYPE NAME ;
 #define ELTP(TARGET,NAME) TARGET *NAME ;
   LIST_OF_VERTEX_TOPOLOGY_ELTS
 #undef ELTP
 #undef ELTT
+#undef ELTX
 #undef SEP
 } VERTEX_TOPOLOGY;
 
@@ -439,11 +442,13 @@ typedef struct vertex_type_
   // end of macro
 
 #define SEP
+#define ELTX(TYPE,NAME) TYPE NAME ;
 #define ELTT(TYPE,NAME) TYPE NAME ;
 #define ELTP(TARGET,NAME) TARGET *NAME ;
   LIST_OF_VERTEX_ELTS
 #undef ELTP
 #undef ELTT
+#undef ELTX
 #undef SEP
 
 }
@@ -551,12 +556,14 @@ typedef struct MRIS
   ELTT(int,status) SEP              /* type of surface (e.g. sphere, plane) */    \
   ELTT(int,patch) SEP               /* if a patch of the surface */    \
   ELTT(int,nlabels) SEP    \
-  ELTP(MRIS_AREA_LABEL,labels) SEP       /* nlabels of these (may be null) */    \
-  ELTT(int,nsize) SEP            /* size of neighborhoods */    \
-  ELTT(int,max_nsize) SEP        /* max the neighborhood size has been set to (typically 3) */    \
-  ELTT(float,avg_nbrs) SEP         /* mean # of vertex neighbors */    \
-  ELTP(void,vp) SEP              /* for misc. use */    \
-  ELTT(float,alpha) SEP            /* rotation around z-axis */    \
+  ELTP(MRIS_AREA_LABEL,labels) SEP  /* nlabels of these (may be null) */    \
+  ELTT(int,nsize) SEP               /* size of neighborhoods */    \
+  ELTX(short,nsizeClock) SEP        /* changed whenever an edge is added or removed, which invalidates the vertex v#num values */ \
+  \
+  ELTT(int,max_nsize) SEP           /* max the neighborhood size has been set to (typically 3) */    \
+  ELTT(float,avg_nbrs) SEP          /* mean # of vertex neighbors */    \
+  ELTP(void,vp) SEP                 /* for misc. use */    \
+  ELTT(float,alpha) SEP             /* rotation around z-axis */    \
   ELTT(float,beta) SEP             /* rotation around y-axis */    \
   ELTT(float,gamma) SEP            /* rotation around x-axis */    \
   ELTT(float,da) SEP    \
