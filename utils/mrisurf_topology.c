@@ -394,6 +394,7 @@ MRIS* MRIScreateWithSimilarTopologyAsSubset(
             cheapAssert(0 <= dstVno[i]);
             cheapAssert(dstVno[i] < nvertices);
         }
+        
         cheapAssert(VERTICES_PER_FACE == 3); 
         mrisAttachFaceToVertices(
           dst, dstFno, dstVno[0],dstVno[1],dstVno[2]);
