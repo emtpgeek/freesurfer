@@ -4780,7 +4780,7 @@ compute_white_target_locations(MRI_SURFACE *mris,
   int const acquiredMarked2 = MRIS_acquireTemp(mris, MRIS_TempAssigned_Vertex_marked2);
 
   MRISclearMarks (mris) ;       // MRISfindNeighborsAtVertex uses marked.  NOTE: This was missing!
-  MRISclearMark2s(mris) ;       // weird because MRISfindNeighborsAtVertex used marked, not marked2
+  MRISclearMark2s(mris) ;
   
   for (vno = 0 ; vno < mris->nvertices ; vno++)
   {
