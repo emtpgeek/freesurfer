@@ -4701,17 +4701,14 @@ compute_white_target_locations(MRI_SURFACE *mris,
 			       int contrast_type, float T2_min_inside, float T2_max_inside, 
 			       int below_set, int above_set, double wsigma, double max_out)
 {
-  int       *vlist, vno, vnum, outer_nbhd_size = 11, inner_nbhd_size = 3, n ;
+  int const outer_nbhd_size = 11, inner_nbhd_size = 3;
+
+  int       vno;
   int       num_in, num_out ;
-  VERTEX    *v, *vn ;
   double    min_grad, max_grad, min_inside, max_inside, min_outside, max_outside, sample_dist ;
   double    nx, ny, nz, d, thickness, grad_scale = 2 ;
   double    grad_val, inside_val, outside_val, xv, yv, zv, xs, ys, zs  ;
   HISTOGRAM *h_inside, *h_outside, *h_grad, *hs ;
-
-  vlist = (int *)calloc(mris->nvertices, sizeof(vlist[0])) ;
-  if (vlist == NULL)
-    ErrorExit(ERROR_NOFILE, "compute_white_target_locations: could not allocate vlist") ;
 
   sample_dist = MIN(SAMPLE_DIST, mri_T2->xsize/2) ;
 
@@ -4723,7 +4720,8 @@ compute_white_target_locations(MRI_SURFACE *mris,
   d = 2*sample_dist ;
   for (vno = 0 ; vno < mris->nvertices ; vno++)
   {
-    v = &mris->vertices[vno] ;
+    VERTEX * const v = &mris->vertices[vno] ;
+    
     if (vno == Gdiag_no)
       DiagBreak() ;
     if (v->ripflag)
@@ -4779,7 +4777,6 @@ compute_white_target_locations(MRI_SURFACE *mris,
   int const acquiredMarked  = MRIS_acquireTemp(mris, MRIS_TempAssigned_Vertex_marked);
   int const acquiredMarked2 = MRIS_acquireTemp(mris, MRIS_TempAssigned_Vertex_marked2);
 
-  MRISclearMarks (mris) ;       // MRISfindNeighborsAtVertex uses marked.  NOTE: This was missing!
   MRISclearMark2s(mris) ;
   
   for (vno = 0 ; vno < mris->nvertices ; vno++)
@@ -4788,7 +4785,9 @@ compute_white_target_locations(MRI_SURFACE *mris,
     double pin0, pout0, mean_gm, mean_wm, sigma_wm, sigma_gm, grad_outside, grad_inside ;
     int  found ;
 
-    v = &mris->vertices[vno] ;
+    VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno] ;
+    VERTEX                * const v  = &mris->vertices         [vno] ;
+
     if (v->ripflag)
     {
       v->targx = v->x ; v->targy = v->y ; v->targz = v->z ;
@@ -4804,11 +4803,19 @@ compute_white_target_locations(MRI_SURFACE *mris,
       continue ;
 
     d = 2*sample_dist ;
-    vnum = MRISfindNeighborsAtVertex(mris, acquiredMarked, vno, outer_nbhd_size, vlist);
-    for (n = 0 ; n < vnum ; n++)
+
+    size_t neighborsIndexBegin, neighborsIndexEnd;
+    MRISfindNeighborsAtVertex(mris, vno);
+    MRISgetNeighborsBeginEnd(mris, vno, 
+        inner_nbhd_size, outer_nbhd_size, 
+        &neighborsIndexBegin, &neighborsIndexEnd);
+
+    size_t neighborsIndex;
+    for (neighborsIndex = neighborsIndexBegin; neighborsIndex < neighborsIndexEnd ; neighborsIndex++)
     {
-      vn = &mris->vertices[vlist[n]] ;
-      if (vn->ripflag || vn->marked <= inner_nbhd_size)
+      VERTEX * const vn = &mris->vertices[vt->v[neighborsIndex]];
+      
+      if (vn->ripflag)
 	continue ;
 
       MRISvertexToVoxel(mris, vn, mri_T2, &xv, &yv, &zv) ;
@@ -5000,8 +5007,7 @@ compute_white_target_locations(MRI_SURFACE *mris,
     HISTOclearCounts(h_inside, h_inside) ;
     HISTOclearCounts(h_outside, h_outside) ;
     HISTOclearCounts(h_grad, h_grad) ;
-    for (n = 0 ; n < vnum ; n++)
-      mris->vertices[vlist[n]].marked = 0 ;
+
     if (best_dist > 0)
       num_out++ ;
     else if (best_dist < 0)

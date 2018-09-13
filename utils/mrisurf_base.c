@@ -202,8 +202,8 @@ static void VERTEX_TOPOLOGYdtr(VERTEX_TOPOLOGY* v) {
 }
 
 static void VERTEXdtr(VERTEX* v) {
-  freeAndNULL(v->dist);
-  freeAndNULL(v->dist_orig);
+  free((void*)v->dist     ); *(void**)(&v->dist     ) = NULL;
+  free((void*)v->dist_orig); *(void**)(&v->dist_orig) = NULL;
 }
 
 static void FACEdtr(FACE* f) {

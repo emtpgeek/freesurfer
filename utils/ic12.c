@@ -111,26 +111,11 @@ MRI_SURFACE *ic12_make_surface(int max_vertices, int max_faces)
   /* now allocate face arrays in vertices */
   for (vno = 0; vno < ICO_NVERTICES; vno++) {
     VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];
-    VERTEX          * const v  = &mris->vertices         [vno];
     vt->f = (int *)calloc(vt->num, sizeof(int));
     if (!vt->f) ErrorExit(ERROR_NO_MEMORY, "ic12: could not allocate %d faces", vt->num);
     vt->n = (uchar *)calloc(vt->num, sizeof(uchar));
     if (!vt->n) ErrorExit(ERROR_NO_MEMORY, "ic12: could not allocate %d nbrs", vt->n);
     vt->num = 0; /* for use as counter in next section */
-    v->dist = (float *)calloc(vt->vnum, sizeof(float));
-    if (!v->dist)
-      ErrorExit(ERROR_NOMEMORY,
-                "mrisFindNeighbors: could not allocate list of %d "
-                "dists at v=%d",
-                vt->vnum,
-                vno);
-    v->dist_orig = (float *)calloc(vt->vnum, sizeof(float));
-    if (!v->dist_orig)
-      ErrorExit(ERROR_NOMEMORY,
-                "mrisFindNeighbors: could not allocate list of %d "
-                "dists at v=%d",
-                vt->vnum,
-                vno);
   }
 
   /* fill in face indices in vertex structures */
@@ -171,6 +156,6 @@ MRI_SURFACE *ic12_make_surface(int max_vertices, int max_faces)
   }
 #endif
   mris->type = MRIS_ICO_SURFACE;
-  MRISsetNeighborhoodSize(mris, 1);
+  MRISsetNeighborhoodSizeAndDist(mris, 1);
   return (mris);
 }

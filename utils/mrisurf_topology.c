@@ -57,6 +57,12 @@ bool mrisCheckVertexVertexTopology(MRIS const *mris)
     }
     
     if (!mris->vertices[vno1].ripflag) {
+      
+      if (v->nsize > v->nsizeMax) {
+        fprintf(stdout, "[vno1:%d].nsize:%d exceeds nsizeMax:%d", vno1, v->nsize, v->nsizeMax);
+        DiagBreak();
+      }
+      
       int vtotalExpected = 0;
       switch (v->nsize) {
       case 1: vtotalExpected = v->vnum;  break;
@@ -85,7 +91,7 @@ static void mrisAddEdgeWkr(MRIS *mris, int vno1, int vno2) {
   cheapAssertValidVno(mris,vno1);
   cheapAssertValidVno(mris,vno2);
   
-  mris->nsizeClock++;   // the v->v[23]num fields are now invalid
+  mris->nsizeMaxClock++;   // the v->v[23]num fields are now invalid
     
   if (Gdiag & DIAG_SHOW && DIAG_VERBOSE_ON) {
     fprintf(stdout, "adding edge %d <--> %d\n", vno1, vno2);
@@ -103,8 +109,8 @@ static void mrisAddEdgeWkr(MRIS *mris, int vno1, int vno2) {
   v1->v[v1->vnum++] = vno2;
   v2->v[v2->vnum++] = vno1;
     
-  v1->nsize = 1; v1->vtotal = v1->vnum; v1->nsizeClock = mris->nsizeClock;
-  v2->nsize = 1; v2->vtotal = v2->vnum; v2->nsizeClock = mris->nsizeClock;
+  v1->nsizeMax = 1; v1->nsize = 1; v1->vtotal = v1->vnum; v1->nsizeMaxClock = mris->nsizeMaxClock;
+  v2->nsizeMax = 1; v2->nsize = 1; v2->vtotal = v2->vnum; v2->nsizeMaxClock = mris->nsizeMaxClock;
 }
 
 
@@ -117,7 +123,7 @@ void mrisAddEdge(MRIS *mris, int vno1, int vno2)
 
 void mrisRemoveEdge(MRIS *mris, int vno1, int vno2)
 {
-  mris->nsizeClock++;   // the v->v[23]num fields are now invalid
+  mris->nsizeMaxClock++;   // the v->v[23]num fields are now invalid
 
   cheapAssertValidVno(mris,vno1);
   cheapAssertValidVno(mris,vno2);
@@ -145,8 +151,8 @@ void mrisRemoveEdge(MRIS *mris, int vno1, int vno2)
   v1->vnum--;
   v2->vnum--;
 
-  v1->nsize = 1; v1->vtotal = v1->vnum; v1->nsizeClock = mris->nsizeClock;
-  v1->nsize = 1; v2->vtotal = v2->vnum; v2->nsizeClock = mris->nsizeClock;
+  v1->nsizeMax = 1; v1->nsize = 1; v1->vtotal = v1->vnum; v1->nsizeMaxClock = mris->nsizeMaxClock;
+  v2->nsizeMax = 1; v2->nsize = 1; v2->vtotal = v2->vnum; v2->nsizeMaxClock = mris->nsizeMaxClock;
   
   // TODO what about any faces that use this edge?
 }
@@ -159,16 +165,49 @@ void mrisRemoveEdge(MRIS *mris, int vno1, int vno2)
 // They are stored, sorted, in the v->v vector with the vnum, v2num, and v3num storing where the hop count changes.
 //
 // Obviously adding or removing edges invalids v2num and v3num.
-//      mris->vnumClock changes to help detect this bug, but it wraps so is not a guarantee.
+//      mris->nsizeMaxClock changes to help detect this bug, but it wraps so is not a guarantee.
 //      Here it is checked to assert vtotal is valid.
-//
+
+void MRISgetNeighborsBeginEnd(
+  MRIS const * mris, 
+  int     vno, 
+  size_t  inner_nbhd_size, 
+  size_t  outer_nbhd_size, 
+  size_t* neighborsIndexBegin,    // set so VERTEX v[*neighborsIndexBegin] is the first in this list with inner <= links <= outer 
+  size_t* neighborsIndexEnd) {    // set so VERTEX v[*neighborsIndexEnd]   is the first in this list with outer < links
+    
+  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+    
+  size_t b = 0, e = 0;
+    
+  if (inner_nbhd_size <= outer_nbhd_size) {
+
+    cheapAssert(mris->nsizeMaxClock == vt->nsizeMaxClock || outer_nbhd_size <= 1);
+
+    switch (inner_nbhd_size) {
+    case 1: b = 0;         break;
+    case 2: b = vt->vnum;  break;
+    case 3: b = vt->v2num; break;
+    default: cheapAssert(false);
+    }
+    switch (outer_nbhd_size) {
+    case 1: e = vt->vnum;  break;
+    case 2: e = vt->v2num; break;
+    case 3: e = vt->v3num; break;
+    default: cheapAssert(false);
+    }
+  }
+    
+  *neighborsIndexBegin = b;
+  *neighborsIndexEnd   = e;
+}
+    
+
+void MRISfindNeighborsAtVertex(MRIS * const mris, int const vno)
+{
 /*
-  Reallocs the *pvlist to be large enough
-  
-  Fills the *pvlist[0..*vlistSize] parameter with the indices of the vertices up to and include
-  nlinks distances in terms of number of edges. Each vertex->marked field will be
-  set to the number of edges between it and the central vertex.
-  
+  Fills in v, vnum, v2num, v3num at the vertex
+
   There are two issues here
     1) adding or removing an edge should invalidate the cached vertex.v#num info
     2) changing a ripflag should invalidate the cached vertex.v#num info
@@ -178,60 +217,74 @@ void mrisRemoveEdge(MRIS *mris, int vno1, int vno2)
   The new code usually asserts in when the edges have changed, and always asserts if a ripped vertex is encountered.
     In the future it may need to recompute if a ripped vertex is encountered.
 */
-void MRISfindNeighborsAtVertex(MRIS * const mris, int const acquiredMarked, int const vno, int const nlinks, int* const vlistSize, int ** const pvlist)
-{
-  MRIS_checkAcquiredTemp(mris, MRIS_TempAssigned_Vertex_marked, acquiredMarked);
 
+  // Get an empty set
+  // Note: This code always clears the temp it uses after use, because it knows which ones it set
+  //
+  unsigned char const Status_notInSet    = 0;   // assumed to be 0 below
+  unsigned char const Status_willBeInSet = 1;
+  unsigned char const Status_inSet       = 2;
+
+  typedef struct Temp {
+    size_t          capacity;
+    unsigned char * status;
+  } Temp;
+  
+  Temp tempForEachThread[_MAX_FS_THREADS];
+  
+  Temp* const temp = &tempForEachThread[omp_get_thread_num()];
+  if (temp->capacity < mris->nvertices) {
+    temp->capacity = mris->nvertices;
+    temp->status   = (unsigned char*)realloc(temp->status, temp->capacity*sizeof(unsigned char));
+    bzero(temp->status, temp->capacity*sizeof(unsigned char));
+  }  
+  
   VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];    
   VERTEX          * const v  = &mris->vertices         [vno];
 
+  size_t const initial_nsizeMax = vt->nsizeMax;   
+
+  // Check ripping is not an issue
+  //
   cheapAssert(!v->ripflag);
 
-  // Mark all the known ones
-  // Note: this code assumes all the v.marked are zero initially
-  //
-  v->marked = -1;
-
-  // Get all that are immediately available.
-  // The vno itself is not included in the list - surprise :-)
-  //
-  if (nlinks == 0) {
-    *vlistSize = 0;
-    return; 
-  }
-  
   // The following is easier with these in an array
   //
-  int vnums[4]; vnums[0] = 0; vnums[1] = vt->vnum; vnums[2] = vt->v2num; vnums[3] = vt->v3num;
+  int vnums[MRIS_MAX_NEIGHBORHOOD_LINKS + 1]; 
+#if MRIS_MAX_NEIGHBORHOOD_LINKS != 3
+  #error bad assumption 
+#else
+  vnums[0] = 0; vnums[1] = vt->vnum; vnums[2] = vt->v2num; vnums[3] = vt->v3num;
+#endif
   
-  // Start with the hops=1 ring, which is always available
+  // The center is assumed to be in the set, so it is not added again
+  //
+  temp->status[vno] = Status_inSet; // already in the set
+
+  // Start with the 1 link, which is always available because it is maintained by addEdge
   //
   int ringLinks = 1;
 
   // mark this ring, and then expand if more rings needed
   //
-  for (;;) {
+  for (ringLinks = 1; ringLinks < MRIS_MAX_NEIGHBORHOOD_LINKS + 1; ringLinks++) {
+  
     int ringBegin = vnums[ringLinks-1];
     int ringEnd   = vnums[ringLinks  ];
 
-    // mark all the elements in the ring
+    // Add all the elements known to be in the ring
+    //
     int n;
     for (n = ringBegin; n < ringEnd; n++) {
       int vnoRing = vt->v[n];
       VERTEX* vr = &mris->vertices[vnoRing];
       cheapAssert(!vr->ripflag);
-      cheapAssert(!vr->marked || (vr->marked == ringLinks));    // some got marked below, but cached ones won't have been
-      vr->marked = ringLinks;
+      temp->status[vnoRing] = Status_inSet;
     }
 
-    // marked enough?
-    if (ringLinks == nlinks) break;
-
-    // Build the next ring
-    // It might be available, or it might have to be found by expanding this ring.
-    // If by expansion, then it will be available...
+    // Build the next ring if it has not already been built
     //
-    if (ringLinks + 1 > vt->nsize) {
+    if (ringLinks + 1 > vt->nsizeMax) {
     
       // Need to create the next ring and store it in the vertex and in the vnums above
       //
@@ -243,26 +296,31 @@ void MRISfindNeighborsAtVertex(MRIS * const mris, int const acquiredMarked, int 
         
         //t const addedBegin = ringEnd;
         int       addedEnd   = ringEnd;
-        
-        for (n = ringBegin; n < ringEnd; n++) {
-          int vnoRing = vt->v[n];
-          VERTEX_TOPOLOGY const * const vtRing = &mris->vertices_topology[vnoRing];    
-          int m;
-          for (m = 0; m < vtRing->vnum; m++) {
-            int const vnoCandidate = vtRing->v[m];
-            VERTEX * const vCandidate  = &mris->vertices         [vnoCandidate];
+
+        // Scan all the vertexs in the current border ring
+        // Add their immediate neighbors that are further away
+        //
+        int i;        
+        for (i = ringBegin; i < ringEnd; i++) {
+          int                     const vnoRing = vt->v[i];
+          VERTEX_TOPOLOGY const * const vtRing  = &mris->vertices_topology[vnoRing];
+          
+          int j;
+          for (j = 0; j < vtRing->vnum; j++) {
+            int      const vnoCandidate = vtRing->v[j];
+            VERTEX * const vCandidate   = &mris->vertices[vnoCandidate];
 
             cheapAssert(!vCandidate->ripflag);
             
             if (pass == 0) {
-              if (vCandidate->marked) continue;                 // in a ring or already counted in this ring
-              vCandidate->marked = nlinks + 1;                  // mark it so don't count it again, and do process it in next pass
-              addedEnd++;                                       // make space for it
+              if (temp->status[vnoRing] != Status_notInSet) continue;   // in a ring or already counted in this ring
+              temp->status[vnoRing] = Status_willBeInSet;               // mark to process it in next pass
+              addedEnd++;                                               // make space for it
             } else {
-              cheapAssert(vCandidate->marked);
-              if (vCandidate->marked != nlinks + 1) continue;   // already processed
-              vCandidate->marked = ringLinks + 1;               // don't process it again, mark it as being in the next ring
-              vt->v[addedEnd++] = vnoCandidate;                 // store it
+              cheapAssert(temp->status[vnoRing] != Status_notInSet);    // must have been found in pass 0
+              if (temp->status[vnoRing] == Status_inSet) continue;      // already processed
+              temp->status[vnoRing] = Status_inSet;                     // don't process it again
+              vt->v[addedEnd++] = vnoCandidate;                         // add it to the next ring
             }
           }
         }
@@ -271,254 +329,43 @@ void MRISfindNeighborsAtVertex(MRIS * const mris, int const acquiredMarked, int 
           vt->v = (int*)realloc(vt->v, addedEnd*sizeof(int));
         } else {
           switch (ringLinks) {
-          case 1: vnums[2] = vt->v2num = addedEnd; vt->nsize = 2; vt->nsizeClock = mris->nsizeClock; break;
-          case 2: vnums[3] = vt->v3num = addedEnd; vt->nsize = 3; vt->nsizeClock = mris->nsizeClock; break;
+          case 1: vnums[2] = vt->v2num = addedEnd; vt->nsizeMax = 2; vt->nsizeMaxClock = mris->nsizeMaxClock; break;
+          case 2: vnums[3] = vt->v3num = addedEnd; vt->nsizeMax = 3; vt->nsizeMaxClock = mris->nsizeMaxClock; break;
           default: cheapAssert(false);
           }
         }
       } 
     }
-    
-    // Use the next ring
-    //
-    ringLinks++;
   }
-  
-  // Copy all the elements from the v to the vlist
+
+  // Make sure the v->dist vectors are large enough
+  // Clear the added elements for repeatability
   //
-  int const result = vnums[ringLinks];
+  size_t const initial_distSize = (!v->dist) ? 0 : initial_nsizeMax;
 
-  int* vlist = *pvlist = (int*)realloc(result * sizeof(int));
-  *vlistSize = result;
-  int n;
-  for (n = 0; n < result; n++) {
-    int vno = vt->v[n];
-    vlist[n] = vno;
-  }
-}
-
-
-static int mrisInitializeNeighborhood(MRIS *mris, int vno)
-{
-  int vtmp[MAX_NEIGHBORS], vnum, i, j, n, neighbors, nsize;
-
-  VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];
-  VERTEX          * const v  = &mris->vertices         [vno];
-  if (vno == Gdiag_no) {
-    DiagBreak();
-  }
-
-  vt->nsize = mris->nsize;
-  if (v->ripflag || !vt->vnum) {
-    return (ERROR_BADPARM);
-  }
-  memmove(vtmp, vt->v, vt->vnum * sizeof(int));
-
-  /* mark 1-neighbors so we don't count them twice */
-  v->marked = 1;
-
-  vnum = neighbors = vt->vnum;
-  for (nsize = 2; nsize <= vt->nsize; nsize++) {
-    /* mark all current neighbors */
-    vnum = neighbors; /* neighbors will be incremented during loop */
-    for (i = 0; i < neighbors; i++) {
-      mris->vertices[vtmp[i]].marked = 1;
-    }
-    for (i = 0; neighbors < MAX_NEIGHBORS && i < vnum; i++) {
-      n = vtmp[i];
-      VERTEX_TOPOLOGY const * const vnbt = &mris->vertices_topology[n];
-      VERTEX          const * const vnb  = &mris->vertices         [n];
-      if (vnb->ripflag) {
-        continue;
-      }
-
-      for (j = 0; j < vnbt->vnum; j++) {
-        VERTEX * const vnb2 = &mris->vertices[vnbt->v[j]];
-        if (vnb2->ripflag || vnb2->marked) {
-          continue;
-        }
-        vtmp[neighbors] = vnbt->v[j];
-        vnb2->marked = 1;
-        if (++neighbors >= MAX_NEIGHBORS) {
-          fprintf(stdout, "vertex %d has too many neighbors!\n", vno);
-          break;
-        }
-      }
-    }
-  }
-  /*
-    now reallocate the v->v structure and place the 2-connected neighbors
-    suquentially after the 1-connected neighbors.
-  */
-  free(vt->v);
-  vt->v = (int *)calloc(neighbors, sizeof(int));
-  if (!vt->v)
-    ErrorExit(ERROR_NO_MEMORY,
-              "mrisInitializeNeighborhood: could not allocate list of %d "
-              "nbrs at v=%d",
-              neighbors,
-              vno);
-
-  v->marked = 0;
-  for (n = 0; n < neighbors; n++) {
-    vt->v[n] = vtmp[n];
-    mris->vertices[vtmp[n]].marked = 0;
-  }
-  if (v->dist) {
-    free(v->dist);
-  }
-  if (v->dist_orig) {
-    free(v->dist_orig);
-  }
-
-  v->dist = (float *)calloc(neighbors, sizeof(float));
-  if (!v->dist)
+  *(float**)&v->dist      = (float *)realloc(v->dist,      vt->v3num*sizeof(float));
+  *(float**)&v->dist_orig = (float *)realloc(v->dist_orig, vt->v3num*sizeof(float));
+    // This should be the only place these fields are written
+    // but it isn't yet
+    
+  if (!v->dist || !v->dist_orig) {
     ErrorExit(ERROR_NOMEMORY,
-              "mrisInitializeNeighborhood: could not allocate list of %d "
+              "MRISfindNeighborsAtVertex: could not allocate list of %d "
               "dists at v=%d",
-              neighbors,
+              vt->v3num,
               vno);
-  v->dist_orig = (float *)calloc(neighbors, sizeof(float));
-  if (!v->dist_orig)
-    ErrorExit(ERROR_NOMEMORY,
-              "mrisInitializeNeighborhood: could not allocate list of %d "
-              "dists at v=%d",
-              neighbors,
-              vno);
-  switch (vt->nsize) {
-    case 2:
-      vt->v2num = neighbors;
-      break;
-    case 3:
-      vt->v3num = neighbors;
-      break;
-    default: /* store old neighborhood size in v3num */
-      vt->v3num = vt->vtotal;
-      break;
   }
-  vt->vtotal = neighbors;
-  for (n = 0; n < neighbors; n++)
-    for (i = 0; i < neighbors; i++)
-      if (i != n && vt->v[i] == vt->v[n])
-        fprintf(stdout, "warning: vertex %d has duplicate neighbors %d and %d!\n", vno, i, n);
-  if ((vno == Gdiag_no) && (Gdiag & DIAG_SHOW) && DIAG_VERBOSE_ON) {
-    fprintf(stdout, "v %d: vnum=%d, v2num=%d, vtotal=%d\n", vno, vt->vnum, vt->v2num, vt->vtotal);
-    for (n = 0; n < neighbors; n++) {
-      fprintf(stdout, "v[%d] = %d\n", n, vt->v[n]);
-    }
+  bzero(&v->dist     [initial_distSize], (vt->v3num - initial_distSize)*sizeof(float));
+  bzero(&v->dist_orig[initial_distSize], (vt->v3num - initial_distSize)*sizeof(float));
+  
+  // Clear the temp for reuse later
+  //
+  temp->status[vno] = Status_notInSet;
+  int i;
+  for (i = 0; i < vt->v3num; i++) {
+    temp->status[vt->v[i]] = Status_notInSet;
   }
-
-  return (NO_ERROR);
 }
-
-int mrisFindNeighbors(MRI_SURFACE *mris)
-{
-  int n0, n1, i, k, m, n, vno, vtotal, ntotal, vtmp[MAX_NEIGHBORS];
-  FACE *f;
-
-  if (Gdiag & DIAG_SHOW && DIAG_VERBOSE_ON) {
-    fprintf(stdout, "finding surface neighbors...");
-  }
-
-  for (k = 0; k < mris->nvertices; k++) {
-    if (k == Gdiag_no) {
-      DiagBreak();
-    }
-    VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[k];    
-    VERTEX          * const v  = &mris->vertices         [k];
-    vt->vnum = 0;
-    for (m = 0; m < vt->num; m++) {
-      n = vt->n[m];               /* # of this vertex in the mth face that it is in */
-      f = &mris->faces[vt->f[m]]; /* ptr to the mth face */
-      /* index of vertex we are connected to */
-      n0 = (n == 0) ? VERTICES_PER_FACE - 1 : n - 1;
-      n1 = (n == VERTICES_PER_FACE - 1) ? 0 : n + 1;
-      for (i = 0; i < vt->vnum && vtmp[i] != f->v[n0]; i++) {
-        ;
-      }
-      if (i == vt->vnum) {
-        vtmp[(int)vt->vnum++] = f->v[n0];
-      }
-      for (i = 0; i < vt->vnum && vtmp[i] != f->v[n1]; i++) {
-        ;
-      }
-      if (i == vt->vnum) {
-        vtmp[(int)vt->vnum++] = f->v[n1];
-      }
-    }
-    if (mris->vertices_topology[k].v) {
-      free(mris->vertices_topology[k].v);
-    }
-    mris->vertices_topology[k].v = (int *)calloc(mris->vertices_topology[k].vnum, sizeof(int));
-    if (!mris->vertices_topology[k].v) 
-      ErrorExit(ERROR_NOMEMORY, 
-      		"mrisFindNeighbors: could not allocate nbr array");
-
-    vt->vtotal = vt->vnum;
-    vt->nsize = 1;
-    for (i = 0; i < vt->vnum; i++) {
-      vt->v[i] = vtmp[i];
-    }
-
-    if (v->dist) {
-      free(v->dist);
-    }
-    if (v->dist_orig) {
-      free(v->dist_orig);
-    }
-
-    v->dist = (float *)calloc(vt->vnum, sizeof(float));
-    if (!v->dist)
-      ErrorExit(ERROR_NOMEMORY,
-                "mrisFindNeighbors: could not allocate list of %d "
-                "dists at v=%d",
-                vt->vnum,
-                k);
-    v->dist_orig = (float *)calloc(vt->vnum, sizeof(float));
-    if (!v->dist_orig)
-      ErrorExit(ERROR_NOMEMORY,
-                "mrisFindNeighbors: could not allocate list of %d "
-                "dists at v=%d",
-                vt->vnum,
-                k);
-  }
-  for (k = 0; k < mris->nfaces; k++) {
-    f = &mris->faces[k];
-    for (m = 0; m < VERTICES_PER_FACE; m++) {
-      VERTEX_TOPOLOGY const * const v = &mris->vertices_topology[f->v[m]];
-      for (i = 0; i < v->num && k != v->f[i]; i++) {
-        ;
-      }
-      if (i == v->num) /* face has vertex, but vertex doesn't have face */
-        ErrorExit(ERROR_BADPARM,
-                  "mrisFindNeighbors: %s: face[%d].v[%d] = %d, "
-                  "but face %d not in vertex %d "
-                  "face list\n",
-                  mris->fname,
-                  k,
-                  m,
-                  f->v[m],
-                  k,
-                  f->v[m]);
-    }
-  }
-
-  for (vno = ntotal = vtotal = 0; vno < mris->nvertices; vno++) {
-    VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];    
-    VERTEX          const * const v  = &mris->vertices         [vno];
-    if (v->ripflag) {
-      continue;
-    }
-    vtotal += vt->vtotal;
-    ntotal++;
-  }
-
-  mris->avg_nbrs = (float)vtotal / (float)ntotal;
-  return (NO_ERROR);
-}
-
-int mrisFindNeighbors2(MRI_SURFACE *mris) { return mrisFindNeighbors(mris); }
-int mrisFindNeighbors3(MRI_SURFACE *mris) { return mrisFindNeighbors(mris); }
 
 
 void MRISresetVtotal(MRIS *mris, int nsize)
@@ -537,7 +384,7 @@ void MRISresetVtotal(MRIS *mris, int nsize)
         if (v->ripflag) continue;
         if (vno == Gdiag_no) DiagBreak();
 
-        cheapAssert(vt->nsize == 1 || vt->nsizeClock == mris->nsizeClock);
+        cheapAssert(vt->nsize == 1 || vt->nsizeMaxClock == mris->nsizeMaxClock);
         
         switch (vt->nsize) {
           default:  cheapAssert(false);
@@ -567,7 +414,7 @@ void MRISresetVtotal(MRIS *mris, int nsize)
         VERTEX          * const v  = &mris->vertices         [vno];
         if (v->ripflag) continue;
         cheapAssert(vt->nsize >= 2);
-        cheapAssert(vt->nsizeClock == mris->nsizeClock);
+        cheapAssert(vt->nsizeMaxClock == mris->nsizeMaxClock);
         vt->vtotal = vt->v2num;
         ntotal++; vtotal += vt->vtotal;
       }
@@ -579,7 +426,7 @@ void MRISresetVtotal(MRIS *mris, int nsize)
         VERTEX          * const v  = &mris->vertices         [vno];
         if (v->ripflag) continue;
         cheapAssert(vt->nsize >= 3);
-        cheapAssert(vt->nsizeClock == mris->nsizeClock);
+        cheapAssert(vt->nsizeMaxClock == mris->nsizeMaxClock);
         vt->vtotal = vt->v3num;
         ntotal++; vtotal += vt->vtotal;
       }
@@ -593,6 +440,25 @@ void MRISresetVtotal(MRIS *mris, int nsize)
   //
   mris->avg_nbrs = (float)vtotal / (float)ntotal;
 }
+
+
+void mrisFindNeighbors(MRI_SURFACE *mris)
+{
+  // This maybe could be done in parallel now
+  // because MRISfindNeighborsAtVertex is no longer using marks
+  //
+  int vno;
+  for (vno = 0; vno < mris->nvertices; vno++) {
+    MRISfindNeighborsAtVertex(mris, vno);
+  }
+  
+  MRISresetVtotal(mris, 1);
+}
+
+void mrisFindNeighbors2(MRI_SURFACE *mris) { return mrisFindNeighbors(mris); }
+void mrisFindNeighbors3(MRI_SURFACE *mris) { return mrisFindNeighbors(mris); }
+
+
 
 
 // Faces
@@ -2711,7 +2577,7 @@ int mrisDivideEdge(MRIS *mris, int vno1, int vno2)
   if (vnewt->vnum != 4 || vnewt->num != 4) {
     DiagBreak();
   }
-  mrisInitializeNeighborhood(mris, vnew_no);
+  
   return (NO_ERROR);
 }
 
@@ -3008,7 +2874,9 @@ int mrisDivideFace(MRIS *mris, int fno, int vno1, int vno2, int vnew_no)
     fprintf(stdout, "face %d: (%d, %d, %d)\n", fnew_no, f2->v[0], f2->v[1], f2->v[2]);
   }
 
-  mrisInitializeNeighborhood(mris, vno3);
+  // MRISfindNeighborsAtVertex would need to be called on all the vertices within some extended neighborhood of the added vertex
+  // but instead the code invalidates all neighborhoods for now
+  //
 
   return (NO_ERROR);
 }

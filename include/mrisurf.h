@@ -193,8 +193,9 @@ face_type, FACE ;
   ELTT(BEVIN_SOMETIMES_CONST_V short,v2num) SEP         /* number of 1, or 2-hop neighbors                      */ \
   ELTT(BEVIN_SOMETIMES_CONST_V short,v3num) SEP         /* number of 1,2,or 3-hop neighbors                     */ \
   ELTT(BEVIN_SOMETIMES_CONST_V short,vtotal) SEP        /* total # of neighbors. copy of vnum.nsize             */ \
-  ELTX(BEVIN_SOMETIMES_CONST_V short,nsizeClock) SEP    /* copy of mris->nsizeClock when v#num                  */ \
-  ELTT(BEVIN_SOMETIMES_CONST_V uchar,nsize) SEP         /* index of the largest valid v#num                     */ \
+  ELTX(BEVIN_SOMETIMES_CONST_V short,nsizeMaxClock) SEP /* copy of mris->nsizeMaxClock when v#num                  */ \
+  ELTT(BEVIN_SOMETIMES_CONST_V uchar,nsizeMax) SEP      /* the max nsize that was used to fill in vnum etc      */ \
+  ELTT(BEVIN_SOMETIMES_CONST_V uchar,nsize) SEP         /* index of the current v#num in vtotal                 */ \
   ELTT(uchar,num) SEP                                   /* number of neighboring faces                          */ \
   // end of macro
 
@@ -416,12 +417,12 @@ typedef struct vertex_type_
   ELTT(float,origarea) SEP    \
   ELTT(float,group_avg_area) SEP    \
   ELTT(float,K) SEP              /* Gaussian curvature */    \
-  ELTT(float,H) SEP              /* mean curvature */    \
+  ELTT(float,H) SEP                     /* mean curvature */    \
   ELTT(float,k1) SEP    \
-  ELTT(float,k2) SEP         /* the principal curvatures */    \
-  ELTP(float,dist) SEP          /* original distance to neighboring vertices */    \
-  ELTP(float,dist_orig) SEP     /* original distance to neighboring vertices */    \
-  ELTT(char,neg) SEP           /* 1 if the normal vector is inverted */    \
+  ELTT(float,k2) SEP                    /* the principal curvatures */    \
+  ELTX(float*,dist) SEP                 /* distance to neighboring vertices */    \
+  ELTX(float*,dist_orig) SEP            /* original distance to neighboring vertices */    \
+  ELTT(char,neg) SEP                    /* 1 if the normal vector is inverted */    \
   ELTT(float,mean) SEP    \
   ELTT(float,mean_imag) SEP      /* imaginary part of complex statistic */    \
   ELTT(float,std_error) SEP    \
@@ -482,8 +483,8 @@ typedef struct MRIS
 //
 #define LIST_OF_MRIS_ELTS_1     \
     \
-  ELTT(const int,nvertices) SEP                 /* # of vertices on surface, change by calling MRISreallocVerticesAndFaces et al */     \
-  ELTT(const int,nfaces) SEP                    /* # of faces on surface,    change by calling MRISreallocVerticesAndFaces et al */     \
+  ELTT(const int,nvertices) SEP                 /* # of vertices on surface, change by calling MRISreallocVerticesAndFaces et al */         \
+  ELTT(const int,nfaces) SEP                    /* # of faces on surface,    change by calling MRISreallocVerticesAndFaces et al */         \
   ELTT(int,nedges) SEP                          /* # of edges on surface*/    \
   ELTT(int,nstrips) SEP    \
   ELTP(VERTEX_TOPOLOGY,vertices_topology) SEP    \
@@ -558,7 +559,7 @@ typedef struct MRIS
   ELTT(int,nlabels) SEP    \
   ELTP(MRIS_AREA_LABEL,labels) SEP  /* nlabels of these (may be null) */    \
   ELTT(int,nsize) SEP               /* size of neighborhoods */    \
-  ELTX(short,nsizeClock) SEP        /* changed whenever an edge is added or removed, which invalidates the vertex v#num values */ \
+  ELTX(short,nsizeMaxClock) SEP     /* changed whenever an edge is added or removed, which invalidates the vertex v#num values */ \
   \
   ELTT(int,max_nsize) SEP           /* max the neighborhood size has been set to (typically 3) */    \
   ELTT(float,avg_nbrs) SEP          /* mean # of vertex neighbors */    \
@@ -2615,10 +2616,6 @@ MRISvertexNormalToVoxel(MRI_SURFACE *mris,
 			double *pnx, double *pny, double *pnz) ;
 MRI *MRIcomputeLaminarVolumeFractions(MRI_SURFACE *mris, double res, MRI *mri_src, MRI *mri_vfracs) ;
 
-int mrisFindNeighbors(MRI_SURFACE *mris);
-int mrisFindNeighbors2(MRI_SURFACE *mris);
-int mrisFindNeighbors3(MRI_SURFACE *mris);
-
 MRIS *MRIStessellate(MRI *mri,  int value, int all_flag);
 void TESSaddFace(MRI *mri, int imnr, int i, int j, int f, int prev_flag, int *pface_index, 
 		 tface_type *face, int *face_index_table0, int *face_index_table1);
@@ -2679,17 +2676,27 @@ void mrisRemoveEdge(MRIS *mris, int vno1, int vno2);
 
 // Neighborhoods - sets of vertexs that are within a few edges of one
 //
-void MRISfindNeighborsAtVertex(MRI_SURFACE *mris, int acquiredMarked, int vno, int nlinks, int* vlistSize, int **pvlist);
+#define MRIS_MAX_NEIGHBORHOOD_LINKS 3   // aka nsize - vnum v2num v3num
+void MRISfindNeighborsAtVertex(MRI_SURFACE *mris, int vno);
     // assumes all marked are cleared
-    // sets *vlistSize to the size of the returned list
-    // reallocs and fills in the vlist with the neighbor vno's, in distance order.  Does not include vno.
-    // returns the number of neighbors - asserts if vlistSize is inadequate
-    // sets vno.marked to -1, and all other returned entries marked to their distances.
-    // fills in a cache at the vertex to speed up later accesses
+    // fills in v, vnum, v2num, v3num at the vertex
 
 void MRISsetNeighborhoodSizeAndDist  (MRI_SURFACE *mris, int nsize) ;
 void MRISresetVtotal(MRI_SURFACE *mris, int nsize) ;
 
+void mrisFindNeighbors (MRI_SURFACE *mris);
+void mrisFindNeighbors2(MRI_SURFACE *mris);
+void mrisFindNeighbors3(MRI_SURFACE *mris);
+    // These iset the neighbors information at all vertices, and set nsize to 1 in all the vertices
+    // Ripped is ignored
+
+void MRISgetNeighborsBeginEnd(
+    MRIS const * mris, 
+    int     vno, 
+    size_t  inner_nbhd_size, 
+    size_t  outer_nbhd_size, 
+    size_t* neighborsIndexBegin,    // set so VERTEX v[*neighborsIndexBegin] is the first in this list with inner <= links <= outer 
+    size_t* neighborsIndexEnd);     // set so VERTEX v[*neighborsIndexEnd]   is the first in this list with outer < links
 
 //  Faces
 //

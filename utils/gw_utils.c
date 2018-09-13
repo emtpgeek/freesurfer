@@ -118,28 +118,11 @@ MRI_SURFACE *GWU_make_surface_from_lists(GWUTILS_VERTEX *vertices, int vertexcou
   //--------------------------------------------
   for (vno = 0; vno < vertexcount; vno++) {
     VERTEX_TOPOLOGY* const vt = &mris->vertices_topology[vno];
-    VERTEX         * const v  = &mris->vertices         [vno];
     vt->f = (int *)calloc(vt->num, sizeof(int));
     if (!vt->f) ErrorExit(ERROR_NO_MEMORY, "%s: could not allocate %d faces", __func__, vt->num);
     vt->n = (uchar *)calloc(vt->num, sizeof(uchar));
     if (!vt->n) ErrorExit(ERROR_NO_MEMORY, "%s: could not allocate %d nbrs", __func__, vt->n);
     vt->num = 0; /* for use as counter in next section */
-    v->dist = (float *)calloc(vt->vnum, sizeof(float));
-    if (!v->dist)
-      ErrorExit(ERROR_NOMEMORY,
-                "%s: could not allocate list of %d "
-                "dists at v=%d",
-                __func__,
-                vt->vnum,
-                vno);
-    v->dist_orig = (float *)calloc(vt->vnum, sizeof(float));
-    if (!v->dist_orig)
-      ErrorExit(ERROR_NOMEMORY,
-                "%s: could not allocate list of %d "
-                "dists at v=%d",
-                __func__,
-                vt->vnum,
-                vno);
   }
 
   //---------------------------------------------
@@ -160,7 +143,7 @@ MRI_SURFACE *GWU_make_surface_from_lists(GWUTILS_VERTEX *vertices, int vertexcou
   MRIScomputeMetricProperties(mris);
 
   mris->type = MRIS_ICO_SURFACE;
-  MRISsetNeighborhoodSize(mris, 1);
+  MRISsetNeighborhoodSizeAndDist(mris, 1);
   return (mris);
 }
 

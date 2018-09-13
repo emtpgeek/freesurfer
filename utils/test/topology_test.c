@@ -169,71 +169,36 @@ int test2()
     if (bitCount(i^j) == 1) 
       mrisAddEdge(src, i, j);
   
-  int* vlist = (int*)malloc(nvertices*sizeof(int));
+  MRISfindNeighborsAtVertex(src, vno1);
+  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno1];
   
   int nlinks;
-  for (nlinks = 0; nlinks < 4; nlinks++) {
-    int acquiredMarked = MRIS_acquireTemp(src, MRIS_TempAssigned_Vertex_marked);                           
-    MRISclearMarks(src);
+  for (nlinks = 1; nlinks < 4; nlinks++) {
+    size_t b,e;
     
-    int const vno1 = 0x0;
-    int const vlistSize = MRISfindNeighborsAtVertex(src, acquiredMarked, vno1, nlinks, vlist);
-    
-    printf("Returned vlistSize:%d at nlinks %d\n", vlistSize, nlinks);
+    MRISgetNeighborsBeginEnd(
+        mris, 
+        vno1, 
+        nlinks, 
+        nlinks, 
+        &b,
+        &e);
 
-    // Check the vno1 marked is correct
-    //
-    if (src->vertices[vno1].marked != -1) {
-        printf("src->vertices[vno1:%p].marked:%d should be -1\n", 
-            (void*)(long)vno1, src->vertices[vno1].marked);
-            fails++;
+    size_t i;
+    for (i = b; i < e; i++) {
+      int vno2  = vt->v[i];
+      mris->vertices[vno2]->marked = links;
     }
-    src->vertices[vno1].marked = 0;
-
-    // Check the other marked are correct
-    //
-    int expected_vlistSize = 0;
-    int vno2;    
-    for (vno2 = 0; vno2 < nvertices; vno2++) {
-      int marked = bitCount(vno1^vno2);
-      if (marked > nlinks) marked = 0;
-      if (marked != src->vertices[vno2].marked) {
-        printf("Marked %p with the wrong distance %d\n", (void*)(long)vno2, src->vertices[vno2].marked);
-        fails++;
-      }
-      if (marked > 0) expected_vlistSize++;
-    }
-
-    // Check the count is right
-    //
-    if (expected_vlistSize != vlistSize) {
-      printf("Returned the wrong number of elements %d, instead of %d\n", 
-        expected_vlistSize, vlistSize);
-      fails++;
-    }
-    
-    // Check that the list is in the correct order
-    //
-    int furtherestSoFar = 1;    // should not find a 0
-    int distancesFound  = 0;
-    for (i = 0; i < vlistSize; i++) {
-      int vno2 = vlist[i];
-      int distance = src->vertices[vno2].marked;
-      if (distance < furtherestSoFar) {
-        printf("Distances in wrong order %d before %d\n", furtherestSoFar, distance);
-        fails++;
-      }
-      int distancesFoundMask = 1 << distance;
-      if (!(distancesFound & distancesFoundMask)) {
-        printf("Listed some at distance %d\n", distance);
-        distancesFound |= distancesFoundMask;
-      } 
-    }
-    
-    MRIS_releaseTemp(src, MRIS_TempAssigned_Vertex_marked, acquiredMarked);
   }
-  
-  freeAndNULL(vlist);
+
+  for (i = 0; i < nvertices; i++) {
+    int expected = (bitCount(i^j);
+    if (expected > 3) expected = 0;
+    if (mris->vertices[vno2]->marked != expected) {
+      fails++;
+      if (fails < 10) printf("mris->vertices[vno2:%d]->marked:%d != expected:%d\n", vno2, mris->vertices[vno2]->marked, expected);
+    }
+  }
   
   // Done
   //  

@@ -3874,26 +3874,11 @@ static MRI_SURFACE *mrisReadSTLfile(const char *fname)
     /* now allocate face arrays in vertices */
     for (vno = 0; vno < mris->nvertices; vno++) {
       VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];
-      VERTEX          * const v  = &mris->vertices         [vno];
       vt->f = (int *)calloc(vt->num, sizeof(int));
       if (!vt->f) ErrorExit(ERROR_NO_MEMORY, "MRISreadSTLfileICOread: could not allocate %d faces", vt->num);
       vt->n = (unsigned char *)calloc(vt->num, sizeof(unsigned char));
       if (!vt->n) ErrorExit(ERROR_NO_MEMORY, "MRISreadSTLfile: could not allocate %d nbrs", vt->n);
       vt->num = 0; /* for use as counter in next section */
-      v->dist = (float *)calloc(vt->vnum, sizeof(float));
-      if (!v->dist)
-        ErrorExit(ERROR_NOMEMORY,
-                  "MRISreadSTLfile: could not allocate list of %d "
-                  "dists at v=%d",
-                  vt->vnum,
-                  vno);
-      v->dist_orig = (float *)calloc(vt->vnum, sizeof(float));
-      if (!v->dist_orig)
-        ErrorExit(ERROR_NOMEMORY,
-                  "MRISreadSTLfile: could not allocate list of %d "
-                  "dists at v=%d",
-                  vt->vnum,
-                  vno);
       vt->vtotal = vt->vnum;
     }
 
