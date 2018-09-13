@@ -187,12 +187,12 @@ main(int argc, char *argv[])
         MRISfree(&mris_var);
         ErrorExit(ERROR_BADPARM,"%s: could not load file %s\n",fname);
       }
-      MRISsetNeighborhoodSize(mris_var, -1) ;  /* back to max */
+      MRISsetNeighborhoodSizeAndDist(mris_var, -1) ;  /* back to max */
       MRIScomputeMetricProperties(mris_var) ;
       MRIScomputeSecondFundamentalForm(mris_var) ;
       MRISuseMeanCurvature(mris_var) ;
       MRISaverageCurvatures(mris_var, navgs) ;
-      MRISresetNeighborhoodSize(mris_var,1);/*only use nearest neighbor distances*/
+      MRISresetVtotal(mris_var,1);/*only use nearest neighbor distances*/
       MRISrestoreVertexPositions(mris_var, CANONICAL_VERTICES) ;
     }
     MRISnormalizeField(mris_var,IsDistanceField(field_no), NORM_MEAN) ;

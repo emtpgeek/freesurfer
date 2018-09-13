@@ -377,7 +377,7 @@ main(int argc, char *argv[])
   } 
   else
   {
-    MRISresetNeighborhoodSize(mris, mris->vertices_topology[0].nsize) ; // set back to max
+    MRISresetVtotal(mris, mris->vertices_topology[0].nsize) ; // set back to max
     if (label_fname) // read in a label instead of a patch
     {
       LABEL *area ;
@@ -425,7 +425,7 @@ main(int argc, char *argv[])
         v->nsize = 1 ;
       }
     }
-    MRISsetNeighborhoodSize(mris, nbrs) ;
+    MRISsetNeighborhoodSizeAndDist(mris, nbrs) ;
 #endif
   }
 
@@ -446,7 +446,7 @@ main(int argc, char *argv[])
     mrisDisturbVertices(mris, disturb) ;
   if (parms.niterations > 0)
   {
-    MRISresetNeighborhoodSize(mris, nbrs) ;
+    MRISresetVtotal(mris, nbrs) ;
 
     if (!FZERO(parms.l_unfold) || !FZERO(parms.l_expand))
     {

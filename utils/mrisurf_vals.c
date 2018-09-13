@@ -675,7 +675,7 @@ int MRISaverageD(MRI_SURFACE *mris, int navgs)
 int MRISmedianFilterVals(MRI_SURFACE *mris, int nmedians)
 {
   int i, vno, vnb, *pnb, vnum, num;
-  float val_list[MAX_NEIGHBORS];
+  float* val_list = (float*)malloc(mris->nvertices*sizeof(float));
 
   for (i = 0; i < nmedians; i++) {
     for (vno = 0; vno < mris->nvertices; vno++) {
@@ -712,6 +712,8 @@ int MRISmedianFilterVals(MRI_SURFACE *mris, int nmedians)
       v->val = v->tdx;
     }
   }
+  
+  free(val_list);
   return (NO_ERROR);
 }
 /*-----------------------------------------------------
@@ -724,7 +726,7 @@ int MRISmedianFilterVals(MRI_SURFACE *mris, int nmedians)
 int MRISmedianFilterVerexPositions(MRI_SURFACE *mris, int nmedians)
 {
   int i, vno, vnb, *pnb, vnum, num;
-  float val_list[MAX_NEIGHBORS];
+  float* val_list = (float*)malloc(mris->nvertices*sizeof(float));
 
   for (i = 0; i < nmedians; i++) {
     for (vno = 0; vno < mris->nvertices; vno++) {
@@ -800,6 +802,8 @@ int MRISmedianFilterVerexPositions(MRI_SURFACE *mris, int nmedians)
       v->z = v->tdz;
     }
   }
+  
+  free(val_list);
   return (NO_ERROR);
 }
 /*-----------------------------------------------------
@@ -856,7 +860,7 @@ int MRISgaussianFilterD(MRI_SURFACE *mris, double wt)
 int MRISmedianFilterD(MRI_SURFACE *mris, int nmedians, int vtotal)
 {
   int i, vno, vnb, *pnb, vnum, num;
-  float val_list[MAX_NEIGHBORS];
+  float* val_list = (float*)malloc(mris->nvertices*sizeof(float));
 
   for (i = 0; i < nmedians; i++) {
     for (vno = 0; vno < mris->nvertices; vno++) {
@@ -897,6 +901,8 @@ int MRISmedianFilterD(MRI_SURFACE *mris, int nmedians, int vtotal)
       v->d = v->tdx;
     }
   }
+  
+  free(val_list);
   return (NO_ERROR);
 }
 /*-----------------------------------------------------
@@ -909,7 +915,7 @@ int MRISmedianFilterD(MRI_SURFACE *mris, int nmedians, int vtotal)
 int MRISmedianFilterCurvature(MRI_SURFACE *mris, int nmedians)
 {
   int i, vno, vnb, *pnb, vnum, num;
-  float val_list[MAX_NEIGHBORS];
+  float* val_list = (float*)malloc(mris->nvertices*sizeof(float));
 
   for (i = 0; i < nmedians; i++) {
     for (vno = 0; vno < mris->nvertices; vno++) {
@@ -945,6 +951,8 @@ int MRISmedianFilterCurvature(MRI_SURFACE *mris, int nmedians)
       v->curv = v->tdx;
     }
   }
+  
+  free(val_list);
   return (NO_ERROR);
 }
 /*-----------------------------------------------------
@@ -957,7 +965,7 @@ int MRISmedianFilterCurvature(MRI_SURFACE *mris, int nmedians)
 int MRISmedianFilterVal2s(MRI_SURFACE *mris, int nmedians)
 {
   int i, vno, vnb, *pnb, vnum, num;
-  float val_list[MAX_NEIGHBORS];
+  float* val_list = (float*)malloc(mris->nvertices*sizeof(float));
 
   for (i = 0; i < nmedians; i++) {
     for (vno = 0; vno < mris->nvertices; vno++) {
@@ -993,6 +1001,8 @@ int MRISmedianFilterVal2s(MRI_SURFACE *mris, int nmedians)
       v->val2 = v->tdx;
     }
   }
+  
+  free(val_list);
   return (NO_ERROR);
 }
 /*-----------------------------------------------------
@@ -1005,7 +1015,7 @@ int MRISmedianFilterVal2s(MRI_SURFACE *mris, int nmedians)
 int MRISmedianFilterVal2baks(MRI_SURFACE *mris, int nmedians)
 {
   int i, vno, vnb, *pnb, vnum, num;
-  float val_list[MAX_NEIGHBORS];
+  float* val_list = (float*)malloc(mris->nvertices*sizeof(float));
 
   for (i = 0; i < nmedians; i++) {
     for (vno = 0; vno < mris->nvertices; vno++) {
@@ -1041,6 +1051,8 @@ int MRISmedianFilterVal2baks(MRI_SURFACE *mris, int nmedians)
       v->val2bak = v->tdx;
     }
   }
+  
+  free(val_list);
   return (NO_ERROR);
 }
 /*-----------------------------------------------------

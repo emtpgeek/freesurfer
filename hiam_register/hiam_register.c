@@ -529,7 +529,7 @@ mrisRegister(MRI_SURFACE *mris, MRI_SP *mrisp_template,
       MRIScomputeSecondFundamentalForm(mris) ;
       MRISuseMeanCurvature(mris) ;
       MRISnormalizeCurvature(mris, which_norm) ;
-      MRISresetNeighborhoodSize(mris,1);/*only use nearest neighbor distances*/
+      MRISresetVtotal(mris,1);/*only use nearest neighbor distances*/
       MRISrestoreVertexPositions(mris, TMP_VERTICES) ;
     }
     MRISstoreMeanCurvature(mris) ;

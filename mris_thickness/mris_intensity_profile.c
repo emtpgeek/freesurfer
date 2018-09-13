@@ -203,7 +203,7 @@ main(int argc, char *argv[]) {
               Progname, fname) ;
   MRISsaveVertexPositions(mris, PIAL_VERTICES) ;
   if (nbrs > 1)
-    MRISresetNeighborhoodSize(mris, nbrs) ;
+    MRISresetVtotal(mris, nbrs) ;
 
 
   if (curv_fname) {

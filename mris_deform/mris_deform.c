@@ -542,7 +542,7 @@ main(int argc, char *argv[]) {
     vp_copy_from_surface(mris, WHITE_VERTICES, WHITE_VERTICES);
     vp_copy_from_surface(mris, PIAL_VERTICES, PIAL_VERTICES);
   }
-  MRISresetNeighborhoodSize(mris, 3) ; // to allow calculation of nbhd stats
+  MRISresetVtotal(mris, 3) ; // to allow calculation of nbhd stats
 
   TransformInvert(transform, NULL) ;
   if (transform->type == MNI_TRANSFORM_TYPE ||

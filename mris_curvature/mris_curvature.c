@@ -152,7 +152,7 @@ main(int argc, char *argv[])
                 Progname, in_fname) ;
   }
 
-  MRISsetNeighborhoodSize(mris, nbrs) ;
+  MRISsetNeighborhoodSizeAndDist(mris, nbrs) ;
 
   if (nbhd_size > 0)
   {
@@ -569,7 +569,7 @@ MRIScomputeNeighbors(MRI_SURFACE *mris, float max_mm)
   float  dist, dx, dy, dz ;
 
 
-  MRISresetNeighborhoodSize(mris, -1) ;  /* back to max */
+  MRISresetVtotal(mris, -1) ;  /* back to max */
   for (vno = 0 ; vno < mris->nvertices ; vno++)
   {
     VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno] ;

@@ -1312,12 +1312,12 @@ int MRISregister(MRI_SURFACE *mris,
       if (MRISreadVertexPositions(mris, fname) != NO_ERROR)
         ErrorExit(ERROR_NOFILE, "%s: could not read surface file %s", "MRISregister", fname);
 
-      MRISresetNeighborhoodSize(mris, -1); /* back to max */
+      MRISresetVtotal(mris, -1); /* back to max */
       MRIScomputeMetricProperties(mris);
       MRIScomputeSecondFundamentalForm(mris);
       MRISuseMeanCurvature(mris);
       MRISnormalizeCurvature(mris, parms->which_norm);
-      MRISresetNeighborhoodSize(mris, 1); /*only use nearest neighbor distances*/
+      MRISresetVtotal(mris, 1); /*only use nearest neighbor distances*/
 
       MRISrestoreVertexPositions(mris, TMP_VERTICES);
       MRIScomputeMetricProperties(mris);
@@ -1766,11 +1766,11 @@ int MRISvectorRegister(MRI_SURFACE *mris,
         parms->fields[n].l_corr = parms->fields[n].l_pcorr = 0.0;
         continue;
       }
-      MRISsetNeighborhoodSize(mris, -1); /* back to max */
+      MRISsetNeighborhoodSizeAndDist(mris, -1); /* back to max */
       MRIScomputeMetricProperties(mris);
       MRIScomputeSecondFundamentalForm(mris);
       MRISuseMeanCurvature(mris);
-      MRISresetNeighborhoodSize(mris, 1); /*only use nearest neighbor distances*/
+      MRISresetVtotal(mris, 1); /*only use nearest neighbor distances*/
       MRISrestoreVertexPositions(mris, TMP_VERTICES);
     }
     MRISnormalizeField(mris, parms->fields[n].type, parms->fields[n].which_norm);
@@ -3229,10 +3229,10 @@ MRI_SURFACE *MRISunfold(MRI_SURFACE *mris, INTEGRATION_PARMS *parms, int max_pas
   parms->tol = 1e-1; /* try and remove as much negative stuff as possible */
 #endif
   mrisStoreVtotalInV3num(mris); /* hack to speed up neg. area removal */
-  MRISresetNeighborhoodSize(mris, 1);
+  MRISresetVtotal(mris, 1);
   fprintf(stdout, "removing remaining folds...\n");
   mrisRemoveNegativeArea(mris, parms, base_averages > 32 ? 32 : base_averages, MAX_NEG_AREA_PCT, 2);
-  MRISresetNeighborhoodSize(mris, 3);
+  MRISresetVtotal(mris, 3);
 
   if (mris->status == MRIS_PLANE && parms->complete_dist_mat == 0) /* smooth out remaining folds */
   {

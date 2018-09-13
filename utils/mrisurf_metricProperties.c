@@ -1464,297 +1464,6 @@ double MRIScomputeTotalVertexSpacingStats(
 
 
 
-int mrisFindNeighbors(MRI_SURFACE *mris)
-{
-  int n0, n1, i, k, m, n, vno, vtotal, ntotal, vtmp[MAX_NEIGHBORS];
-  FACE *f;
-
-  if (Gdiag & DIAG_SHOW && DIAG_VERBOSE_ON) {
-    fprintf(stdout, "finding surface neighbors...");
-  }
-
-  for (k = 0; k < mris->nvertices; k++) {
-    if (k == Gdiag_no) {
-      DiagBreak();
-    }
-    VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[k];    
-    VERTEX          * const v  = &mris->vertices         [k];
-    vt->vnum = 0;
-    for (m = 0; m < vt->num; m++) {
-      n = vt->n[m];               /* # of this vertex in the mth face that it is in */
-      f = &mris->faces[vt->f[m]]; /* ptr to the mth face */
-      /* index of vertex we are connected to */
-      n0 = (n == 0) ? VERTICES_PER_FACE - 1 : n - 1;
-      n1 = (n == VERTICES_PER_FACE - 1) ? 0 : n + 1;
-      for (i = 0; i < vt->vnum && vtmp[i] != f->v[n0]; i++) {
-        ;
-      }
-      if (i == vt->vnum) {
-        vtmp[(int)vt->vnum++] = f->v[n0];
-      }
-      for (i = 0; i < vt->vnum && vtmp[i] != f->v[n1]; i++) {
-        ;
-      }
-      if (i == vt->vnum) {
-        vtmp[(int)vt->vnum++] = f->v[n1];
-      }
-    }
-    if (mris->vertices_topology[k].v) {
-      free(mris->vertices_topology[k].v);
-    }
-    mris->vertices_topology[k].v = (int *)calloc(mris->vertices_topology[k].vnum, sizeof(int));
-    if (!mris->vertices_topology[k].v) ErrorExit(ERROR_NOMEMORY, "mrisFindNeighbors: could not allocate nbr array");
-
-    vt->vtotal = vt->vnum;
-    vt->nsize = 1;
-    for (i = 0; i < vt->vnum; i++) {
-      vt->v[i] = vtmp[i];
-    }
-
-    if (v->dist) {
-      free(v->dist);
-    }
-    if (v->dist_orig) {
-      free(v->dist_orig);
-    }
-
-    v->dist = (float *)calloc(vt->vnum, sizeof(float));
-    if (!v->dist)
-      ErrorExit(ERROR_NOMEMORY,
-                "mrisFindNeighbors: could not allocate list of %d "
-                "dists at v=%d",
-                vt->vnum,
-                k);
-    v->dist_orig = (float *)calloc(vt->vnum, sizeof(float));
-    if (!v->dist_orig)
-      ErrorExit(ERROR_NOMEMORY,
-                "mrisFindNeighbors: could not allocate list of %d "
-                "dists at v=%d",
-                vt->vnum,
-                k);
-    /*
-      if (vt->num != vt->vnum)
-      printf("%d: num=%d vnum=%d\n",k,vt->num,vt->vnum);
-    */
-  }
-  for (k = 0; k < mris->nfaces; k++) {
-    f = &mris->faces[k];
-    for (m = 0; m < VERTICES_PER_FACE; m++) {
-      VERTEX_TOPOLOGY const * const v = &mris->vertices_topology[f->v[m]];
-      for (i = 0; i < v->num && k != v->f[i]; i++) {
-        ;
-      }
-      if (i == v->num) /* face has vertex, but vertex doesn't have face */
-        ErrorExit(ERROR_BADPARM,
-                  "mrisFindNeighbors: %s: face[%d].v[%d] = %d, "
-                  "but face %d not in vertex %d "
-                  "face list\n",
-                  mris->fname,
-                  k,
-                  m,
-                  f->v[m],
-                  k,
-                  f->v[m]);
-    }
-  }
-
-  for (vno = ntotal = vtotal = 0; vno < mris->nvertices; vno++) {
-    VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];    
-    VERTEX          const * const v  = &mris->vertices         [vno];
-    if (v->ripflag) {
-      continue;
-    }
-    vtotal += vt->vtotal;
-    ntotal++;
-  }
-
-  mris->avg_nbrs = (float)vtotal / (float)ntotal;
-  return (NO_ERROR);
-}
-
-/* This may be the same as the above. Whoever wrote it should
-   NOT have done this. Very bad programming. */
-int mrisFindNeighbors2(MRI_SURFACE *mris)
-{
-  int n0, n1, i, k, m, n, vno, vtotal, ntotal, vtmp[MAX_NEIGHBORS];
-  FACE *f;
-
-
-  if (Gdiag & DIAG_SHOW && DIAG_VERBOSE_ON) fprintf(stdout, "finding surface neighbors...");
-
-  for (k = 0; k < mris->nvertices; k++) {
-    if (k == Gdiag_no) DiagBreak();
-    VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[k];
-    VERTEX          * const v  = &mris->vertices         [k];
-    vt->vnum = 0;
-    for (m = 0; m < vt->num; m++) {
-      n = vt->n[m];               /* # of this vertex in the mth face that it is in */
-      f = &mris->faces[vt->f[m]]; /* ptr to the mth face */
-      /* index of vertex we are connected to */
-      n0 = (n == 0) ? VERTICES_PER_FACE - 1 : n - 1;
-      n1 = (n == VERTICES_PER_FACE - 1) ? 0 : n + 1;
-      for (i = 0; i < vt->vnum && vtmp[i] != f->v[n0]; i++)
-        ;
-      if (i == vt->vnum) vtmp[(int)vt->vnum++] = f->v[n0];
-      for (i = 0; i < vt->vnum && vtmp[i] != f->v[n1]; i++)
-        ;
-      if (i == vt->vnum) vtmp[(int)vt->vnum++] = f->v[n1];
-    }
-    if (mris->vertices_topology[k].v) free(mris->vertices_topology[k].v);
-    mris->vertices_topology[k].v = (int *)calloc(mris->vertices_topology[k].vnum, sizeof(int));
-    if (!mris->vertices_topology[k].v) ErrorExit(ERROR_NOMEMORY, "mrisFindNeighbors2: could not allocate nbr array");
-
-    vt->vtotal = vt->vnum;
-    vt->nsize = 1;
-    for (i = 0; i < vt->vnum; i++) {
-      vt->v[i] = vtmp[i];
-    }
-
-    if (v->dist) free(v->dist);
-    if (v->dist_orig) free(v->dist_orig);
-
-    v->dist = (float *)calloc(vt->vnum, sizeof(float));
-    if (!v->dist)
-      ErrorExit(ERROR_NOMEMORY,
-                "mrisFindNeighbors2: could not allocate list of %d "
-                "dists at v=%d",
-                vt->vnum,
-                k);
-    v->dist_orig = (float *)calloc(vt->vnum, sizeof(float));
-    if (!v->dist_orig)
-      ErrorExit(ERROR_NOMEMORY,
-                "mrisFindNeighbors2: could not allocate list of %d "
-                "dists at v=%d",
-                vt->vnum,
-                k);
-    /*
-        if (v->num != v->vnum)
-          printf("%d: num=%d vnum=%d\n",k,v->num,v->vnum);
-    */
-  }
-  for (k = 0; k < mris->nfaces; k++) {
-    f = &mris->faces[k];
-    for (m = 0; m < VERTICES_PER_FACE; m++) {
-      VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[f->v[m]];
-      for (i = 0; i < vt->num && k != vt->f[i]; i++)
-        ;
-      if (i == vt->num) /* face has vertex, but vertex doesn't have face */
-        ErrorExit(ERROR_BADPARM,
-                  "%s: face[%d].v[%d] = %d, but face %d not in vertex %d "
-                  "face list\n",
-                  mris->fname,
-                  k,
-                  m,
-                  f->v[m],
-                  k,
-                  f->v[m]);
-    }
-  }
-
-  for (vno = ntotal = vtotal = 0; vno < mris->nvertices; vno++) {
-    VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
-    VERTEX          const * const v  = &mris->vertices         [vno];
-    if (v->ripflag) continue;
-    vtotal += vt->vtotal;
-    ntotal++;
-  }
-
-  mris->avg_nbrs = (float)vtotal / (float)ntotal;
-  return (NO_ERROR);
-}
-
-/* Might be the same as in mrisurf.c. Here's a clue: if you need a
-function that is defined statically in a library, delete the word
-"static" and copy the function declaration to the include file, then
-call the function that is already there. It is just terrible
-programming practice to copy entire functions to a new file.
- */
-int mrisFindNeighbors3(MRI_SURFACE *mris) {
-  int          n0,n1,i,k,m,n, vno, vtotal, ntotal, vtmp[MAX_NEIGHBORS] ;
-  FACE         *f;
-
-  if (Gdiag & DIAG_SHOW && DIAG_VERBOSE_ON)
-    fprintf(stdout, "finding surface neighbors...") ;
-
-  for (k=0;k<mris->nvertices;k++) {
-    if (k == Gdiag_no)
-      DiagBreak() ;
-    VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[k];
-    VERTEX          * const v  = &mris->vertices         [k];
-    vt->vnum = 0;
-    for (m=0;m<vt->num;m++) {
-      n = vt->n[m];     /* # of this vertex in the mth face that it is in */
-      f = &mris->faces[vt->f[m]];  /* ptr to the mth face */
-      /* index of vertex we are connected to */
-      n0 = (n == 0)                   ? VERTICES_PER_FACE-1 : n-1;
-      n1 = (n == VERTICES_PER_FACE-1) ? 0                   : n+1;
-      for (i=0;i<vt->vnum && vtmp[i]!=f->v[n0];i++);
-      if (i==vt->vnum)
-        vtmp[(int)vt->vnum++] = f->v[n0];
-      for (i=0;i<vt->vnum && vtmp[i]!=f->v[n1];i++);
-      if (i==vt->vnum)
-        vtmp[(int)vt->vnum++] = f->v[n1];
-    }
-    if (mris->vertices_topology[k].v)
-      free(mris->vertices_topology[k].v) ;
-    mris->vertices_topology[k].v = (int *)calloc(mris->vertices_topology[k].vnum,sizeof(int));
-    if (!mris->vertices_topology[k].v)
-      ErrorExit(ERROR_NOMEMORY,
-                "mrisFindNeighbors: could not allocate nbr array") ;
-
-    vt->vtotal = vt->vnum ;
-    vt->nsize = 1 ;
-    for (i=0;i<vt->vnum;i++) {
-      vt->v[i] = vtmp[i];
-    }
-
-    if (v->dist)
-      free(v->dist) ;
-    if (v->dist_orig)
-      free(v->dist_orig) ;
-
-    v->dist = (float *)calloc(vt->vnum, sizeof(float)) ;
-    if (!v->dist)
-      ErrorExit(ERROR_NOMEMORY,
-                "mrisFindNeighbors: could not allocate list of %d "
-                "dists at v=%d", vt->vnum, k) ;
-    v->dist_orig = (float *)calloc(vt->vnum, sizeof(float)) ;
-    if (!v->dist_orig)
-      ErrorExit(ERROR_NOMEMORY,
-                "mrisFindNeighbors: could not allocate list of %d "
-                "dists at v=%d", vt->vnum, k) ;
-    /*
-        if (v->num != vt->vnum)
-          printf("%d: num=%d vnum=%d\n",k,vt->num,vt->vnum);
-    */
-  }
-  for (k=0;k<mris->nfaces;k++) {
-    f = &mris->faces[k];
-    for (m=0;m<VERTICES_PER_FACE;m++) {
-      VERTEX_TOPOLOGY const * const v = &mris->vertices_topology[f->v[m]];
-      for (i=0;i<v->num && k!=v->f[i];i++);
-      if (i==v->num)   /* face has vertex, but vertex doesn't have face */
-        ErrorExit(ERROR_BADPARM,
-                  "%s: face[%d].v[%d] = %d, but face %d not in vertex %d "
-                  "face list\n", mris->fname,k,m,f->v[m], k, f->v[m]);
-    }
-  }
-
-  for (vno = ntotal = vtotal = 0 ; vno < mris->nvertices ; vno++) {
-    VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
-    VERTEX          const * const v  = &mris->vertices         [vno];
-    if (v->ripflag)
-      continue ;
-    vtotal += vt->vtotal ;
-    ntotal++ ;
-  }
-
-  mris->avg_nbrs = (float)vtotal / (float)ntotal ;
-  return(NO_ERROR) ;
-}
-
-
-
 /*-----------------------------------------------------
   Parameters:
 
@@ -1764,7 +1473,7 @@ int mrisFindNeighbors3(MRI_SURFACE *mris) {
   Expand the list of neighbors of each vertex, reallocating
   the v->v array to hold the expanded list.
   ------------------------------------------------------*/
-int MRISsetNeighborhoodSize(MRI_SURFACE *mris, int nsize)
+void MRISsetNeighborhoodSizeAndDist(MRI_SURFACE *mris, int nsize)
 {
   int vno, niter, ntotal, vtotal;
 
@@ -1801,16 +1510,18 @@ int MRISsetNeighborhoodSize(MRI_SURFACE *mris, int nsize)
     }
     ROMP_PF_end
     mris->nsize = nsize;
-    return (NO_ERROR);
+    return;
   }
   
   // setting neighborhood size to a value larger than it has been in the past
   mris->max_nsize = nsize;
   for (niter = 0; niter < nsize - mris->nsize; niter++) {
     // this can't be parallelized due to the marking of neighbors
+
+    int* const vtmp = (int*)malloc(mris->nvertices*sizeof(int));
+         
     for (vno = 0; vno < mris->nvertices; vno++) {
       int i, n, neighbors, j, vnum, nb_vnum;
-      int vtmp[MAX_NEIGHBORS];
 
       VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];    
       VERTEX          * const v  = &mris->vertices         [vno];
@@ -1826,7 +1537,7 @@ int MRISsetNeighborhoodSize(MRI_SURFACE *mris, int nsize)
       for (i = 0; i < vnum; i++) mris->vertices[vt->v[i]].marked = 1;
 
       /* count 2-neighbors */
-      for (neighbors = vnum, i = 0; neighbors < MAX_NEIGHBORS && i < vnum; i++) {
+      for (neighbors = vnum, i = 0; i < vnum; i++) {
         n = vt->v[i];
         VERTEX_TOPOLOGY const * const vnbt = &mris->vertices_topology[n];
         VERTEX                * const vnb  = &mris->vertices         [n];
@@ -1841,10 +1552,6 @@ int MRISsetNeighborhoodSize(MRI_SURFACE *mris, int nsize)
 
           vtmp[neighbors] = vnbt->v[j];
           vnb2->marked = 1;
-          if (++neighbors >= MAX_NEIGHBORS) {
-            fprintf(stderr, "vertex %d has too many neighbors!\n", vno);
-            break;
-          }
         }
       }
       /*
@@ -1856,7 +1563,7 @@ int MRISsetNeighborhoodSize(MRI_SURFACE *mris, int nsize)
       vt->v = (int *)calloc(neighbors, sizeof(int));
       if (!vt->v)
         ErrorExit(ERROR_NO_MEMORY,
-                  "MRISsetNeighborhoodSize: could not allocate list of %d "
+                  "MRISsetNeighborhoodSizeAndDist: could not allocate list of %d "
                   "nbrs at v=%d",
                   neighbors,
                   vno);
@@ -1873,14 +1580,14 @@ int MRISsetNeighborhoodSize(MRI_SURFACE *mris, int nsize)
       v->dist = (float *)calloc(neighbors, sizeof(float));
       if (!v->dist)
         ErrorExit(ERROR_NOMEMORY,
-                  "MRISsetNeighborhoodSize: could not allocate list of %d "
+                  "MRISsetNeighborhoodSizeAndDist: could not allocate list of %d "
                   "dists at v=%d",
                   neighbors,
                   vno);
       v->dist_orig = (float *)calloc(neighbors, sizeof(float));
       if (!v->dist_orig)
         ErrorExit(ERROR_NOMEMORY,
-                  "MRISsetNeighborhoodSize: could not allocate list of %d "
+                  "MRISsetNeighborhoodSizeAndDist: could not allocate list of %d "
                   "dists at v=%d",
                   neighbors,
                   vno);
@@ -1908,6 +1615,8 @@ int MRISsetNeighborhoodSize(MRI_SURFACE *mris, int nsize)
         }
       }
     }
+
+    free(vtmp);
   }
 
 #ifndef __APPLE__
@@ -1970,14 +1679,14 @@ int MRISsetNeighborhoodSize(MRI_SURFACE *mris, int nsize)
       v->dist = (float *)calloc(vt->vtotal, sizeof(float));
       if (!v->dist)
         ErrorExit(ERROR_NOMEMORY,
-                  "MRISsetNeighborhoodSize: could not allocate list of %d "
+                  "MRISsetNeighborhoodSizeAndDist: could not allocate list of %d "
                   "dists at v=%d",
                   vt->vtotal,
                   vno);
       v->dist_orig = (float *)calloc(vt->vtotal, sizeof(float));
       if (!v->dist_orig)
         ErrorExit(ERROR_NOMEMORY,
-                  "MRISsetNeighborhoodSize: could not allocate list of %d "
+                  "MRISsetNeighborhoodSizeAndDist: could not allocate list of %d "
                   "orig dists at v=%d",
                   vt->vtotal,
                   vno);
@@ -1997,7 +1706,6 @@ int MRISsetNeighborhoodSize(MRI_SURFACE *mris, int nsize)
 
   mrisComputeVertexDistances(mris);
   mrisComputeOriginalVertexDistances(mris);
-  return (NO_ERROR);
 }
 
 

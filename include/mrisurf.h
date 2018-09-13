@@ -1252,8 +1252,6 @@ MRI_SURFACE  *MRISprojectOntoSphere(MRI_SURFACE *mris_src,
 MRI_SURFACE  *MRISprojectOntoEllipsoid(MRI_SURFACE *mris_src,
                                        MRI_SURFACE *mris_dst,
                                        float a, float b, float c) ;
-int          MRISsetNeighborhoodSize(MRI_SURFACE *mris, int nsize) ;
-int          MRISresetNeighborhoodSize(MRI_SURFACE *mris, int nsize) ;
 int          MRISsampleDistances(MRI_SURFACE *mris, int *nbr_count,int n_nbrs);
 int          MRISsampleAtEachDistance(MRI_SURFACE *mris, int nbhd_size,
                                       int nbrs_per_distance) ;
@@ -2617,9 +2615,6 @@ MRISvertexNormalToVoxel(MRI_SURFACE *mris,
 			double *pnx, double *pny, double *pnz) ;
 MRI *MRIcomputeLaminarVolumeFractions(MRI_SURFACE *mris, double res, MRI *mri_src, MRI *mri_vfracs) ;
 
-#define MAX_NEIGHBORS 10000
-int MRISfindNeighborsAtVertex(MRI_SURFACE *mris, int acquiredMarked, int vno, int nlinks, int *vlist);
-
 int mrisFindNeighbors(MRI_SURFACE *mris);
 int mrisFindNeighbors2(MRI_SURFACE *mris);
 int mrisFindNeighbors3(MRI_SURFACE *mris);
@@ -2674,15 +2669,39 @@ MRIS *MRISsortVertices(MRIS *mris0);
 bool mrisCheckVertexVertexTopology(MRIS const * mris);
 bool mrisCheckVertexFaceTopology  (MRIS const * mris);  // includes a mrisCheckVertexVertexTopology check
 
+//  Vertices
+//
 static int  mrisVertexNeighborIndex (MRIS const * mris, int vno1, int vno2);
 static bool mrisVerticesAreNeighbors(MRIS const * mris, int vno1, int vno2);
-void mrisAddEdge   (MRIS* mris, int vno1, int vno2);
 
+void mrisAddEdge   (MRIS* mris, int vno1, int vno2);
+void mrisRemoveEdge(MRIS *mris, int vno1, int vno2);
+
+// Neighborhoods - sets of vertexs that are within a few edges of one
+//
+void MRISfindNeighborsAtVertex(MRI_SURFACE *mris, int acquiredMarked, int vno, int nlinks, int* vlistSize, int **pvlist);
+    // assumes all marked are cleared
+    // sets *vlistSize to the size of the returned list
+    // reallocs and fills in the vlist with the neighbor vno's, in distance order.  Does not include vno.
+    // returns the number of neighbors - asserts if vlistSize is inadequate
+    // sets vno.marked to -1, and all other returned entries marked to their distances.
+    // fills in a cache at the vertex to speed up later accesses
+
+void MRISsetNeighborhoodSizeAndDist  (MRI_SURFACE *mris, int nsize) ;
+void MRISresetVtotal(MRI_SURFACE *mris, int nsize) ;
+
+
+//  Faces
+//
 void mrisSetVertexFaceIndex(MRIS *mris, int vno, int fno);
     // is being used outside mrissurf_topology but shouldn't be
     
 void mrisAttachFaceToEdges   (MRIS* mris, int fno, int vno1, int vno2, int vno3);   // edges must already exist
 void mrisAttachFaceToVertices(MRIS* mris, int fno, int vno1, int vno2, int vno3);   // adds any needed edges
+
+// Marked
+//
+bool mrisAnyVertexOfFaceMarked(MRIS *mris, int fno);
 
 
 // Static function implementations

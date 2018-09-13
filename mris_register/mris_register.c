@@ -280,7 +280,7 @@ main(int argc, char *argv[])
     }
   }
 
-  MRISresetNeighborhoodSize(mris, 1) ;
+  MRISresetVtotal(mris, 1) ;
   if (annot_name)
   {
     if (MRISreadAnnotation(mris, annot_name) != NO_ERROR)
@@ -383,7 +383,7 @@ main(int argc, char *argv[])
 
           if (tnbrs > 1)
           {
-            MRISresetNeighborhoodSize(mris_template, tnbrs) ;
+            MRISresetVtotal(mris_template, tnbrs) ;
           }
           MRIScomputeMetricProperties(mris_template) ;
           MRIScomputeSecondFundamentalForm(mris_template) ;
@@ -436,7 +436,7 @@ main(int argc, char *argv[])
 
   if (nbrs > 1)
   {
-    MRISresetNeighborhoodSize(mris, nbrs) ;
+    MRISresetVtotal(mris, nbrs) ;
   }
   MRISprojectOntoSphere(mris, mris, DEFAULT_RADIUS) ;
   mris->status = MRIS_PARAMETERIZED_SPHERE ;

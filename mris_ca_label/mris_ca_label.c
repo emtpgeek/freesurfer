@@ -161,7 +161,7 @@ main(int argc, char *argv[])
   if (!mris)
     ErrorExit(ERROR_NOFILE, "%s: could not read surface file %s for %s",
               Progname, fname, subject_name) ;
-  MRISresetNeighborhoodSize(mris, nbrs) ;
+  MRISresetVtotal(mris, nbrs) ;
   mris->ct = gcsa->ct ; /* hack so that color table
                                        will get written into annot file */
 

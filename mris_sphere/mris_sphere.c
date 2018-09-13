@@ -365,7 +365,7 @@ main(int argc, char *argv[])
     }
     MRISscaleBrain(mris, mris, target_radius/(DEFAULT_RADIUS*SCALE_UP)) ;
     parms.start_t = inflation_parms.start_t ;
-    MRISresetNeighborhoodSize(mris, nbrs) ;
+    MRISresetVtotal(mris, nbrs) ;
   }
 
   if (Gdiag & DIAG_WRITE && DIAG_VERBOSE_ON)
@@ -378,7 +378,7 @@ main(int argc, char *argv[])
     MRISwrite(mris, "after") ;
   }
   fprintf(stderr,"surface projected - minimizing metric distortion...\n");
-  MRISsetNeighborhoodSize(mris, nbrs) ;
+  MRISsetNeighborhoodSizeAndDist(mris, nbrs) ;
   if (MRIScountNegativeFaces(mris) > nint(.8*mris->nfaces))
   {
     printf("!!!!!!!!!  everted surface detected - correcting !!!!!!!!!!!!!!\n") ;

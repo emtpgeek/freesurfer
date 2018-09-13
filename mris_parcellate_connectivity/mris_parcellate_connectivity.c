@@ -100,7 +100,7 @@ main(int argc, char *argv[]) {
   mris = MRISread(surf_fname) ;
   if (mris == NULL)
     ErrorExit(ERROR_NOFILE, "%s: could not read surface %s\n", Progname, surf_fname) ;
-  MRISresetNeighborhoodSize(mris, nbrs) ;
+  MRISresetVtotal(mris, nbrs) ;
   mri_cmatrix = MRIread(cmatrix_fname) ;
   if (mri_cmatrix == NULL)
     ErrorExit(ERROR_NOFILE, "%s: could not read surface %s\n", Progname, cmatrix_fname) ;

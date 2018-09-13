@@ -240,7 +240,7 @@ main(int argc, char *argv[]) {
   mris = MRISread(in_fname) ;
   if (!mris)  ErrorExit(ERROR_NOFILE, "%s: could not read surface file %s",Progname, in_fname) ;
   MRISsaveVertexPositions(mris, CANONICAL_VERTICES) ;
-  MRISresetNeighborhoodSize(mris, 3) ; // reset current size to 1-nbrs
+  MRISresetVtotal(mris, 3) ; // reset current size to 1-nbrs
 
   printf("Reading %s\n",ico_fname) ;
   mris_ico = MRISread(ico_fname) ;

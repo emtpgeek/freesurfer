@@ -234,8 +234,8 @@ main(int argc, char *argv[])
               Progname, rh_surf_fname) ;
 
 
-  MRISresetNeighborhoodSize(mris_lh, 1) ;
-  MRISresetNeighborhoodSize(mris_rh, 1) ;
+  MRISresetVtotal(mris_lh, 1) ;
+  MRISresetVtotal(mris_rh, 1) ;
     
   if (MRISreadOriginalProperties(mris_lh, orig_name) != NO_ERROR)
     ErrorExit(ERROR_NOFILE, "%s: could not read lh original properties from %s",Progname, orig_name) ;

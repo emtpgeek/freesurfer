@@ -26,13 +26,11 @@
 
 
 
-void mrisRemoveEdge(MRIS *mris, int vno1, int vno2);
 
 
 
 // Vertices and Faces interact via edges
 //
-int triangleMarked(MRIS *mris, int fno);
 int mrisCountValidLinks(MRIS *mris, int vno1, int vno2);
 int isFace(MRIS *mris, int vno0, int vno1, int vno2);
 int findFace(MRIS *mris, int vno0, int vno1, int vno2);

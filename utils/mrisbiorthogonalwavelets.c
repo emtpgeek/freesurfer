@@ -68,7 +68,7 @@ MRI_SURFACE *wavelet_analysis_curv(MRI_SURFACE *mris_out, int order)
   for (i = order; i > 0; i--) {
     MRIS* mris_high = ReadIcoByOrder(i, 100);  // higher order surface
     
-    MRISsetNeighborhoodSize(mris_high, 3);
+    MRISsetNeighborhoodSizeAndDist(mris_high, 3);
     
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
 
@@ -122,7 +122,7 @@ MRI_SURFACE *wavelet_analysis_curv(MRI_SURFACE *mris_out, int order)
   for (i = order; i > 0; i--) {
     MRIS* mris_high = ReadIcoByOrder(i, 100);  // higher order surface
     
-    MRISsetNeighborhoodSize(mris_high, 3);
+    MRISsetNeighborhoodSizeAndDist(mris_high, 3);
 
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
 
@@ -207,7 +207,7 @@ MRI_SURFACE *wavelet_analysis_vec(MRI_SURFACE *mris_out, int order)
   for (i = order; i > 0; i--) {
     MRIS* mris_high = ReadIcoByOrder(i, 100);  // higher order surface
 
-    MRISsetNeighborhoodSize(mris_high, 3);
+    MRISsetNeighborhoodSizeAndDist(mris_high, 3);
     
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
 
@@ -262,7 +262,7 @@ MRI_SURFACE *wavelet_analysis_vec(MRI_SURFACE *mris_out, int order)
   for (i = order; i > 0; i--) {
     MRIS* mris_high = ReadIcoByOrder(i, 100);  // higher order surface
     
-    MRISsetNeighborhoodSize(mris_high, 3);
+    MRISsetNeighborhoodSizeAndDist(mris_high, 3);
 
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
 
@@ -372,7 +372,7 @@ MRI_SURFACE *wavelet_synthesis_curv(MRI_SURFACE *mris_out, int order)
   for (i = order; i > 0; i--) {
     MRIS * mris_high = ReadIcoByOrder(i, 100);  // higher order surface
     
-    MRISsetNeighborhoodSize(mris_high, 3);
+    MRISsetNeighborhoodSizeAndDist(mris_high, 3);
 
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
     
@@ -423,7 +423,7 @@ MRI_SURFACE *wavelet_synthesis_curv(MRI_SURFACE *mris_out, int order)
   for (i = 1; i <= order; i++) {
     MRIS* mris_high = ReadIcoByOrder(i, 100);  // higher order surface
 
-    MRISsetNeighborhoodSize(mris_high, 3);
+    MRISsetNeighborhoodSizeAndDist(mris_high, 3);
     
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
 
@@ -507,7 +507,7 @@ MRI_SURFACE *wavelet_synthesis_vec(MRI_SURFACE *mris_out, int order)
   for (i = order; i > 0; i--) {
     MRIS * mris_high = ReadIcoByOrder(i, 100);  // higher order surface
     
-    MRISsetNeighborhoodSize(mris_high, 3);
+    MRISsetNeighborhoodSizeAndDist(mris_high, 3);
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
 
     int m;
@@ -559,7 +559,7 @@ MRI_SURFACE *wavelet_synthesis_vec(MRI_SURFACE *mris_out, int order)
   for (i = 1; i <= order; i++) {
     MRIS * mris_high = ReadIcoByOrder(i, 100);  // higher order surface
     
-    MRISsetNeighborhoodSize(mris_high, 3);
+    MRISsetNeighborhoodSizeAndDist(mris_high, 3);
 
     int const number = IcoNVtxsFromOrder(i - 1);  // the start of m vertices
 

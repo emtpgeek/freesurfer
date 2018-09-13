@@ -352,7 +352,7 @@ main(int argc, char *argv[]) {
 
   fprintf(stderr, "Gaussian smoothing for %d times...............\n", niteration);
   if (niteration>0) {
-    MRISresetNeighborhoodSize(mris, 2) ;
+    MRISresetVtotal(mris, 2) ;
     mrisClearMomentum(mris);
     mrisClearGradient(mris);
     MRIScomputeMetricProperties(mris) ;
@@ -1868,9 +1868,9 @@ FindSpikes(MRI_SURFACE *mris, int iter) {
   MRISuseMeanCurvature(mris);
   counter=0;
 
-  if ( iter<= 50 && iter%5==0) MRISresetNeighborhoodSize(mris, 2) ;
-  else MRISresetNeighborhoodSize(mris, 1) ;
-  //MRISresetNeighborhoodSize(mris, 1) ;
+  if ( iter<= 50 && iter%5==0) MRISresetVtotal(mris, 2) ;
+  else MRISresetVtotal(mris, 1) ;
+  //MRISresetVtotal(mris, 1) ;
   if (iter<=100) step = 4;
   else step =  9;
 

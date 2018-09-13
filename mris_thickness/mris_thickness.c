@@ -139,7 +139,7 @@ main(int argc, char *argv[]) {
     ErrorExit(ERROR_NOFILE, "%s: could not read surface file %s",
               Progname, fname) ;
 
-  MRISresetNeighborhoodSize(mris, nbhd_size) ;
+  MRISresetVtotal(mris, nbhd_size) ;
   if (osurf_fname) {
     MRI_SURFACE *mris2 ;
     mris2 = MRISread(osurf_fname) ;

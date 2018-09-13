@@ -97,7 +97,7 @@ main(int argc, char *argv[]) {
     ErrorExit(ERROR_NOFILE, "%s: could not read intensity volume %s", Progname, argv[2]) ;
   out_fname = argv[3] ;
 
-  MRISresetNeighborhoodSize(mris, nbhd_size) ;
+  MRISresetVtotal(mris, nbhd_size) ;
 
   mri_grad = MRIScomputeGradient(mris, mri, FROBENIUS_NORM, NULL) ;
   if (mask_label)

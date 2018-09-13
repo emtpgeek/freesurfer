@@ -3626,14 +3626,14 @@ void MRISinitTopoFixParameters(MRIS *mris, TOPOFIX_PARMS *parms)
   mrisRipAllDefects(mris, (DEFECT_LIST *)parms->defect_list, 0);
 
   // computing curvature statistics
-  MRISsetNeighborhoodSize(mris, 2);
+  MRISsetNeighborhoodSizeAndDist(mris, 2);
   parms->h_k1 = HISTOalloc(100);
   parms->h_k2 = HISTOalloc(100);
   parms->mri_k1_k2 = MRIalloc(100, 100, 1, MRI_FLOAT);
   parms->h_dot = HISTOalloc(100);
   mrisComputePrincipalCurvatureDistributions(mris, parms->h_k1, parms->h_k2, parms->mri_k1_k2);
   mrisComputeNormalDotDistribution(mris, parms->h_dot);
-  MRISsetNeighborhoodSize(mris, 1);
+  MRISsetNeighborhoodSizeAndDist(mris, 1);
 
   // computing mri statistics
   MRIScomputeMetricProperties(mris);
@@ -8392,7 +8392,7 @@ MRIS *MRIScorrectTopology(
      current = original (non smoothed)
   */
 
-  MRISsetNeighborhoodSize(mris, 2);
+  MRISsetNeighborhoodSizeAndDist(mris, 2);
   h_k1 = HISTOalloc(100);
   h_k2 = HISTOalloc(100);
   mri_k1_k2 = MRIalloc(100, 100, 1, MRI_FLOAT);
@@ -8682,7 +8682,7 @@ MRIS *MRIScorrectTopology(
   for (newNfaces = fno = 0; fno < mris->nfaces; fno++) {
     f = &mris->faces[fno];
     /* don't update triangle with marked vertices */
-    if (triangleMarked(mris, fno)) {
+    if (mrisAnyVertexOfFaceMarked(mris, fno)) {
       continue;
     }
     /* initialize face */
@@ -8731,13 +8731,13 @@ MRIS *MRIScorrectTopology(
 
     /* count # of good triangles attached to this vertex */
     for (vdstt->num = n = 0; n < vt->num; n++)
-      if (triangleMarked(mris, vt->f[n]) == 0) {
+      if (mrisAnyVertexOfFaceMarked(mris, vt->f[n]) == 0) {
         vdstt->num++;
       }
     vdstt->f = (int *)  calloc(vdstt->num, sizeof(int));
     vdstt->n = (uchar *)calloc(vdstt->num, sizeof(uchar));
     for (i = n = 0; n < vt->num; n++) {
-      if (triangleMarked(mris, vt->f[n])) {
+      if (mrisAnyVertexOfFaceMarked(mris, vt->f[n])) {
         continue;
       }
       vdstt->n[i] = vt->n[n];
@@ -11845,7 +11845,7 @@ static OPTIMAL_DEFECT_MAPPING *mrisFindOptimalDefectMapping(MRIS *mris_src, DEFE
   EDGE *edge;
 
   /* first neighbors only */
-  MRISsetNeighborhoodSize(mris_src, 1);
+  MRISsetNeighborhoodSizeAndDist(mris_src, 1);
 
   nvertices = defect->nvertices + defect->nchull;
   vertex_list = (int *)malloc(nvertices * sizeof(int));
@@ -16101,7 +16101,7 @@ static int mrisOrientRetessellatedSurface(MRIS *mris, DEFECT_LIST *dl, int *vtra
     }
   }
 
-  MRISsetNeighborhoodSize(mris, 2);
+  MRISsetNeighborhoodSizeAndDist(mris, 2);
 
   i = 0;
   do {
@@ -16223,7 +16223,7 @@ static int mrisOrientRetessellatedSurface(MRIS *mris, DEFECT_LIST *dl, int *vtra
   oriented = 0;
   MRISsaveVertexPositions(mris, TMP_VERTICES);
   MRIScomputeMetricProperties(mris);
-  MRISsetNeighborhoodSize(mris, 2);
+  MRISsetNeighborhoodSizeAndDist(mris, 2);
 
   /* first orient vertices */
 
@@ -17061,7 +17061,7 @@ static void mrisComputeSurfaceStatistics(
   nfaces = mris->nfaces;
   tp.faces = (int *)malloc(nfaces * sizeof(int));
   for (nfaces = n = 0; n < mris->nfaces; n++) {
-    if (triangleMarked(mris, n)) {
+    if (mrisAnyVertexOfFaceMarked(mris, n)) {
       continue;
     }
     tp.faces[nfaces++] = n;

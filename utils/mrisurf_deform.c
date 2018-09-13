@@ -13515,7 +13515,7 @@ MRIS *MRISextractMarkedVertices(MRIS *mris)
   for (fno = 0; fno < mris->nfaces; fno++) {
     FACE* f = &mris->faces[fno];
     /* don't update triangle with marked vertices */
-    if (triangleMarked(mris, fno)) {
+    if (mrisAnyVertexOfFaceMarked(mris, fno)) {
       continue;
     }
     /* initialize face */
@@ -13545,7 +13545,7 @@ MRIS *MRISextractMarkedVertices(MRIS *mris)
     vdstt->num = 0;
     int n;
     for (n = 0; n < vt->num; n++)
-      if (triangleMarked(mris, vt->f[n]) == 0) {
+      if (mrisAnyVertexOfFaceMarked(mris, vt->f[n]) == 0) {
         vdstt->num++;
       }
     vdstt->f = (int *)calloc(vdstt->num, sizeof(int));
@@ -13553,7 +13553,7 @@ MRIS *MRISextractMarkedVertices(MRIS *mris)
     
     int i = 0;
     for (n = 0; n < vt->num; n++) {
-      if (triangleMarked(mris, vt->f[n])) {
+      if (mrisAnyVertexOfFaceMarked(mris, vt->f[n])) {
         continue;
       }
       vdstt->n[i] = vt->n[n];
@@ -15081,7 +15081,7 @@ MRI_SURFACE *MRISconcat(MRI_SURFACE *mris1, MRI_SURFACE *mris2, MRI_SURFACE *mri
     mris->hemisphere = mris1->hemisphere;
   mris->type = mris1->type;
   mris->nsize = mris1->nsize;
-  MRISsetNeighborhoodSize(mris, mris->nsize);
+  MRISsetNeighborhoodSizeAndDist(mris, mris->nsize);
 
   memmove(&mris->vg, &mris1->vg, sizeof(mris1->vg));
   MRIScomputeMetricProperties(mris);

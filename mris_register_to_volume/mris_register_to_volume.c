@@ -331,7 +331,7 @@ main(int argc, char **argv)
     MRISrestoreVertexPositions(mris, ORIGINAL_VERTICES) ;
     MRIScomputeMetricProperties(mris) ;
   }
-  MRISresetNeighborhoodSize(mris, 2) ;
+  MRISresetVtotal(mris, 2) ;
 
   if (1)
   {
