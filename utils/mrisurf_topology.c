@@ -230,7 +230,7 @@ void MRISfindNeighborsAtVertex(MRIS * const mris, int const vno)
     unsigned char * status;
   } Temp;
   
-  Temp tempForEachThread[_MAX_FS_THREADS];
+  static Temp tempForEachThread[_MAX_FS_THREADS];
   
   Temp* const temp = &tempForEachThread[omp_get_thread_num()];
   if (temp->capacity < mris->nvertices) {
@@ -267,7 +267,7 @@ void MRISfindNeighborsAtVertex(MRIS * const mris, int const vno)
 
   // mark this ring, and then expand if more rings needed
   //
-  for (ringLinks = 1; ringLinks < MRIS_MAX_NEIGHBORHOOD_LINKS + 1; ringLinks++) {
+  for (ringLinks = 1; ringLinks < MRIS_MAX_NEIGHBORHOOD_LINKS; ringLinks++) {
   
     int ringBegin = vnums[ringLinks-1];
     int ringEnd   = vnums[ringLinks  ];
@@ -313,14 +313,14 @@ void MRISfindNeighborsAtVertex(MRIS * const mris, int const vno)
             cheapAssert(!vCandidate->ripflag);
             
             if (pass == 0) {
-              if (temp->status[vnoRing] != Status_notInSet) continue;   // in a ring or already counted in this ring
-              temp->status[vnoRing] = Status_willBeInSet;               // mark to process it in next pass
-              addedEnd++;                                               // make space for it
+              if (temp->status[vnoCandidate] != Status_notInSet) continue;  // in a ring or already counted in this ring
+              temp->status[vnoCandidate] = Status_willBeInSet;              // mark to process it in next pass
+              addedEnd++;                                                   // make space for it
             } else {
-              cheapAssert(temp->status[vnoRing] != Status_notInSet);    // must have been found in pass 0
-              if (temp->status[vnoRing] == Status_inSet) continue;      // already processed
-              temp->status[vnoRing] = Status_inSet;                     // don't process it again
-              vt->v[addedEnd++] = vnoCandidate;                         // add it to the next ring
+              cheapAssert(temp->status[vnoCandidate] != Status_notInSet);   // must have been found in pass 0
+              if (temp->status[vnoCandidate] == Status_inSet) continue;     // already processed
+              temp->status[vnoCandidate] = Status_inSet;                    // don't process it again
+              vt->v[addedEnd++] = vnoCandidate;                             // add it to the next ring
             }
           }
         }
@@ -328,9 +328,9 @@ void MRISfindNeighborsAtVertex(MRIS * const mris, int const vno)
         if (pass == 0) {
           vt->v = (int*)realloc(vt->v, addedEnd*sizeof(int));
         } else {
-          switch (ringLinks) {
-          case 1: vnums[2] = vt->v2num = addedEnd; vt->nsizeMax = 2; vt->nsizeMaxClock = mris->nsizeMaxClock; break;
-          case 2: vnums[3] = vt->v3num = addedEnd; vt->nsizeMax = 3; vt->nsizeMaxClock = mris->nsizeMaxClock; break;
+          switch (ringLinks+1) {
+          case 2: vnums[2] = vt->v2num = addedEnd; vt->nsizeMax = 2; vt->nsizeMaxClock = mris->nsizeMaxClock; break;
+          case 3: vnums[3] = vt->v3num = addedEnd; vt->nsizeMax = 3; vt->nsizeMaxClock = mris->nsizeMaxClock; break;
           default: cheapAssert(false);
           }
         }

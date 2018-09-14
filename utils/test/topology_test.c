@@ -143,7 +143,7 @@ int bitCount(int x) {
   return count;
 }
 
-int test2()
+int test2Wkr(int verticesLog2)
 {
   if (bitCount(5) != 2) {
     printf("bitCount(5) != 2\n");
@@ -154,7 +154,6 @@ int test2()
 
   // Make the src
   //
-  int const verticesLog2 = 8;
   int const max_vertices = 1<<verticesLog2, max_faces = 0, 
                nvertices = max_vertices,    nfaces    = 0;
 
@@ -168,16 +167,17 @@ int test2()
   for (j = 0; j < i; j++)
     if (bitCount(i^j) == 1) 
       mrisAddEdge(src, i, j);
-  
+
+  int const vno1 = 0;  
   MRISfindNeighborsAtVertex(src, vno1);
-  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno1];
+  VERTEX_TOPOLOGY const * const vt = &src->vertices_topology[vno1];
   
   int nlinks;
   for (nlinks = 1; nlinks < 4; nlinks++) {
     size_t b,e;
     
     MRISgetNeighborsBeginEnd(
-        mris, 
+        src, 
         vno1, 
         nlinks, 
         nlinks, 
@@ -187,24 +187,35 @@ int test2()
     size_t i;
     for (i = b; i < e; i++) {
       int vno2  = vt->v[i];
-      mris->vertices[vno2]->marked = links;
+      src->vertices[vno2].marked = nlinks;
     }
   }
 
-  for (i = 0; i < nvertices; i++) {
-    int expected = (bitCount(i^j);
+  int vno2;
+  for (vno2 = 0; vno2 < nvertices; vno2++) {
+    int expected = bitCount(vno1^vno2);
     if (expected > 3) expected = 0;
-    if (mris->vertices[vno2]->marked != expected) {
+    if (src->vertices[vno2].marked != expected) {
       fails++;
-      if (fails < 10) printf("mris->vertices[vno2:%d]->marked:%d != expected:%d\n", vno2, mris->vertices[vno2]->marked, expected);
+      if (fails == 1) printf("FAIL when verticesLog2:%d\n", verticesLog2);
+      if (fails > 10) goto Done;
+      printf("src->vertices[vno2:%d]->marked:%d != expected:%d\n", vno2, src->vertices[vno2].marked, expected);
     }
   }
   
   // Done
   //  
+Done:
   MRISdtr(src);
 
   return fails;
+}
+
+
+int test2() {
+         test2Wkr(2);
+         test2Wkr(3);
+  return test2Wkr(8);
 }
 
 
