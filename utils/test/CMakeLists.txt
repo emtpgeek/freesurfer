@@ -1,3 +1,6 @@
+add_test_executable(test_TriangleFile_readWrite EXCLUDE_FROM_ALL test_TriangleFile_readWrite.c)
+target_link_libraries(test_TriangleFile_readWrite utils)
+
 add_executable(testcolortab EXCLUDE_FROM_ALL testcolortab.c)
 target_link_libraries(testcolortab utils)
 
@@ -21,6 +24,7 @@ target_link_libraries(sse_mathfun_test m)
 
 add_test_script(NAME utils_test SCRIPT test.py
   DEPENDS
+  test_TriangleFile_readWrite
   testcolortab
   test_c_nr_wrapper
   extest
