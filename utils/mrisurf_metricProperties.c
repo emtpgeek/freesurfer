@@ -5242,6 +5242,8 @@ static void mrisCreateDistVectors(MRIS* mris, int vno) {
 
   size_t capacity = vt->vtotal;
 
+  if (!capacity) return;    // seen during testing of mris_make_surfaces
+  
   *(float**)&v->dist      = (float *)realloc(v->dist,      capacity*sizeof(float));
   *(float**)&v->dist_orig = (float *)realloc(v->dist_orig, capacity*sizeof(float));
     //

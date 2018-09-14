@@ -360,7 +360,7 @@ void MRISctr(MRIS *mris, int max_vertices, int max_faces, int nvertices, int nfa
   // This should be the ONLY place where an MRIS is constructed
   //
   bzero(mris, sizeof(MRIS));
-  MRISoverAllocVerticesAndFaces(mris, nvertices, nfaces, nvertices, nfaces);
+  MRISoverAllocVerticesAndFaces(mris, max_vertices, max_faces, nvertices, nfaces);
   mris->nsize = 1;
 }
 
