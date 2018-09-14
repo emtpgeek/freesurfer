@@ -5235,6 +5235,28 @@ int mrisClearDistances(MRI_SURFACE *mris)
 /*-----------------------------------------------------------------
   Calculate distances between each vertex and each of its neighbors.
   ----------------------------------------------------------------*/
+static void mrisCreateDistVectors(MRIS* mris, int vno) {
+
+  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+  VERTEX                * const v  = &mris->vertices         [vno];
+
+  size_t capacity = vt->vtotal;
+
+  *(float**)&v->dist      = (float *)realloc(v->dist,      capacity*sizeof(float));
+  *(float**)&v->dist_orig = (float *)realloc(v->dist_orig, capacity*sizeof(float));
+    //
+    // This should be the only place these fields are written but it isn't yet
+    
+  if (!v->dist || !v->dist_orig) {
+    ErrorExit(ERROR_NOMEMORY,
+              "mrisCreateDistVectors: could not allocate list of %d "
+              "dists at v=%d",
+              capacity,
+              vno);
+  }
+}
+
+
 int mrisComputeVertexDistances(MRI_SURFACE *mris)
 {
   int vno;
@@ -5260,18 +5282,20 @@ int mrisComputeVertexDistances(MRI_SURFACE *mris)
 
         VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
         VERTEX                * const v  = &mris->vertices         [vno];
-        if (v->ripflag || v->dist == NULL) continue;
+        if (v->ripflag) continue;
 
-        int *pv;
-        int const vtotal = vt->vtotal;
+        mrisCreateDistVectors(mris, vno);
+        
         int n;
-        for (pv = vt->v, n = 0; n < vtotal; n++) {
-          VERTEX const * const vn = &mris->vertices[*pv++];
-          // if (vn->ripflag) continue;
+        for (n = 0; n < vt->vtotal; n++) {
+          VERTEX const * const vn = &mris->vertices[vt->v[n]];
+          cheapAssert(!vn->ripflag);
+
           float xd = v->x - vn->x;
           float yd = v->y - vn->y;
           float zd = v->z - vn->z;
           float d = xd * xd + yd * yd + zd * zd;
+
           v->dist[n] = sqrt(d);
         }
 
@@ -5295,22 +5319,22 @@ int mrisComputeVertexDistances(MRI_SURFACE *mris)
 
         VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
         VERTEX          const * const v  = &mris->vertices         [vno];
-        if (v->ripflag || v->dist == NULL) continue;
+        if (v->ripflag) continue;
 
+        mrisCreateDistVectors(mris, vno);
+        
         XYZ xyz1_normalized;
         float xyz1_length;
         XYZ_NORMALIZED_LOAD(&xyz1_normalized, &xyz1_length, v->x, v->y, v->z);  // length 1 along radius vector
 
         float const radius = xyz1_length;
 
-        int *pv;
-        int const vtotal = vt->vtotal;
         int n;
-        for (pv = vt->v, n = 0; n < vtotal; n++) {
-          VERTEX const * const vn = &mris->vertices[*pv++];
-          if (vn->ripflag) continue;
+        for (n = 0; n < vt->vtotal; n++) {
+          VERTEX const * const vn = &mris->vertices[vt->v[n]];
+          cheapAssert(!vn->ripflag);
           
-          float angle = fabs(XYZApproxAngle(&xyz1_normalized, vn->x, vn->y, vn->z));
+          float angle = fabsf(XYZApproxAngle(&xyz1_normalized, vn->x, vn->y, vn->z));
             // radians, so 2pi around the circumference
 
           float d = angle * radius;

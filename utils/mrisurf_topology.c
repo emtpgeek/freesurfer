@@ -242,8 +242,6 @@ void MRISfindNeighborsAtVertex(MRIS * const mris, int const vno)
   VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];    
   VERTEX          * const v  = &mris->vertices         [vno];
 
-  size_t const initial_nsizeMax = vt->nsizeMax;   
-
   // Check ripping is not an issue
   //
   cheapAssert(!v->ripflag);
@@ -338,26 +336,6 @@ void MRISfindNeighborsAtVertex(MRIS * const mris, int const vno)
     }
   }
 
-  // Make sure the v->dist vectors are large enough
-  // Clear the added elements for repeatability
-  //
-  size_t const initial_distSize = (!v->dist) ? 0 : initial_nsizeMax;
-
-  *(float**)&v->dist      = (float *)realloc(v->dist,      vt->v3num*sizeof(float));
-  *(float**)&v->dist_orig = (float *)realloc(v->dist_orig, vt->v3num*sizeof(float));
-    // This should be the only place these fields are written
-    // but it isn't yet
-    
-  if (!v->dist || !v->dist_orig) {
-    ErrorExit(ERROR_NOMEMORY,
-              "MRISfindNeighborsAtVertex: could not allocate list of %d "
-              "dists at v=%d",
-              vt->v3num,
-              vno);
-  }
-  bzero(&v->dist     [initial_distSize], (vt->v3num - initial_distSize)*sizeof(float));
-  bzero(&v->dist_orig[initial_distSize], (vt->v3num - initial_distSize)*sizeof(float));
-  
   // Clear the temp for reuse later
   //
   temp->status[vno] = Status_notInSet;
