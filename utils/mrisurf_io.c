@@ -3901,21 +3901,14 @@ static MRI_SURFACE *mrisReadSTLfile(const char *fname)
   ------------------------------------------------------*/
 MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
 {
-  MRI_SURFACE *mris = NULL;
-  int nquads, nvertices, magic, version, ix, iy, iz, vno, fno, n, m;
-  int imnr, imnr0, imnr1, type, vertices[VERTICES_PER_FACE + 1], num;
-  float x, y, z, xhi, xlo, yhi, ylo, zhi, zlo;
-  FILE *fp = NULL;
-  FACE *face;
-  int tag, nread;
-  char tmpstr[2000];
-  MRI *mri;
-
-  // default:
-  version = -3;
-
   chklc();                              /* check to make sure license.dat is present */
-  type = MRISfileNameType(fname);       /* using extension to get type */
+
+  MRI_SURFACE* mris = NULL;
+  FILE*        fp   = NULL;
+
+  int version = -3;
+
+  int   type = MRISfileNameType(fname);       /* using extension to get type */
   if (type == MRIS_ASCII_TRIANGLE_FILE) /* .ASC */
   {
     mris = mrisReadAsciiFile(fname);
@@ -3930,7 +3923,13 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
     if (!mris) {
       return (NULL);
     }
+
+    if (!mrisCheckVertexFaceTopology(mris)) {
+      cheapAssert(false);
+    }
+    
     return (mris);
+    
     version = -2;
   }
   else if (type == MRIS_GEO_TRIANGLE_FILE) /* .GEO */
@@ -3974,8 +3973,8 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
     fp = fopen(fname, "rb");
     if (!fp) ErrorReturn(NULL, (ERROR_NOFILE, "MRISread(%s): could not open file", fname));
 
-    magic = 0;
-    nread = fread3(&magic, fp);
+    int magic = 0;
+    int nread = fread3(&magic, fp);
     if (nread != 1) {
       printf("ERROR: reading %s\n", fname);
       printf("Read %d bytes, expected 1\n", nread);
@@ -4008,8 +4007,15 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
       }
     }
   }
+
+  if (!mrisCheckVertexFaceTopology(mris)) {
+    cheapAssert(false);
+  }
+
   /* some type of quadrangle file processing */
   if (version >= -2) {
+
+    int nvertices, nquads;
     fread3(&nvertices, fp);
     fread3(&nquads, fp); /* # of qaudrangles - not triangles */
 
@@ -4034,14 +4040,20 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
     mris = MRISoverAlloc(pct_over * nvertices, pct_over * 2 * nquads, nvertices, 2 * nquads);
     mris->type = MRIS_BINARY_QUADRANGLE_FILE;
 
-    imnr0 = 1000;
-    imnr1 = 0;
+    int imnr0 = 1000;
+    int imnr1 = 0;
+
     /* read vertices *************************************************/
+    int vno;
     for (vno = 0; vno < nvertices; vno++) {
       VERTEX_TOPOLOGY * const vertext = &mris->vertices_topology[vno];    
       VERTEX          * const vertex  = &mris->vertices         [vno];
+      
+      vertext->nsize = 1;
+      
       if (version == -1) /* QUAD_FILE_MAGIC_NUMBER */
       {
+        int ix, iy, iz;
         fread2(&ix, fp);
         fread2(&iy, fp);
         fread2(&iz, fp);
@@ -4059,7 +4071,7 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
       vertex->label = NO_LABEL ;
 #endif
       /* brain-dead code and never used again either */
-      imnr = (int)((vertex->y - START_Y) / SLICE_THICKNESS + 0.5);
+      int imnr = (int)((vertex->y - START_Y) / SLICE_THICKNESS + 0.5);
       if (imnr > imnr1) {
         imnr1 = imnr;
       }
@@ -4068,12 +4080,10 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
       }
       if (version == 0) /* old surface format */
       {
+        int num;
         fread1(&num, fp); /* # of faces we are part of */
-        vertext->num = num;
-        vertext->f = (int *)calloc(vertext->num, sizeof(int));
-        if (!vertext->f) ErrorExit(ERROR_NO_MEMORY, "MRISread: could not allocate %d faces", vertext->num);
-        vertext->n = (uchar *)calloc(vertext->num, sizeof(uchar));
-        if (!vertext->n) ErrorExit(ERROR_NO_MEMORY, "MRISread: could not allocate %d nbrs", vertext->n);
+        
+        int n;
         for (n = 0; n < vertext->num; n++) {
           fread3(&vertext->f[n], fp);
         }
@@ -4082,13 +4092,18 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
         vertext->num = 0; /* will figure it out */
       }
     }
+
     /* read face vertices *******************************************/
+    int fno;
     for (fno = 0; fno < mris->nfaces; fno += 2) {
-      int which;
 
       if (fno == 86) {
         DiagBreak();
       }
+      
+      int vertices[VERTICES_PER_FACE + 1];
+      
+      int n;
       for (n = 0; n < 4; n++) /* read quandrangular face */
       {
         fread3(&vertices[n], fp);
@@ -4103,39 +4118,22 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
         NOTE: for this to work properly in the write, the first two
         vertices in the first face (EVEN and ODD) must be 0 and 1.
       */
-      which = WHICH_FACE_SPLIT(vertices[0], vertices[1]);
+      int which = WHICH_FACE_SPLIT(vertices[0], vertices[1]);
 
-      /* 1st triangle */
       if (EVEN(which)) {
-        mris->faces[fno].v[0] = vertices[0];
-        mris->faces[fno].v[1] = vertices[1];
-        mris->faces[fno].v[2] = vertices[3];
-
-        /* 2nd triangle */
-        mris->faces[fno + 1].v[0] = vertices[2];
-        mris->faces[fno + 1].v[1] = vertices[3];
-        mris->faces[fno + 1].v[2] = vertices[1];
-      }
-      else {
-        mris->faces[fno].v[0] = vertices[0];
-        mris->faces[fno].v[1] = vertices[1];
-        mris->faces[fno].v[2] = vertices[2];
-
-        /* 2nd triangle */
-        mris->faces[fno + 1].v[0] = vertices[0];
-        mris->faces[fno + 1].v[1] = vertices[2];
-        mris->faces[fno + 1].v[2] = vertices[3];
-      }
-      for (n = 0; n < VERTICES_PER_FACE; n++) {
-        mris->vertices_topology[mris->faces[fno    ].v[n]].num++;
-        mris->vertices_topology[mris->faces[fno + 1].v[n]].num++;
+        mrisAttachFaceToVertices(mris, fno + 0, vertices[0], vertices[1], vertices[3]);
+        mrisAttachFaceToVertices(mris, fno + 1, vertices[2], vertices[3], vertices[1]);
+      } else {
+        mrisAttachFaceToVertices(mris, fno + 0, vertices[0], vertices[1], vertices[2]);
+        mrisAttachFaceToVertices(mris, fno + 1, vertices[0], vertices[2], vertices[3]);
       }
     }
     mris->useRealRAS = 0;
 
     // read tags
     {
-      long long len;
+      long long len; 
+      int tag;
 
       while ((tag = TAGreadStart(fp, &len)) != 0) {
         switch (tag) {
@@ -4169,6 +4167,7 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
       }
     }
     fclose(fp);
+    fp = NULL;
   }
   /* end of quadrangle file processing */
   /* file is closed now for all types ***********************************/
@@ -4176,9 +4175,7 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
   /* find out if this surface is lh or rh from fname */
   strcpy(mris->fname, fname);
   {
-    const char *surf_name;
-
-    surf_name = strrchr(fname, '/');
+    const char *surf_name = strrchr(fname, '/');
     if (surf_name == NULL) {
       surf_name = fname;
     }
@@ -4203,32 +4200,17 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
   /* build members of mris structure                                     */
   /***********************************************************************/
   if ((version < 0) || type == MRIS_ASCII_TRIANGLE_FILE) {
-    for (vno = 0; vno < mris->nvertices; vno++) {
-      mris->vertices_topology[vno].f = (int *)calloc(mris->vertices_topology[vno].num, sizeof(int));
-      if (!mris->vertices_topology[vno].f)
-        ErrorExit(ERROR_NOMEMORY,
-                  "MRISread(%s): could not allocate %d faces at %dth vertex",
-                  fname,
-                  vno,
-                  mris->vertices_topology[vno].num);
-
-      mris->vertices_topology[vno].n = (uchar *)calloc(mris->vertices_topology[vno].num, sizeof(uchar));
-      if (!mris->vertices_topology[vno].n)
-        ErrorExit(ERROR_NOMEMORY,
-                  "MRISread(%s): could not allocate %d indices at %dth vertex",
-                  fname,
-                  vno,
-                  mris->vertices_topology[vno].num);
-      mris->vertices_topology[vno].num = 0;
-    }
-    for (fno = 0; fno < mris->nfaces; fno++) {
-      face = &mris->faces[fno];
-      for (n = 0; n < VERTICES_PER_FACE; n++) mris->vertices_topology[face->v[n]].f[mris->vertices_topology[face->v[n]].num++] = fno;
-    }
+    // used each vertex's vertex.num to create vertex.f and vertex.n, then zero'ed vertex.num
+    // used each face's v[VERTICES_PER_FACE] to fill in vertex.f, but did not fill in vertex.n
+    // The vertex.n[] is filled in below
+    cheapAssert(!"NYI");
   }
 
+  float xhi, xlo, yhi, ylo, zhi, zlo;
   xhi = yhi = zhi = -10000;
   xlo = ylo = zlo = 10000;
+
+  int vno;
   for (vno = 0; vno < mris->nvertices; vno++) {
     if (vno == Gdiag_no) {
       DiagBreak();
@@ -4236,29 +4218,19 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
     mris->vertices[vno].curv = 0;
     mris->vertices[vno].origarea = -1;
     mris->vertices[vno].border = 0;
-#if 0
-    mris->vertices[vno].origripflag = 0;
-    mris->vertices[vno].ripflag = 0;
-    mris->vertices[vno].val = 0;
-    mris->vertices[vno].dist = 0;
-    mris->vertices[vno].mx = 0;
-    mris->vertices[vno].my = 0;
-    mris->vertices[vno].mz = 0;
-    mris->vertices[vno].fieldsign = 0;
-    mris->vertices[vno].fsmask = 1;
-    mris->vertices[vno].nc = 0;
-    mris->vertices[vno].marked = 0;
-#endif
+
+    int n;
     for (n = 0; n < mris->vertices_topology[vno].num; n++) {
+      int m;
       for (m = 0; m < VERTICES_PER_FACE; m++) {
         if (mris->faces[mris->vertices_topology[vno].f[n]].v[m] == vno) {
           mris->vertices_topology[vno].n[n] = m;
         }
       }
     }
-    x = mris->vertices[vno].x;
-    y = mris->vertices[vno].y;
-    z = mris->vertices[vno].z;
+    float x = mris->vertices[vno].x;
+    float y = mris->vertices[vno].y;
+    float z = mris->vertices[vno].z;
     if (x > xhi) {
       xhi = x;
     }
@@ -4287,48 +4259,30 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
   mris->xctr = (xhi + xlo) / 2;
   mris->yctr = (yhi + ylo) / 2;
   mris->zctr = (zhi + zlo) / 2;
+  
+  // The above complicated code should have built a valid structure
+  //
+  if (!mrisCheckVertexFaceTopology(mris)) {
+    cheapAssert(false);
+  }
+
   mrisFindNeighbors(mris);
   MRIScomputeNormals(mris);
   mrisComputeVertexDistances(mris);
   mrisReadTransform(mris, fname);
-  if (type == MRIS_ASCII_TRIANGLE_FILE || type == MRIS_GEO_TRIANGLE_FILE) {
-#if 0
-    MRISsetNeighborhoodSizeAndDist(mris, 2) ;
-    MRIScomputeSecondFundamentalForm(mris) ;
-    MRISuseMeanCurvature(mris) ;
-#endif
-  }
-  else {
-#if 0
-    if (MRISreadBinaryCurvature(mris, fname) != NO_ERROR)
-    {
-      fprintf(stdout, "computing surface curvature directly...\n") ;
-      MRISsetNeighborhoodSizeAndDist(mris, 2) ;
-      MRIScomputeSecondFundamentalForm(mris) ;
-      MRISuseMeanCurvature(mris) ;
-    }
-
-    if (MRISreadBinaryAreas(mris, fname) != NO_ERROR)
-    {
-      fprintf(stdout, "ignoring area file...\n") ;  /*return(NULL) ;*/
-    }
-#endif
-  }
 
   mris->radius = MRISaverageRadius(mris);
-#if 0
-  if (IS_QUADRANGULAR(mris))
-  {
-    MRISremoveTriangleLinks(mris) ;
-  }
-#endif
+
   MRIScomputeMetricProperties(mris);
-  /*  mrisFindPoles(mris) ;*/
 
   MRISstoreCurrentPositions(mris);
 
+
   // Check whether there is an area file for group average
+  //
+  char tmpstr[2000];
   sprintf(tmpstr, "%s.avg.area.mgh", fname);
+
   if (Gdiag_no >= 0 && DIAG_VERBOSE_ON) {
     printf("Trying to read average area %s\n", tmpstr);
   }
@@ -4336,7 +4290,7 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
     if (Gdiag_no >= 0 && DIAG_VERBOSE_ON) {
       printf("Reading in average area %s\n", tmpstr);
     }
-    mri = MRIread(tmpstr);
+    MRI *mri = MRIread(tmpstr);
     if (!mri) {
       printf("ERROR: reading in average area %s\n", tmpstr);
       return (NULL);

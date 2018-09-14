@@ -448,6 +448,7 @@ bool mrisCheckVertexFaceTopology(MRIS const * mris) {
   for (fno = 0; fno < mris->nfaces; fno++) {
     FACE const * const f = &mris->faces[fno];
 
+    int prevVno = f->v[VERTICES_PER_FACE-1];
     int n;
     for (n = 0; n < VERTICES_PER_FACE; n++) {
       int const vno = f->v[n];
@@ -455,6 +456,8 @@ bool mrisCheckVertexFaceTopology(MRIS const * mris) {
 
       int i = -1;
 
+      // The vertex points to the face exactly once
+      //
       int iTrial;
       for (iTrial = 0; iTrial < v->num; iTrial++) {
         if (v->f[iTrial] == fno) {
@@ -478,6 +481,17 @@ bool mrisCheckVertexFaceTopology(MRIS const * mris) {
         DiagBreak();
         return false;
       }
+      
+      // The vertices are neighbours
+      //
+      if (!mrisVerticesAreNeighbors(mris, vno, prevVno)) {
+        fprintf(stdout, "[fno:%d] holds adjacent vno:%d and vno:%d but they are not neighbours\n", 
+            fno, vno, prevVno);
+        DiagBreak();
+        return false;
+      }
+      
+      prevVno = vno;
     }
   }
   
