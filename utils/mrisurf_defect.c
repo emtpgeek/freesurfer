@@ -16,6 +16,8 @@
  * Reporting: freesurfer@nmr.mgh.harvard.edu
  *
  */
+#define COMPILING_MRISURF_TOPOLOGY  // GROSS HACK
+
 #include "mrisurf_defect.h"
 
 #define VOLUME_SCALE 2.0f

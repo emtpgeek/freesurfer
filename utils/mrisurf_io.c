@@ -3001,6 +3001,9 @@ MRI_SURFACE *MRISreadVTK(MRI_SURFACE *mris, const char *fname)
       fclose(fp);
       ErrorReturn(NULL, (ERROR_NOFILE, "MRISreadVTK: error reading file %s, facepoints != 3\n", fname));
     }
+    
+    vertices_per_face_t vertices;
+    
     int n;
     for (n = 0; n < 3; n++) {
       vno = -1;
@@ -3009,13 +3012,14 @@ MRI_SURFACE *MRISreadVTK(MRI_SURFACE *mris, const char *fname)
         fclose(fp);
         ErrorReturn(NULL, (ERROR_NOFILE, "MRISreadVTK: invalid vertex num in %s, vno = %d\n", fname, vno));
       }
-      if (newMris)  // dont overwrite face data if passed an mris struct
-      {
-        // fill-in the face data to our new mris struct
-        face->v[n] = vno;
-        mris->vertices_topology[vno].num++;
-      }
-      else {
+      vertices[n] = vno;
+    }
+    
+    if (!newMris) {
+      mrisAttachFaceToVertices(mris, fno, vertices[0], vertices[1], vertices[2]);
+    } else {
+      // dont overwrite face data if passed an mris struct
+      for (n = 0; n < 3; n++) {
         // confirm that the mris structure passed to us has the same face num
         if (face->v[n] != vno) {
           fclose(fp);
@@ -3025,10 +3029,6 @@ MRI_SURFACE *MRISreadVTK(MRI_SURFACE *mris, const char *fname)
         }
       }
     }
-  }
-  if (fno != mris->nfaces) {
-    fclose(fp);
-    ErrorReturn(NULL, (ERROR_NOFILE, "MRISreadVTK: failure reading %s, fno=%d != nfaces\n", fname, fno, mris->nfaces));
   }
 
   /* at this point in the file, we're at the end, or there is possibly
@@ -3399,18 +3399,19 @@ static MRI_SURFACE *mrisReadAsciiFile(const char *fname)
   for (fno = 0; fno < mris->nfaces; fno++) {
     face = &mris->faces[fno];
     if (fno == Gdiag_no) DiagBreak();
+    vertices_per_face_t vertices;
     for (n = 0; n < VERTICES_PER_FACE; n++) {
-      fscanf(fp, "%d ", &face->v[n]);
-      if (face->v[n] < 0 || face->v[n] >= mris->nvertices)
+      fscanf(fp, "%d ", &vertices[n]);
+      if (vertices[n] < 0 || vertices[n] >= mris->nvertices)
         ErrorExit(ERROR_BADPARM,
                   "%s: face %d vertex %d: %d -- out of range!!! Should be in [0 %d]",
                   Progname,
                   fno,
                   n,
-                  face->v[n],
+                  vertices[n],
                   mris->nvertices - 1);
-      mris->vertices_topology[face->v[n]].num++;
     }
+    mrisAttachFaceToVertices(mris, fno, vertices[0], vertices[1], vertices[2]);
     fscanf(fp, "%d\n", &rip);
     face->ripflag = rip;
   }
@@ -3435,7 +3436,7 @@ static MRI_SURFACE *mrisReadGeoFile(const char *fname)
   MRI_SURFACE *mris;
   char line[202], *cp;
   int vno, fno, n, nvertices, nfaces, patch, vertices_per_face, nedges;
-  FACE *face;
+
   FILE *fp;
 
   fp = fopen(fname, "r");
@@ -3469,25 +3470,19 @@ static MRI_SURFACE *mrisReadGeoFile(const char *fname)
     }
   }
   for (fno = 0; fno < mris->nfaces; fno++) {
-    int tmp;
-    face = &mris->faces[fno];
-    for (n = 0; n < VERTICES_PER_FACE - 1; n++) {
-      fscanf(fp, "%d ", &face->v[n]);
-      face->v[n]--; /* make it 0-based */
-      if (face->v[n] < 0) {
-        DiagBreak();
-      }
-      mris->vertices_topology[face->v[n]].num++;
+    vertices_per_face_t vertices;
+    
+    for (n = 0; n < VERTICES_PER_FACE; n++) {
+      fscanf(fp, "%d ", &vertices[n]);
+      cheapAssert(vertices[n] > 0);
+      vertices[n] -= 1; /* make it 0-based */
     }
-    n = VERTICES_PER_FACE - 1; /* already true - but make it explicit */
-    fscanf(fp, "-%d\n", &face->v[n]);
-    face->v[n]--; /* make it 0-based */
-    mris->vertices_topology[face->v[n]].num++;
 
     /* swap positions so normal (via cross-product) will point outwards */
-    tmp = face->v[1];
-    face->v[1] = face->v[2];
-    face->v[2] = tmp;
+    int tmp;
+    tmp = vertices[1]; vertices[1] = vertices[2]; vertices[2] = tmp;
+    
+    mrisAttachFaceToVertices(mris, fno, vertices[0], vertices[1], vertices[2]);
   }
 
   fclose(fp);
@@ -3782,27 +3777,30 @@ static MRI_SURFACE *mrisReadSTLfile(const char *fname)
       int nextVertexNo = 0;
       for (faceNo = 0; faceNo < nfaces; faceNo++) {
 
-        FACE* face = &mris->faces   [faceNo];
-	XYZ*  xyz  = &faceNormalXYZs[faceNo];
+	XYZ* xyz = &faceNormalXYZs[faceNo];
 
         setFaceNorm(mris, faceNo, xyz->x, xyz->y, xyz->z);
 
+        vertices_per_face_t vertexNos;
+        
 	int faceVertexNo;
 	for (faceVertexNo = 0; faceVertexNo < 3; faceVertexNo++) {
 	  int undupVertexNo = 3*faceNo + faceVertexNo;
-	  Key* keyPtr = vertices[undupVertexNo];
+	  Key* keyPtr  = vertices[undupVertexNo];
           int vertexNo = keyPtr->vertexNo;
   	  if (vertexNo == nextVertexNo) { 
   	    VERTEX* v = &mris->vertices[vertexNo];
   	    v->x = keyPtr->x; v->y = keyPtr->y; v->z = keyPtr->z;
   	    nextVertexNo++;
 	  }
-       	  face->v[faceVertexNo] = vertexNo;
+       	  vertexNos[faceVertexNo] = vertexNo;
   	  if (mrisReadSTLfile_debugging && undupVertexNo < 10) {
 	    fprintf(stdout, "Mapping undupVertexNo:%d to vertexNo:%d (%f, %f, %f)\n",
 	       undupVertexNo, vertexNo, keyPtr->x, keyPtr->y, keyPtr->z);
 	  }
-        }	  
+        }
+        
+        mrisAttachFaceToVertices(mris, faceNo, vertexNos[0], vertexNos[1], vertexNos[2]);	  
       } // for
     } // filled in the mris
 
@@ -5374,7 +5372,6 @@ static int mrisReadTriangleFilePositions(MRI_SURFACE *mris, const char *fname)
   ------------------------------------------------------*/
 static MRI_SURFACE *mrisReadTriangleFile(const char *fname, double pct_over)
 {
-  FACE *f;
   int nvertices, nfaces, magic, vno, fno, n;
   char line[STRLEN];
   FILE *fp;
@@ -5418,16 +5415,11 @@ static MRI_SURFACE *mrisReadTriangleFile(const char *fname, double pct_over)
   }
 
   for (fno = 0; fno < mris->nfaces; fno++) {
-    f = &mris->faces[fno];
+    vertices_per_face_t vertices;
     for (n = 0; n < VERTICES_PER_FACE; n++) {
-      f->v[n] = freadInt(fp);
-      if (f->v[n] >= mris->nvertices || f->v[n] < 0)
-        ErrorExit(ERROR_BADFILE, "f[%d]->v[%d] = %d - out of range!\n", fno, n, f->v[n]);
+      vertices[n] = freadInt(fp);
     }
-
-    for (n = 0; n < VERTICES_PER_FACE; n++) {
-      mris->vertices_topology[mris->faces[fno].v[n]].num++;
-    }
+    mrisAttachFaceToVertices(mris, fno, vertices[0], vertices[1], vertices[2]);
   }
   // new addition
   mris->useRealRAS = 0;

@@ -1966,96 +1966,22 @@ MRI_SURFACE *ic2562_make_two_icos(float x1, float y1, float z1, float r1, float 
 
   //-------------------------------------
   // fill in faces, for ico 1
-  // and count # of faces each vertex is part of
   //-------------------------------------
-  int* vnums = (int*)calloc(mris->nvertices,sizeof(int));
-  
   for (fno = 0; fno < ICO_NFACES; fno++) {
-    FACE* f = &mris->faces[fno];
-    for (n = 0; n < VERTICES_PER_FACE; n++) {
-      f->v[n] = gw_ic2562_faces[fno].vno[n] - 1; /* make it zero-based */
-      vnums[f->v[n]] += 3; /* will remove duplicates later */
-    }
+    mrisAttachFaceToVertices(mris, fno, 
+        gw_ic2562_faces[fno].vno[0] - 1,
+        gw_ic2562_faces[fno].vno[1] - 1,
+        gw_ic2562_faces[fno].vno[2] - 1);
   }
 
   //-------------------------------------
   // fill in faces, for ico 2
   //-------------------------------------
   for (fno = 0; fno < ICO_NFACES; fno++) {
-    FACE* const f = &mris->faces[fno + ICO_NFACES];
-    for (n = 0; n < VERTICES_PER_FACE; n++) {
-      f->v[n] = (gw_ic2562_faces[fno].vno[n] - 1) + ICO_NVERTICES; /* make it zero-based */
-      vnums[f->v[n]] += 3; /* will remove duplicates later */
-    }
-  }
-
-  //-------------------------------------
-  // Space for vertex neighbor list
-  //-------------------------------------
-
-  for (vno = 0; vno < mris->nvertices; vno++) {
-    VERTEX_TOPOLOGY* const vt = &mris->vertices_topology[vno];
-    vt->v = (int *)calloc(vnums[vno] / 2, sizeof(int));
-    if (!vt->v) ErrorExit(ERROR_NOMEMORY, "%s: could not allocate %dth vertex list.", __func__, vno);
-  }
-
-  freeAndNULL(vnums);
-  
-  //-------------------------------------
-  // now build list of neighbors
-  //-------------------------------------
-  for (fno = 0; fno < mris->nfaces; fno++) {
-    FACE* const f = &mris->faces[fno];
-    if (fno == 3) DiagBreak();
-    for (n = 0; n < VERTICES_PER_FACE; n++) {
-      int const vno1 = f->v[n];
-
-      /* now add an edge to other 2 vertices if not already in list */
-      for (n1 = 0; n1 < VERTICES_PER_FACE; n1++) {
-        if (n1 == n) /* don't connect vertex to itself */
-          continue;
-
-        //------------------------------------------------------
-        // [GW] In the following, not sure why we need to use
-        // table rather than mris, but that's how existing code
-        // does it.
-        //------------------------------------------------------
-        int vno2;
-        if (fno < ICO_NFACES) {
-          vno2 = gw_ic2562_faces[fno].vno[n1] - 1; /* make it zero-based */
-        }
-        else {
-          vno2 = gw_ic2562_faces[fno - ICO_NFACES].vno[n1] - 1 + ICO_NVERTICES; /* make it zero-based */
-        }
-
-        if (!mrisVerticesAreNeighbors(mris, vno1, vno2)) 
-          mrisAddEdge(mris, vno1, vno2);
-      }
-    }
-  }
-
-  //----------------------------------------
-  // now allocate face arrays in vertices /
-  //----------------------------------------
-  for (vno = 0; vno < mris->nvertices; vno++) {
-    VERTEX_TOPOLOGY* const vt = &mris->vertices_topology[vno];
-    vt->f = (int *)calloc(vt->num, sizeof(int));
-    if (!vt->f) ErrorExit(ERROR_NO_MEMORY, "ic2562: could not allocate %d faces", vt->num);
-    vt->n = (unsigned char *)calloc(vt->num, sizeof(unsigned char));
-    if (!vt->n) ErrorExit(ERROR_NO_MEMORY, "ic2562: could not allocate %d nbrs", vt->n);
-    vt->num = 0; /* for use as counter in next section */
-  }
-
-  //----------------------------------------------
-  // fill in face indices in vertex structures /
-  //----------------------------------------------
-  for (fno = 0; fno < mris->nfaces; fno++) {
-    FACE* f = &mris->faces[fno];
-    for (n = 0; n < VERTICES_PER_FACE; n++) {
-      VERTEX_TOPOLOGY* const vt = &mris->vertices_topology[f->v[n]];
-      vt->n[vt->num] = n;
-      vt->f[vt->num++] = fno;
-    }
+    mrisAttachFaceToVertices(mris, fno + ICO_NFACES,
+      (gw_ic2562_faces[fno].vno[0] - 1) + ICO_NVERTICES,    /* make it zero-based */
+      (gw_ic2562_faces[fno].vno[1] - 1) + ICO_NVERTICES,    /* make it zero-based */
+      (gw_ic2562_faces[fno].vno[2] - 1) + ICO_NVERTICES);   /* make it zero-based */
   }
 
   MRIScomputeMetricProperties(mris);

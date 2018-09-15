@@ -707,37 +707,18 @@ MRIS *mrisReadGIFTIdanum(const char *fname, MRIS *mris, int daNum)
     mris->zctr = (zhi + zlo) / 2;
 
     /* Copy in the faces. */
-    int face_index;
-    for (face_index = 0; face_index < num_faces; face_index++) {
+    int fno;
+    for (fno = 0; fno < num_faces; fno++) {
+
+      vertices_per_face_t vertices;
+    
       int face_vertex_index;
       for (face_vertex_index = 0; face_vertex_index < VERTICES_PER_FACE; face_vertex_index++) {
-        vertex_index = (int)gifti_get_DA_value_2D(faces, face_index, face_vertex_index);
-        mris->faces[face_index].v[face_vertex_index] = vertex_index;
-        mris->vertices_topology[vertex_index].num++;
+        vertex_index = (int)gifti_get_DA_value_2D(faces, fno, face_vertex_index);
+        vertices[face_vertex_index] = vertex_index;
       }
-    }
-    // each vertex has a face list (faster than face list in some operations)
-    for (vertex_index = 0; vertex_index < num_vertices; vertex_index++) {
-      mris->vertices_topology[vertex_index].f = (int   *)calloc(mris->vertices_topology[vertex_index].num, sizeof(int));
-      mris->vertices_topology[vertex_index].n = (uchar *)calloc(mris->vertices_topology[vertex_index].num, sizeof(uchar));
-      mris->vertices_topology[vertex_index].num = 0;  // this gets re-calc'd next...
-    }
-    for (face_index = 0; face_index < mris->nfaces; face_index++) {
-      FACE *face = &mris->faces[face_index];
-      int n;
-      for (n = 0; n < VERTICES_PER_FACE; n++)
-        mris->vertices_topology[face->v[n]].f[mris->vertices_topology[face->v[n]].num++] =
-            face_index;  // note that .num is auto-incremented!
-    }
-    for (vertex_index = 0; vertex_index < num_vertices; vertex_index++) {
-      int n, m;
-      for (n = 0; n < mris->vertices_topology[vertex_index].num; n++) {
-        for (m = 0; m < VERTICES_PER_FACE; m++) {
-          if (mris->faces[mris->vertices_topology[vertex_index].f[n]].v[m] == vertex_index) {
-            mris->vertices_topology[vertex_index].n[n] = m;
-          }
-        }
-      }
+
+      mrisAttachFaceToVertices(mris, fno, vertices[0], vertices[1], vertices[2]);
     }
 
     // check-for and read coordsys struct for talairach xform

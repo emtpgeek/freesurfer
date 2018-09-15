@@ -16,6 +16,9 @@
  * Reporting: freesurfer@nmr.mgh.harvard.edu
  *
  */
+#define COMPILING_MRISURF_TOPOLOGY  // GROSS HACK
+
+
 #include "mrisurf_deform.h"
 #include "mrisurf_io.h"
 

@@ -46,116 +46,31 @@ IC_FACE ic12_faces[ICO_NFACES]
 // clang-format on
 MRI_SURFACE *ic12_make_surface(int max_vertices, int max_faces)
 {
-  MRI_SURFACE *mris;
-  int vno, fno, n, n1;
   static int first_time = 1;
 
   if (first_time) {
     first_time = 0;
+    int vno, fno;
     for (fno = 0; fno < ICO_NFACES; fno++) {
       vno = ic12_faces[fno].vno[1];
       ic12_faces[fno].vno[1] = ic12_faces[fno].vno[2];
       ic12_faces[fno].vno[2] = vno;
     }
-  }
-
-  mris = MRISoverAlloc(max_vertices, max_faces, ICO_NVERTICES, ICO_NFACES);
-
-  /* position vertices */
-  for (vno = 0; vno < ICO_NVERTICES; vno++) {
-    VERTEX * const v = &mris->vertices[vno];
-
-    v->x = 100.0 * ic12_vertices[vno].x;
-    v->y = 100.0 * ic12_vertices[vno].y;
-    v->z = 100.0 * ic12_vertices[vno].z;
-  }
-
-  int* vnums = (int*)calloc(mris->nvertices, sizeof(int));
-
-  /* fill in faces, and count # of faces each vertex is part of */
-  for (fno = 0; fno < ICO_NFACES; fno++) {
-    FACE * const f = &mris->faces[fno];
-    if (fno == 15) DiagBreak();
-    for (n = 0; n < VERTICES_PER_FACE; n++) {
-      f->v[n] = ic12_faces[fno].vno[n] - 1; /* make it zero-based */
-      vnums[f->v[n]] += 3; // Not sure what the extra +2 is for...
+    /* position vertices */
+    for (vno = 0; vno < ICO_NVERTICES; vno++) {
+      ic12_vertices[vno].x *= 100;
+      ic12_vertices[vno].y *= 100;
+      ic12_vertices[vno].z *= 100;
     }
   }
 
-  for (vno = 0; vno < ICO_NVERTICES; vno++) {
-    VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];
-    vt->v = (int *)calloc(vnums[vno] / 2, sizeof(int));
-    if (!vt->v) ErrorExit(ERROR_NOMEMORY, "ic12: could not allocate %dth vertex list.", vno);
-  }
-
-  /* now build list of neighbors */
-  for (fno = 0; fno < ICO_NFACES; fno++) {
-    FACE * const f = &mris->faces[fno];
-    if (fno == 3) DiagBreak();
-    for (n = 0; n < VERTICES_PER_FACE; n++) {
-      int const vno1 = f->v[n];
-
-      /* now add an edge to other 2 vertices if not already in list */
-      for (n1 = 0; n1 < VERTICES_PER_FACE; n1++) {
-        if (n1 == n) /* don't connect vertex to itself */
-          continue;
-
-        int vno2 = ic12_faces[fno].vno[n1] - 1; /* make it zero-based */
-
-        if (!mrisVerticesAreNeighbors(mris, vno1, vno2)) 
-          mrisAddEdge(mris, vno1, vno2);
-      }
-    }
-  }
-
-  /* now allocate face arrays in vertices */
-  for (vno = 0; vno < ICO_NVERTICES; vno++) {
-    VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];
-    vt->f = (int *)calloc(vt->num, sizeof(int));
-    if (!vt->f) ErrorExit(ERROR_NO_MEMORY, "ic12: could not allocate %d faces", vt->num);
-    vt->n = (uchar *)calloc(vt->num, sizeof(uchar));
-    if (!vt->n) ErrorExit(ERROR_NO_MEMORY, "ic12: could not allocate %d nbrs", vt->n);
-    vt->num = 0; /* for use as counter in next section */
-  }
-
-  /* fill in face indices in vertex structures */
-  for (fno = 0; fno < ICO_NFACES; fno++) {
-    FACE const * const f = &mris->faces[fno];
-    for (n = 0; n < VERTICES_PER_FACE; n++) {
-      VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[f->v[n]];
-      vt->n[vt->num] = n;
-      vt->f[vt->num++] = fno;
-    }
-  }
-
-  MRIScomputeMetricProperties(mris);
-#if 0
-  for (fno = 0 ; fno < mris->nfaces ; fno++)
-  {
-    float dot ;
-    int   ano ;
-
-    FACE * const f = &mris->faces[fno] ;
-    if (f->ripflag)
-      continue ;
-
-    /* now give the area an orientation: if the unit normal is pointing
-       inwards on the ellipsoid then the area should be negative.
-       */
-    VERTEX const * const v = &mris->vertices[f->v[0]] ;
-    dot = v->x * f->nx + v->y * f->ny + v->z * f->nz;
-    if (dot < 0.0f)   /* not in same direction, area < 0 and reverse n */
+  ICOSAHEDRON icos =
     {
-      f->area *= -1.0f ;
-      f->nx *= -1.0f;
-      f->ny *= -1.0f;
-      f->nz *= -1.0f;
-      for (ano = 0 ; ano < ANGLES_PER_TRIANGLE ; ano++)
-        f->angle[ano] *= -1.0f ;
-    }
-  }
-#endif
-  mris->type = MRIS_ICO_SURFACE;
-  MRISsetNeighborhoodSizeAndDist(mris, 1);
-  return (mris);
+        ICO_NVERTICES, 
+        ICO_NFACES, 
+        ic12_vertices,
+        ic12_faces
+    };
+    
+  return ICOtoMRIS(&icos, max_vertices, max_faces);
 }

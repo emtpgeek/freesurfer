@@ -125,7 +125,12 @@ typedef struct edge_type_
 
 typedef struct face_type_
 {
-#define BEVIN_SOMETIMES_CONST_F 
+#ifndef COMPILING_MRISURF_TOPOLOGY
+#define BEVIN_SOMETIMES_CONST_F const
+#else
+#define BEVIN_SOMETIMES_CONST_F
+#endif
+
     // Bevin is using this to find where various fields are written
     // so he can consolidate their modifications into a few places to keep the surface consistent
 

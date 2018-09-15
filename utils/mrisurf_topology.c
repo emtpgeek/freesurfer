@@ -16,6 +16,8 @@
  * Reporting: freesurfer@nmr.mgh.harvard.edu
  *
  */
+#define COMPILING_MRISURF_TOPOLOGY
+ 
 #include "mrisurf_topology.h"
 
 

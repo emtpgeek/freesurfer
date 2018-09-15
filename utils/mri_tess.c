@@ -22,6 +22,8 @@
  *
  */
 
+#define COMPILING_MRISURF_TOPOLOGY  // GROSS HACK
+
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
