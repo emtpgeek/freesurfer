@@ -707,6 +707,8 @@ MRIS *mrisReadGIFTIdanum(const char *fname, MRIS *mris, int daNum)
     mris->zctr = (zhi + zlo) / 2;
 
     /* Copy in the faces. */
+    setFaceAttachmentDeferred(mris, true);
+    
     int fno;
     for (fno = 0; fno < num_faces; fno++) {
 
@@ -721,6 +723,8 @@ MRIS *mrisReadGIFTIdanum(const char *fname, MRIS *mris, int daNum)
       mrisAttachFaceToVertices(mris, fno, vertices[0], vertices[1], vertices[2]);
     }
 
+    setFaceAttachmentDeferred(mris, false);
+    
     // check-for and read coordsys struct for talairach xform
     if (coords->coordsys && (coords->numCS > 0)) {
       int idx;

@@ -542,13 +542,12 @@ static void mrisAddFaceToVertex(MRIS *mris, int vno, int fno, int n) {
   v->n[i] = n;
 }
 
-
-
 static void mrisAttachFaceWkr(MRIS* mris, int fno, int vno0, int vno1, int vno2, bool edgesMustExist) {
   cheapAssertValidFno(mris,fno);
   cheapAssertValidVno(mris,vno0);
   cheapAssertValidVno(mris,vno1);
   cheapAssertValidVno(mris,vno2);
+  cheapAssert(vno0 != vno1 && vno0 != vno2 && vno1 != vno2);
 
   int vno[4]; vno[0] = vno0; vno[1] = vno1;  vno[2] = vno2;  vno[3] = vno0;
   if (edgesMustExist) {
@@ -570,6 +569,14 @@ static void mrisAttachFaceWkr(MRIS* mris, int fno, int vno0, int vno1, int vno2,
   for (i = 0; i < 3; i++)
     mrisAddFaceToVertex(mris, vno[i], fno, i);
 }
+
+
+
+void setFaceAttachmentDeferred(MRIS* mris, bool to) {
+    // currently NYI until seen to be a performance problem
+}
+
+
 
 void mrisAttachFaceToEdges   (MRIS* mris, int fno, int vno1, int vno2, int vno3) {
   mrisAttachFaceWkr(mris, fno, vno1, vno2, vno3, true);

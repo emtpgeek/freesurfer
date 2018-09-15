@@ -490,6 +490,7 @@ typedef struct MRIS
     \
   ELTT(const int,nvertices) SEP                 /* # of vertices on surface, change by calling MRISreallocVerticesAndFaces et al */         \
   ELTT(const int,nfaces) SEP                    /* # of faces on surface,    change by calling MRISreallocVerticesAndFaces et al */         \
+  ELTT(const bool,faceAttachmentDeferred) SEP   /* defer connecting faces to vertices, for performance reasons                   */         \
   ELTT(int,nedges) SEP                          /* # of edges on surface*/    \
   ELTT(int,nstrips) SEP    \
   ELTP(VERTEX_TOPOLOGY,vertices_topology) SEP    \
@@ -2707,6 +2708,7 @@ void MRISgetNeighborsBeginEnd(
 void mrisSetVertexFaceIndex(MRIS *mris, int vno, int fno);
     // is being used outside mrissurf_topology but shouldn't be
     
+void setFaceAttachmentDeferred(MRIS* mris, bool to);                                // for performance reasons, defer adding them; or do all the deferred ones
 void mrisAttachFaceToEdges   (MRIS* mris, int fno, int vno1, int vno2, int vno3);   // edges must already exist
 void mrisAttachFaceToVertices(MRIS* mris, int fno, int vno1, int vno2, int vno3);   // adds any needed edges
 

@@ -1742,13 +1742,20 @@ MRIS *ICOtoMRIS(ICOSAHEDRON const * const ico, int max_vertices, int max_faces) 
   }
 
   /* fill in faces */
+
+  setFaceAttachmentDeferred(mris, true);
+
   for (fno = 0; fno < ico->nfaces; fno++) {
     mrisAttachFaceToVertices(mris, fno,
       ico->faces[fno].vno[0] - 1, /* make it zero-based */
       ico->faces[fno].vno[1] - 1,
       ico->faces[fno].vno[2] - 1);
   }
+  
+  setFaceAttachmentDeferred(mris, false);
 
+  // other properties
+  //
   MRISsetNeighborhoodSizeAndDist(mris, -1);
   MRIScomputeMetricProperties(mris);
   mris->radius = MRISaverageRadius(mris);

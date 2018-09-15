@@ -2993,6 +2993,9 @@ MRI_SURFACE *MRISreadVTK(MRI_SURFACE *mris, const char *fname)
   }
 
   /* finally, read the face data...*/
+  
+  setFaceAttachmentDeferred(mris, true);
+  
   int fno, facepoints = 0;
   for (fno = 0; fno < mris->nfaces; fno++) {
     FACE *face = &mris->faces[fno];
@@ -3015,7 +3018,7 @@ MRI_SURFACE *MRISreadVTK(MRI_SURFACE *mris, const char *fname)
       vertices[n] = vno;
     }
     
-    if (!newMris) {
+    if (newMris) {
       mrisAttachFaceToVertices(mris, fno, vertices[0], vertices[1], vertices[2]);
     } else {
       // dont overwrite face data if passed an mris struct
@@ -3030,6 +3033,8 @@ MRI_SURFACE *MRISreadVTK(MRI_SURFACE *mris, const char *fname)
       }
     }
   }
+
+  setFaceAttachmentDeferred(mris, false);
 
   /* at this point in the file, we're at the end, or there is possibly
      curv or scalar data fields to read */
@@ -3183,7 +3188,7 @@ int MRISwriteGeo(MRI_SURFACE *mris, const char *fname)
     }
 
     /* swap order on output to conform to movie.byu convention */
-    fprintf(fp, "%d ", vnos[face->v[VERTICES_PER_FACE - 1]] + 1);
+    fprintf(fp, "%d ",   vnos[face->v[VERTICES_PER_FACE - 1]] + 1);
     fprintf(fp, "-%d\n", vnos[face->v[VERTICES_PER_FACE - 2]] + 1);
   }
 
@@ -3382,12 +3387,11 @@ static MRI_SURFACE *mrisReadAsciiFile(const char *fname)
   patch = 0;
   cp = fgetl(line, STRLEN, fp);
   sscanf(cp, "%d %d\n", &nvertices, &nfaces);
+
   mris = MRISalloc(nvertices, nfaces);
-#if 0
-  mris->type = MRIS_ASCII_TRIANGLE_FILE ;
-#else
   mris->type = MRIS_TRIANGULAR_SURFACE;
-#endif
+  setFaceAttachmentDeferred(mris, true);
+
   for (vno = 0; vno < mris->nvertices; vno++) {
     v = &mris->vertices[vno];
     fscanf(fp, "%f  %f  %f  %d\n", &v->x, &v->y, &v->z, &rip);
@@ -3415,6 +3419,8 @@ static MRI_SURFACE *mrisReadAsciiFile(const char *fname)
     fscanf(fp, "%d\n", &rip);
     face->ripflag = rip;
   }
+
+  setFaceAttachmentDeferred(mris, false);
 
   mris->patch = patch;
   if (patch) {
@@ -3469,21 +3475,29 @@ static MRI_SURFACE *mrisReadGeoFile(const char *fname)
       fscanf(fp, "\n");
     }
   }
+  
+  setFaceAttachmentDeferred(mris, false);
+  
   for (fno = 0; fno < mris->nfaces; fno++) {
     vertices_per_face_t vertices;
     
     for (n = 0; n < VERTICES_PER_FACE; n++) {
       fscanf(fp, "%d ", &vertices[n]);
+      if (n == VERTICES_PER_FACE-1) vertices[n] = -vertices[n];         // the last is written with a minus sign
       cheapAssert(vertices[n] > 0);
-      vertices[n] -= 1; /* make it 0-based */
+      vertices[n] -= 1;                                                 // make it 0-based
     }
 
-    /* swap positions so normal (via cross-product) will point outwards */
     int tmp;
     tmp = vertices[1]; vertices[1] = vertices[2]; vertices[2] = tmp;
+        // Swap positions so normal (via cross-product) will point outwards
+        // Writing also swaps these two
     
     mrisAttachFaceToVertices(mris, fno, vertices[0], vertices[1], vertices[2]);
   }
+
+  setFaceAttachmentDeferred(mris, false);
+
 
   fclose(fp);
   return (mris);
@@ -3775,6 +3789,9 @@ static MRI_SURFACE *mrisReadSTLfile(const char *fname)
       int nfaces = mris->nfaces;
       int faceNo;
       int nextVertexNo = 0;
+      
+      setFaceAttachmentDeferred(mris, true);
+      
       for (faceNo = 0; faceNo < nfaces; faceNo++) {
 
 	XYZ* xyz = &faceNormalXYZs[faceNo];
@@ -3802,6 +3819,8 @@ static MRI_SURFACE *mrisReadSTLfile(const char *fname)
         
         mrisAttachFaceToVertices(mris, faceNo, vertexNos[0], vertexNos[1], vertexNos[2]);	  
       } // for
+      
+      setFaceAttachmentDeferred(mris, false);
     } // filled in the mris
 
     free(faceNormalXYZs);
@@ -3964,7 +3983,7 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
   }
   else if (type == MRI_MGH_FILE) /* .mgh */
   {
-    ErrorExit(ERROR_BADFILE, "ERROR: MRISread: cannot read surface data from file %s!\n", fname);
+    ErrorExit(ERROR_BADFILE, "ERROR: MRISread: does not support reading surface data from MGH files such as %s\n", fname);
   }
   else  // default type MRIS_BINARY_QUADRANGLE_FILE ... use magic number
   {
@@ -4092,6 +4111,9 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
     }
 
     /* read face vertices *******************************************/
+    
+    setFaceAttachmentDeferred(mris, true);
+    
     int fno;
     for (fno = 0; fno < mris->nfaces; fno += 2) {
 
@@ -4126,6 +4148,9 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
         mrisAttachFaceToVertices(mris, fno + 1, vertices[0], vertices[2], vertices[3]);
       }
     }
+    
+    setFaceAttachmentDeferred(mris, false);
+    
     mris->useRealRAS = 0;
 
     // read tags
@@ -4197,12 +4222,6 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
   /***********************************************************************/
   /* build members of mris structure                                     */
   /***********************************************************************/
-  if ((version < 0) || type == MRIS_ASCII_TRIANGLE_FILE) {
-    // used each vertex's vertex.num to create vertex.f and vertex.n, then zero'ed vertex.num
-    // used each face's v[VERTICES_PER_FACE] to fill in vertex.f, but did not fill in vertex.n
-    // The vertex.n[] is filled in below
-    cheapAssert(!"NYI");
-  }
 
   float xhi, xlo, yhi, ylo, zhi, zlo;
   xhi = yhi = zhi = -10000;
@@ -5414,6 +5433,9 @@ static MRI_SURFACE *mrisReadTriangleFile(const char *fname, double pct_over)
       ErrorExit(ERROR_BADFILE, "%s: vertex %d z coordinate %f!", Progname, vno, v->z);
   }
 
+  
+  setFaceAttachmentDeferred(mris, true);
+  
   for (fno = 0; fno < mris->nfaces; fno++) {
     vertices_per_face_t vertices;
     for (n = 0; n < VERTICES_PER_FACE; n++) {
@@ -5421,6 +5443,10 @@ static MRI_SURFACE *mrisReadTriangleFile(const char *fname, double pct_over)
     }
     mrisAttachFaceToVertices(mris, fno, vertices[0], vertices[1], vertices[2]);
   }
+  
+  setFaceAttachmentDeferred(mris, false);
+  
+  
   // new addition
   mris->useRealRAS = 0;
 
