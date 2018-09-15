@@ -1922,7 +1922,7 @@ MRI_SURFACE *ic2562_make_two_icos(float x1, float y1, float z1, float r1, float 
 //---------------------------------------------------
 {
   MRI_SURFACE *mris;
-  int vno, fno, n, n1;
+  int vno, fno;
   static int first_time = 1;
 
   //-----------------------------------------

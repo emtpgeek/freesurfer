@@ -4536,7 +4536,8 @@ static int mrisOrigNormalFace(MRIS *mris, int fac, int n, float norm[])
   ------------------------------------------------------*/
 static int mrisWhiteNormalFace(MRIS *mris, int fac, int n, float norm[])
 {
-  int n0, n1, *pv;
+  int n0, n1;
+  int const *pv;
   FACE *f;
   float v0[3], v1[3];
   register VERTEX *v, *vn0, *vn1;
@@ -4776,7 +4777,8 @@ void computeVertexPseudoNormal(MRIS const *mris, int vno, float norm[3], int ver
  */ 
 int mrisNormalFace(MRIS *mris, int fac, int n, float norm[])
 {
-  int n0, n1, *pv;
+  int n0, n1;
+  int const *pv;
   FACE *f;
   float v0[3], v1[3];
   register VERTEX *v, *vn0, *vn1;
