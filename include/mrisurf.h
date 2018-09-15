@@ -1674,7 +1674,6 @@ int   MRISsetMarks(MRI_SURFACE *mris, int mark) ;
 int   MRISsequentialAverageVertexPositions(MRI_SURFACE *mris, int navgs) ;
 int   MRISreverseCoords(MRI_SURFACE *mris, int which_direction, int reverse_face_order, int which_coords) ;
 int   MRISreverse(MRI_SURFACE *mris, int which, int reverse_face_order) ;
-void  MRISreverseFaceOrder(MRIS *mris);
 int   MRISdisturbOriginalDistances(MRI_SURFACE *mris, double max_pct) ;
 double MRISstoreAnalyticDistances(MRI_SURFACE *mris, int which) ;
 int   MRISnegateValues(MRI_SURFACE *mris) ;
@@ -2710,6 +2709,9 @@ void mrisSetVertexFaceIndex(MRIS *mris, int vno, int fno);
     
 void mrisAttachFaceToEdges   (MRIS* mris, int fno, int vno1, int vno2, int vno3);   // edges must already exist
 void mrisAttachFaceToVertices(MRIS* mris, int fno, int vno1, int vno2, int vno3);   // adds any needed edges
+
+void  MRISflipFaceAroundV1(MRIS *mris, int fno);
+void  MRISreverseFaceOrder(MRIS *mris);
 
 // Marked
 //

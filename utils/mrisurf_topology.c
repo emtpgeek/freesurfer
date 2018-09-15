@@ -580,6 +580,16 @@ void mrisAttachFaceToVertices(MRIS* mris, int fno, int vno1, int vno2, int vno3)
 }
 
 
+void MRISflipFaceAroundV1(MRIS *mris, int fno) {
+    FACE* f = &mris->faces[fno];
+    int vno0 = f->v[0];
+    int vno2 = f->v[2];
+    f->v[0] = vno2;
+    f->v[2] = vno0;
+    mrisSetVertexFaceIndex(mris, vno0, fno);
+    mrisSetVertexFaceIndex(mris, vno2, fno);
+}
+
 /*!
   \fn void MRISreverseFaceOrder(MRIS *mris)
   \brief Reverse order of the vertices in each face. This
@@ -589,19 +599,9 @@ void MRISreverseFaceOrder(MRIS *mris)
 {
   int fno;
   for (fno = 0; fno < mris->nfaces; fno++) {
-    FACE* f = &mris->faces[fno];
-    int vno0 = f->v[0];
-    int vno1 = f->v[1];
-    int vno2 = f->v[2];
-    f->v[0] = vno2;
-    f->v[1] = vno1;
-    f->v[2] = vno0;
-    mrisSetVertexFaceIndex(mris, vno0, fno);
-    mrisSetVertexFaceIndex(mris, vno1, fno);
-    mrisSetVertexFaceIndex(mris, vno2, fno);
+    MRISflipFaceAroundV1(mris, fno);
   }
 }
-
 
 
 void MRIScreateSimilarTopologyMapsForNonripped(

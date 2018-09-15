@@ -2160,8 +2160,7 @@ static void write_surface(char *fname) {
     mris->vertices[k].z = z ;
   }
   for (k=0;k<nfaces;k++)
-    for (n = 0 ; n < 3 ; n++)
-      mris->faces[k].v[n] = face[k][n] ;
+    mrisAttachFaceToVertices(mris, k, face[k][0], face[k][1], face[k][2]); 
   
   mris->type = MRIS_TRIANGULAR_SURFACE ;
   MRISwrite(mris, fname) ;

@@ -628,16 +628,18 @@ main(int argc, char *argv[])
     int fno,fno2,fno3;
     for (fno=0,fno3=0; fno < mris->nfaces; fno++, fno3++)
     {
-      mris3->faces[fno3].v[0] = mris->faces[fno].v[0];
-      mris3->faces[fno3].v[1] = mris->faces[fno].v[1];
-      mris3->faces[fno3].v[2] = mris->faces[fno].v[2];
+      mrisAttachFaceToVertices(mris3, fno3, 
+        mris->faces[fno].v[0],
+        mris->faces[fno].v[1],
+        mris->faces[fno].v[2]);
     }
     int offset = mris->nvertices;
     for (fno2=0; fno2 < mris2->nfaces; fno2++, fno3++)
     {
-      mris3->faces[fno3].v[0] = mris2->faces[fno2].v[0] + offset;
-      mris3->faces[fno3].v[1] = mris2->faces[fno2].v[1] + offset;
-      mris3->faces[fno3].v[2] = mris2->faces[fno2].v[2] + offset;
+      mrisAttachFaceToVertices(mris3, fno3, 
+        mris2->faces[fno2].v[0] + offset,
+        mris2->faces[fno2].v[1] + offset,
+        mris2->faces[fno2].v[2] + offset);
     }
     MRISwrite(mris3, out_fname);
     MRISfree(&mris2);

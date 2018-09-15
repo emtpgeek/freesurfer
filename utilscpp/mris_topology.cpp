@@ -775,8 +775,7 @@ extern "C" MRIP* MRIPextractFromMRIS(MRIS *mris, int defect_number)
       FACE *f = &mris_dst->faces[nfaces];
       ft_from[n]=nfaces;
       ft_to[nfaces++]=n;
-      for (int i = 0 ; i < 3 ; i++)
-        f->v[i] = vt_from[fsrc->v[i]];
+      mrisAttachFaceToVertices(mris_dst, nfaces, vt_from[fsrc->v[0]], vt_from[fsrc->v[1]], vt_from[fsrc->v[2]]);
     }
   }
   mrip->ftrans_to = ft_to;
@@ -1023,11 +1022,8 @@ MRIS * SurfaceToMRIS(Surface *surface, MRIS *mris)
   }
   //Faces
   for (int n = 0 ; n < surface->nfaces ; n++) {
-    FACE *fdst=&mris->faces[n];
     Face *fsrc = &surface->faces[n];
-    fdst->v[0]=fsrc->v[0];
-    fdst->v[1]=fsrc->v[1];
-    fdst->v[2]=fsrc->v[2];
+    mrisAttachFaceToVertices(mris, n, fsrc->v[0], fsrc->v[1], fsrc->v[2]);
   }
 
   MRIScomputeNormals(mris);
@@ -1071,11 +1067,7 @@ bool MRISaddMRIP(MRIS *mris_dst, MRIP *mrip)
   for (int n = 0 ; n < mris->nfaces ; n++) {
     FACE *fsrc = &mris->faces[n];
     if (n >= nfaces) fto[n] = currNumFaces++;
-    FACE *fdst = &mris_dst->faces[fto[n]];
-    //vertex indices
-    fdst->v[0] = vto[fsrc->v[0]];
-    fdst->v[1] = vto[fsrc->v[1]];
-    fdst->v[2] = vto[fsrc->v[2]];
+    mrisAttachFaceToVertices(mris, fto[n], vto[fsrc->v[0]], vto[fsrc->v[1]], vto[fsrc->v[2]]); 
   }
 
   //stuff in vertices and faces

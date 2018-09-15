@@ -432,39 +432,8 @@ int saveTesselation2(tesselation_parms *parms) {
   }
   /*then init faces*/
   for (m = 0 ; m < parms->face_index ; m ++) {
-
     face2=&parms->face[m];
-
-    mris->faces[m].v[0] = face2->v[0] ;
-    mris->faces[m].v[1] = face2->v[1] ;
-    mris->faces[m].v[2] = face2->v[2] ;
-    for (n = 0 ; n < VERTICES_PER_FACE ; n++)
-      mris->vertices_topology[mris->faces[m].v[n]].num++;
-  }
-
-  /*allocate indices & faces for each vertex*/
-  for (vno = 0 ; vno< mris->nvertices ; vno++) {
-    // vertex = &mris->vertices[vno] ;
-    mris->vertices_topology[vno].f =
-      (int *)calloc(mris->vertices_topology[vno].num,sizeof(int));
-    if (!mris->vertices_topology[vno].f)
-      ErrorExit(ERROR_NOMEMORY,
-                "%s: could not allocate %d faces at %dth vertex",
-                Progname, mris->vertices_topology[vno].num,vno) ;
-    mris->vertices_topology[vno].n =
-      (uchar *)calloc(mris->vertices_topology[vno].num,sizeof(uchar));
-    if (!mris->vertices_topology[vno].n)
-      ErrorExit(ERROR_NOMEMORY,
-                "%s: could not allocate %d indices at %dth vertex",
-                Progname, mris->vertices_topology[vno].num,vno) ;
-    mris->vertices_topology[vno].num = 0 ;
-  }
-
-  /*init faces for each vertex*/
-  for (fno = 0 ; fno < mris->nfaces ; fno++) {
-    face = &mris->faces[fno] ;
-    for (n = 0 ; n < VERTICES_PER_FACE ; n++)
-      mris->vertices_topology[face->v[n]].f[mris->vertices_topology[face->v[n]].num++] = fno;
+    mrisAttachFaceToVertices(mris, m, face2->v[0], face2->v[1], face2->v[2]); 
   }
 
   /*necessary initialization*/
@@ -475,12 +444,6 @@ int saveTesselation2(tesselation_parms *parms) {
     mris->vertices[vno].origarea = -1;
     mris->vertices[vno].border = 0;
 
-    for (n=0;n<mris->vertices_topology[vno].num;n++) {
-      for (m=0;m<VERTICES_PER_FACE;m++) {
-        if (mris->faces[mris->vertices_topology[vno].f[n]].v[m] == vno)
-          mris->vertices_topology[vno].n[n] = m;
-      }
-    }
     x = mris->vertices[vno].x;
     y = mris->vertices[vno].y;
     z = mris->vertices[vno].z;
@@ -513,35 +476,6 @@ int saveTesselation2(tesselation_parms *parms) {
   MRIScomputeMetricProperties(mris) ;
   MRISstoreCurrentPositions(mris) ;
   parms->mris_table[parms->ind]=mris;
-  //MRISdivideLongEdges(mris, 0.3);
-
-#if 0
-  {
-    int f;
-    float v0[3],v1[3],d1,d2,d3;
-    for (f=0;f<mris->nfaces;f++) {
-      v0[0] = mris->vertices[mris->faces[f].v[2]].x - 
-        mris->vertices[mris->faces[f].v[0]].x;
-      v0[1] = mris->vertices[mris->faces[f].v[2]].y - 
-        mris->vertices[mris->faces[f].v[0]].y;
-      v0[2] = mris->vertices[mris->faces[f].v[2]].z - 
-        mris->vertices[mris->faces[f].v[0]].z;
-      v1[0] = mris->vertices[mris->faces[f].v[1]].x - 
-        mris->vertices[mris->faces[f].v[0]].x;
-      v1[1] = mris->vertices[mris->faces[f].v[1]].y - 
-        mris->vertices[mris->faces[f].v[0]].y;
-      v1[2] = mris->vertices[mris->faces[f].v[1]].z - 
-        mris->vertices[mris->faces[f].v[0]].z;
-      d1 = -v1[1]*v0[2] + v0[1]*v1[2];
-      d2 = v1[0]*v0[2] - v0[0]*v1[2];
-      d3 = -v1[0]*v0[1] + v0[0]*v1[1];
-      if (sqrt(d1*d1+d2*d2+d3*d3)/2>0.5)
-        fprintf(stderr,"\n Face #%d -> %f %d %d %d ",
-                f,sqrt(d1*d1+d2*d2+d3*d3)/2,mris->faces[f].v[0],
-                mris->faces[f].v[1],mris->faces[f].v[2]);
-    }
-  }
-#endif
 
   return(NO_ERROR) ;
 }
@@ -894,26 +828,7 @@ int main(int argc, char *argv[]) {
     }
     fprintf(stderr,"%f mm",sqrt(max_e));
     fprintf(stderr,"\nreversing orientation of faces...");
-    for (n = 0 ; n < mris->nfaces ; n++) {
-      vn0=mris->faces[n].v[0];
-      vn2=mris->faces[n].v[2];
-      /* vertex 0 becomes vertex 2 */
-      { 
-        VERTEX_TOPOLOGY* const v=&mris->vertices_topology[vn0];
-        for (p = 0 ; p < v->num ; p++)
-          if (v->f[p]==n)
-            v->n[p]=2;
-        mris->faces[n].v[2]=vn0;
-      }
-      /* vertex 2 becomes vertex 0 */
-      { 
-        VERTEX_TOPOLOGY* const v=&mris->vertices_topology[vn2];
-        for (p = 0 ; p < v->num ; p++)
-          if (v->f[p]==n)
-            v->n[p]=0;
-        mris->faces[n].v[0]=vn2;
-      }
-    }
+    MRISreverseFaceOrder(mris);
   }
 
   fprintf(stderr,"\nchecking orientation of surface...");
