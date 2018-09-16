@@ -547,7 +547,12 @@ static void mrisAttachFaceWkr(MRIS* mris, int fno, int vno0, int vno1, int vno2,
   cheapAssertValidVno(mris,vno0);
   cheapAssertValidVno(mris,vno1);
   cheapAssertValidVno(mris,vno2);
+  
   cheapAssert(vno0 != vno1 && vno0 != vno2 && vno1 != vno2);
+    //
+    // This assertion was seen when a triangular tesselation written as a quad file did so by creating quad with two identical vertices
+    // which then might be read back as two triangles, one of which has identical vertices!  This would ruin euler
+    // calculations as well as create huge numbers of zero-area badly-defined-norm FACE.
 
   int vno[4]; vno[0] = vno0; vno[1] = vno1;  vno[2] = vno2;  vno[3] = vno0;
   if (edgesMustExist) {

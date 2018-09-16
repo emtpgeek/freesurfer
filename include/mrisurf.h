@@ -49,7 +49,10 @@
 #define MAX_CMDS 1000
 
 #define NEW_VERSION_MAGIC_NUMBER  16777215 // was in mrisurf.c
-#define WHICH_FACE_SPLIT(vno0, vno1) (1*nint(sqrt(1.9*vno0) + sqrt(3.5*vno1)));
+
+#define WHICH_FACE_SPLIT(vno0, vno1) (1*nint(sqrt(1.9*vno0) + sqrt(3.5*vno1)))
+    //
+    // This is used in a repeatable arbitrary true false selector based on the resulting int being EVEN or ODD
 
 //  UnitizeNormalFace is a global variable used in mrisNormalFace() to allow the
 //  output norm to be unitized or not. That function computed the norm

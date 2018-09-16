@@ -18,6 +18,8 @@
  */
 #include "mrisurf_io.h"
 
+//#define OLD_BUGGY_QUADS   // revert to the buggy old two-triangles -> one quad -> two triangles code
+
 #define QUAD_FILE_MAGIC_NUMBER (-1 & 0x00ffffff)
 #define TRIANGLE_FILE_MAGIC_NUMBER (-2 & 0x00ffffff)
 #define NEW_QUAD_FILE_MAGIC_NUMBER (-3 & 0x00ffffff)
@@ -4034,7 +4036,7 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
 
     int nvertices, nquads;
     fread3(&nvertices, fp);
-    fread3(&nquads, fp); /* # of qaudrangles - not triangles */
+    fread3(&nquads, fp); /* # of quadrangles - not triangles */
 
     if (nvertices <= 0) /* sanity-checks */
       ErrorExit(ERROR_BADFILE,
@@ -4054,36 +4056,91 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
     if (Gdiag & DIAG_SHOW && DIAG_VERBOSE_ON)
       fprintf(stdout, "reading %d vertices and %d faces.\n", nvertices, 2 * nquads);
 
-    mris = MRISoverAlloc(pct_over * nvertices, pct_over * 2 * nquads, nvertices, 2 * nquads);
-    mris->type = MRIS_BINARY_QUADRANGLE_FILE;
+    // Need to read the quads to determine how many triangles are needed
+    // since some quads have adjacent identical vertexs
+    // because they represent triangular faces
+    //
+    float* vertexXYZs = (float*)malloc(3*nvertices*sizeof(float));
+    int*   quadVnos   = (int  *)malloc(4*nquads   *sizeof(  int));
 
-    int imnr0 = 1000;
-    int imnr1 = 0;
-
-    /* read vertices *************************************************/
+    // The vertexs first in the file, read their XYZ 
+    //
     int vno;
     for (vno = 0; vno < nvertices; vno++) {
-      VERTEX_TOPOLOGY * const vertext = &mris->vertices_topology[vno];    
-      VERTEX          * const vertex  = &mris->vertices         [vno];
-      
-      vertext->nsize = 1;
-      
+      float* xyz = vertexXYZs + 3*vno;
       if (version == -1) /* QUAD_FILE_MAGIC_NUMBER */
       {
         int ix, iy, iz;
         fread2(&ix, fp);
         fread2(&iy, fp);
         fread2(&iz, fp);
-        vertex->x = ix / 100.0;
-        vertex->y = iy / 100.0;
-        vertex->z = iz / 100.0;
+        *(xyz+0) = ix / 100.0;
+        *(xyz+0) = iy / 100.0;
+        *(xyz+0) = iz / 100.0;
       }
       else /* version == -2 */ /* NEW_QUAD_FILE_MAGIC_NUMBER */
       {
-        vertex->x = freadFloat(fp);
-        vertex->y = freadFloat(fp);
-        vertex->z = freadFloat(fp);
+        *(xyz+0) = freadFloat(fp);
+        *(xyz+1) = freadFloat(fp);
+        *(xyz+2) = freadFloat(fp);
       }
+
+      if (version == 0) /* old surface format */
+      {
+        int num;
+        fread1(&num, fp);   // # of faces we are part of
+        int vno;            // and the vno's
+        int n;
+        for (n = 0; n < num; n++) {
+          fread3(&vno, fp);
+        }
+      }
+    }
+    
+    // Read quad vertex numbers
+    // Decide how many faces are needed
+    //
+    int nfaces = 0;
+
+    int qno;
+    for (qno = 0; qno < nquads; qno += 2) {
+      int* quadVno = quadVnos + 4*qno;
+
+      int n;
+      for (n = 0; n < 4; n++)
+        fread3(quadVno + n, fp);
+       
+      if (quadVno[0] != quadVno[1]
+      &&  quadVno[1] != quadVno[2]
+      &&  quadVno[2] != quadVno[0]) nfaces++;
+
+      if (quadVno[1] != quadVno[2]
+      &&  quadVno[2] != quadVno[3]
+      &&  quadVno[3] != quadVno[1]) nfaces++;
+    }
+
+    // Create
+    //
+    mris = MRISoverAlloc(pct_over * nvertices, pct_over * nfaces, nvertices, nfaces);
+    mris->type = MRIS_BINARY_QUADRANGLE_FILE;
+
+    // Fill in the vertices
+    //
+    int imnr0 = 1000;
+    int imnr1 = 0;
+
+    for (vno = 0; vno < nvertices; vno++) {
+      VERTEX_TOPOLOGY * const vertext = &mris->vertices_topology[vno];    
+      VERTEX          * const vertex  = &mris->vertices         [vno];
+      
+      float* xyz = vertexXYZs + 3*vno;
+
+      vertext->nsize = 1;
+      
+      vertex->x = *(xyz + 0);
+      vertex->y = *(xyz + 1);
+      vertex->z = *(xyz + 2);
+
 #if 0
       vertex->label = NO_LABEL ;
 #endif
@@ -4095,63 +4152,41 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
       if (imnr < imnr0) {
         imnr0 = imnr;
       }
-      if (version == 0) /* old surface format */
-      {
-        int num;
-        fread1(&num, fp); /* # of faces we are part of */
-        
-        int n;
-        for (n = 0; n < vertext->num; n++) {
-          fread3(&vertext->f[n], fp);
-        }
-      }
-      else {
-        vertext->num = 0; /* will figure it out */
-      }
     }
 
-    /* read face vertices *******************************************/
-    
+    // Fill in the faces
+    //
     setFaceAttachmentDeferred(mris, true);
-    
-    int fno;
-    for (fno = 0; fno < mris->nfaces; fno += 2) {
 
-      if (fno == 86) {
-        DiagBreak();
-      }
-      
-      int vertices[VERTICES_PER_FACE + 1];
-      
-      int n;
-      for (n = 0; n < 4; n++) /* read quandrangular face */
-      {
-        fread3(&vertices[n], fp);
-        if (vertices[n] == 22) {
-          DiagBreak();
-        }
+    int fno = 0;
+    for (qno = 0; qno < nquads; qno++) {
+
+      int* quadVno = quadVnos + 4*qno;
+      if (quadVno[0] != quadVno[1]
+      &&  quadVno[1] != quadVno[2]
+      &&  quadVno[2] != quadVno[0]) {
+        mrisAttachFaceToVertices(mris, fno, quadVno[0], quadVno[1], quadVno[2]);
+        fno++;
       }
 
-      /* if we're going to be arbitrary,
-         we might as well be really arbitrary */
-      /*
-        NOTE: for this to work properly in the write, the first two
-        vertices in the first face (EVEN and ODD) must be 0 and 1.
-      */
-      int which = WHICH_FACE_SPLIT(vertices[0], vertices[1]);
-
-      if (EVEN(which)) {
-        mrisAttachFaceToVertices(mris, fno + 0, vertices[0], vertices[1], vertices[3]);
-        mrisAttachFaceToVertices(mris, fno + 1, vertices[2], vertices[3], vertices[1]);
-      } else {
-        mrisAttachFaceToVertices(mris, fno + 0, vertices[0], vertices[1], vertices[2]);
-        mrisAttachFaceToVertices(mris, fno + 1, vertices[0], vertices[2], vertices[3]);
+      if (quadVno[1] != quadVno[2]
+      &&  quadVno[2] != quadVno[3]
+      &&  quadVno[3] != quadVno[1]) {
+        mrisAttachFaceToVertices(mris, fno, quadVno[1], quadVno[2], quadVno[3]);
+        fno++;
       }
     }
+
+    cheapAssert(fno == mris->nfaces);
     
     setFaceAttachmentDeferred(mris, false);
     
+    // The rest of the data
+    //
     mris->useRealRAS = 0;
+
+    freeAndNULL(vertexXYZs);
+    freeAndNULL(quadVnos);
 
     // read tags
     {
@@ -4424,8 +4459,15 @@ int MRISwrite(MRI_SURFACE *mris, const char *name)
 #else
   fwrite3(QUAD_FILE_MAGIC_NUMBER, fp);
 #endif
+
   fwrite3(mris->nvertices, fp);
+
+#ifdef OLD_BUGGY_QUADS
   fwrite3(mris->nfaces / 2, fp); /* # of quadrangles */
+#else
+  fwrite3(mris->nfaces    , fp); /* each face is going to be a quadrangle with two identical vertexs */
+#endif
+
   for (k = 0; k < mris->nvertices; k++) {
     x = mris->vertices[k].x;
     y = mris->vertices[k].y;
@@ -4440,33 +4482,39 @@ int MRISwrite(MRI_SURFACE *mris, const char *name)
     fwrite2((int)(z * 100), fp);
 #endif
   }
+  
+  // This incorrectly assumes the number of faces is even
+  //
+#ifdef OLD_BUGGY_QUADS
   for (k = 0; k < mris->nfaces; k += 2) {
-    int which;
-    FACE *f;
+    FACE const * const f = &mris->faces[k];
 
-    f = &mris->faces[k];
-    {
-      int n;
-      for (n = 0; n < VERTICES_PER_FACE; n++) {
-        if ((mris->faces[k].v[n] == 22) || (mris->faces[k + 1].v[n] == 22)) {
-          DiagBreak();
-        }
-      }
-    }
-    which = WHICH_FACE_SPLIT(f->v[0], f->v[1]);
+    // This incorrectly assumed that the f[k] and f[k+1] abut!
+    //
+    int which = WHICH_FACE_SPLIT(f->v[0], f->v[1]);
     if (EVEN(which)) {
-      fwrite3(mris->faces[k].v[0], fp);
-      fwrite3(mris->faces[k].v[1], fp);
+      fwrite3(mris->faces[k    ].v[0], fp);
+      fwrite3(mris->faces[k    ].v[1], fp);
       fwrite3(mris->faces[k + 1].v[0], fp);
-      fwrite3(mris->faces[k].v[2], fp);
+      fwrite3(mris->faces[k    ].v[2], fp);
     }
     else {
-      fwrite3(mris->faces[k].v[0], fp);
-      fwrite3(mris->faces[k].v[1], fp);
-      fwrite3(mris->faces[k].v[2], fp);
+      fwrite3(mris->faces[k    ].v[0], fp);
+      fwrite3(mris->faces[k    ].v[1], fp);
+      fwrite3(mris->faces[k    ].v[2], fp);
       fwrite3(mris->faces[k + 1].v[2], fp);
     }
   }
+#else
+  for (k = 0; k < mris->nfaces; k += 2) {
+    FACE const * const f = &mris->faces[k];
+    fwrite3(f->v[0], fp);
+    fwrite3(f->v[1], fp);
+    fwrite3(f->v[2], fp);
+    fwrite3(f->v[2], fp);
+  }
+#endif
+  
   /* write whether vertex data was using the
      real RAS rather than conformed RAS */
   fwriteInt(TAG_OLD_USEREALRAS, fp);

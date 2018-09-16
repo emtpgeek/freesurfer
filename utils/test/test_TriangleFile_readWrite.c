@@ -6,15 +6,15 @@
 static const char* fnm_base = "./test_TriangleFile_readWrite.tmp";
 
 static const char* extensions[] = { 
+    "ANNOT",
+    "Any_other_means_MRIS_BINARY_QUADRANGLE_FILE",
     "GEO",
     "ICO",      // "TRI" is equivalent
     "VTK",
     "STL",
     "GII",
     "MGH",
-    "ANNOT",
-    "Any_other_means_MRIS_BINARY_QUADRANGLE_FILE",
-    "ASC",      // NYI crash that Bevin caused
+    "ASC",
     NULL};
 
 static char fnm[1024];
@@ -77,13 +77,13 @@ int main() {
     if (src->nvertices != dst->nvertices) {
       fails++;
       printf("FAIL src->nvertices:%d != dst->nvertices:%d\n",
-        dst->nvertices, dst->nfaces);
+        dst->nvertices, dst->nvertices);
     }
 
     if (src->nfaces != dst->nfaces) {
       fails++;
       printf("FAIL src->nfaces:%d != dst->nfaces:%d\n",
-        dst->nfaces, dst->nfaces);
+        src->nfaces, dst->nfaces);
     }
     
     MRISfree(&dst);
