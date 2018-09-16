@@ -4025,7 +4025,7 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
     }
   }
 
-  if (!mrisCheckVertexFaceTopology(mris)) {
+  if (!!mris && !mrisCheckVertexFaceTopology(mris)) {
     cheapAssert(false);
   }
 
