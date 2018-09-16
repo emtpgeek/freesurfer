@@ -379,12 +379,11 @@ void reallocateFaces(tesselation_parms *parms) {
 }
 
 int saveTesselation2(tesselation_parms *parms) {
-  int vno,m,n,fno;
+  int vno,m;
   int pct_over=1;
   quad_face_type *face2;
   quad_vertex_type *vertex2;
   MRIS* mris;
-  FACE *face;
   float x, y, z, xhi, xlo, yhi, ylo, zhi, zlo ;
   float st,ps,xx1,yy0,zz1;
   float j,i,imnr;
@@ -814,15 +813,16 @@ int main(int argc, char *argv[]) {
   freeTesselationParms(&parms);
 
   {
-    float dist,max_e=0.0;
-    int n,p,vn0,vn2;
     fprintf(stderr,"computing the maximum edge length...");
+    float max_e=0.0;
+    int n;
     for (n = 0 ; n < mris->nvertices ; n++) {
       VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[n];
       VERTEX          const * const v  = &mris->vertices         [n];
-      for (p = 0 ; p < vt->vnum ; p++) {
-        VERTEX const * const vp = &mris->vertices[vt->v[p]];
-        dist=SQR(vp->x - v->x)+SQR(vp->y - v->y)+SQR(vp->z - v->z);
+      int i;
+      for (i = 0 ; i < vt->vnum ; i++) {
+        VERTEX const * const vp = &mris->vertices[vt->v[i]];
+        float dist=SQR(vp->x - v->x)+SQR(vp->y - v->y)+SQR(vp->z - v->z);
         if (dist>max_e) max_e=dist;
       }
     }

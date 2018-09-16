@@ -114,9 +114,11 @@ static void faceLoad(GtsTriangle * t, gpointer * data)
   GtsVertex *v1, *v2, *v3;
   gts_triangle_vertices(t, &v1, &v2, &v3);
 
-  mris->faces[faceLoadContext->nextFace].v[0] = (guint) (glong) GTS_OBJECT (v1)->reserved;
-  mris->faces[faceLoadContext->nextFace].v[1] = (guint) (glong) GTS_OBJECT (v2)->reserved;
-  mris->faces[faceLoadContext->nextFace].v[2] = (guint) (glong) GTS_OBJECT (v3)->reserved;
+  mrisAttachFaceToVertices(mris, faceLoadContext->nextFace, 
+    (guint) (glong) GTS_OBJECT (v1)->reserved, 
+    (guint) (glong) GTS_OBJECT (v2)->reserved, 
+    (guint) (glong) GTS_OBJECT (v3)->reserved);
+
   faceLoadContext->nextFace++;
 }
 
