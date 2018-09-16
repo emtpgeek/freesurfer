@@ -772,7 +772,6 @@ extern "C" MRIP* MRIPextractFromMRIS(MRIS *mris, int defect_number)
       };
     if (is_face) {
       FACE *fsrc = &mris->faces[n];
-      FACE *f = &mris_dst->faces[nfaces];
       ft_from[n]=nfaces;
       ft_to[nfaces++]=n;
       mrisAttachFaceToVertices(mris_dst, nfaces, vt_from[fsrc->v[0]], vt_from[fsrc->v[1]], vt_from[fsrc->v[2]]);
