@@ -4103,7 +4103,7 @@ MRI_SURFACE *MRISreadOverAlloc(const char *fname, double pct_over)
     int nfaces = 0;
 
     int qno;
-    for (qno = 0; qno < nquads; qno += 2) {
+    for (qno = 0; qno < nquads; qno++) {
       int* quadVno = quadVnos + 4*qno;
 
       int n;
@@ -4506,7 +4506,7 @@ int MRISwrite(MRI_SURFACE *mris, const char *name)
     }
   }
 #else
-  for (k = 0; k < mris->nfaces; k += 2) {
+  for (k = 0; k < mris->nfaces; k++) {
     FACE const * const f = &mris->faces[k];
     fwrite3(f->v[0], fp);
     fwrite3(f->v[1], fp);

@@ -60,7 +60,8 @@ bool mrisCheckVertexVertexTopology(MRIS const *mris)
     
     if (!mris->vertices[vno1].ripflag) {
       
-      if (v->nsize > v->nsizeMax) {
+      if (v->nsize > 1 && 
+          v->nsize > v->nsizeMax) {
         fprintf(stdout, "[vno1:%d].nsize:%d exceeds nsizeMax:%d", vno1, v->nsize, v->nsizeMax);
         DiagBreak();
       }
