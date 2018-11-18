@@ -32,6 +32,30 @@
 #include "matrix.h"
 #include "dmatrix.h"
 
+
+// Used to find and control where various fields are written
+//
+#if defined(COMPILING_MRISURF_TOPOLOGY) || defined(COMPILING_MRISURF_TOPOLOGY_FRIEND_CHECKED)
+#define CONST_EXCEPT_MRISURF_TOPOLOGY 
+#else
+#define CONST_EXCEPT_MRISURF_TOPOLOGY const
+#endif
+
+#if defined(COMPILING_MRISURF_METRIC_PROPERTIES) || defined(COMPILING_MRISURF_METRIC_PROPERTIES_FRIEND)
+#define CONST_EXCEPT_MRISURF_METRIC_PROPERTIES 
+#else
+#define CONST_EXCEPT_MRISURF_METRIC_PROPERTIES const
+#endif
+
+#if defined(COMPILING_MRISURF_TOPOLOGY) || defined(COMPILING_MRISURF_METRIC_PROPERTIES)
+#define CONST_EXCEPT_MRISURF_TOP_AND_METPROP
+#else
+#define CONST_EXCEPT_MRISURF_TOP_AND_METPROP const
+#endif
+
+
+// Misc
+//
 #define MAX_SURFACES 20
 #define TALAIRACH_COORDS     0
 #define SPHERICAL_COORDS     1
@@ -129,20 +153,7 @@ typedef struct edge_type_
 } MRI_EDGE;
 
 
-#if defined(COMPILING_MRISURF_TOPOLOGY) || defined(COMPILING_MRISURF_TOPOLOGY_FRIEND_CHECKED)
-#define CONST_EXCEPT_MRISURF_TOPOLOGY 
-#else
-#define CONST_EXCEPT_MRISURF_TOPOLOGY const
-#endif
 
-#if defined(COMPILING_MRISURF_METRIC_PROPERTIES) || defined(COMPILING_MRISURF_METRIC_PROPERTIES_FRIEND)
-#define CONST_EXCEPT_MRISURF_METRIC_PROPERTIES 
-#else
-#define CONST_EXCEPT_MRISURF_METRIC_PROPERTIES const
-#endif
-    //
-    // Used to find and control where various fields are written
-    
 typedef struct face_type_
 {
 #define LIST_OF_FACE_ELTS_1    \
@@ -271,8 +282,9 @@ typedef struct vertex_type_
 #define LIST_OF_VERTEX_ELTS_1    \
   LIST_OF_VERTEX_TOPOLOGY_ELTS_IN_VERTEX \
   \
-  ELTX(float* /*CONST_EXCEPT_MRISURF_METRIC_PROPERTIES*/,dist)      SEP         /* distance to neighboring vertices */          \
-  ELTX(float* /*CONST_EXCEPT_MRISURF_METRIC_PROPERTIES*/,dist_orig) SEP         /* original distance to neighboring vertices */ \
+  /* These are computed from x,y,z but precede them here because they must be 8-byte aligned */ \
+  ELTX(float CONST_EXCEPT_MRISURF_TOP_AND_METPROP* CONST_EXCEPT_MRISURF_TOPOLOGY,dist)      SEP         /* distance to neighboring vertices */          \
+  ELTX(float CONST_EXCEPT_MRISURF_TOP_AND_METPROP* CONST_EXCEPT_MRISURF_TOPOLOGY,dist_orig) SEP         /* original distance to neighboring vertices */ \
   \
   ELTT(CONST_EXCEPT_MRISURF_METRIC_PROPERTIES float,x)          SEP             /* Current coordinates. */                      \
   ELTT(CONST_EXCEPT_MRISURF_METRIC_PROPERTIES float,y)          SEP             /* Use MRISsetXYZ() to set */                   \

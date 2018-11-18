@@ -235,18 +235,6 @@ static void VERTEX_TOPOLOGYdtr(VERTEX_TOPOLOGY* v) {
   freeAndNULL(v->n);
 }
 
-void MRISfreeDists(MRI_SURFACE *mris)
-  // Maybe should not be here...
-{
-  int vno;
-  for (vno = 0; vno < mris->nvertices; vno++) {
-    freeAndNULL(mris->vertices[vno].dist);
-    freeAndNULL(mris->vertices[vno].dist_orig);
-    mris->vertices_topology[vno].vtotal = 0;
-  }
-}
-
-
 static void VERTEXdtr(VERTEX* v) {
   free((void*)v->dist     ); *(void**)(&v->dist     ) = NULL;
   free((void*)v->dist_orig); *(void**)(&v->dist_orig) = NULL;

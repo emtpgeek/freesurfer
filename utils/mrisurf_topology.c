@@ -580,6 +580,18 @@ int mrisStoreVtotalInV3num(MRIS *mris)
   return (NO_ERROR);
 }
 
+
+void MRISfreeDists(MRIS *mris)
+{
+  int vno;
+  for (vno = 0; vno < mris->nvertices; vno++) {
+    freeAndNULL(mris->vertices[vno].dist);
+    freeAndNULL(mris->vertices[vno].dist_orig);
+    mris->vertices_topology[vno].vtotal = 0;
+  }
+}
+
+
 static void resizeVertexD(VERTEX_TOPOLOGY const * const vt, VERTEX* const v, int newSize, int oldSize) {
 
   // allocating zero is a free: keep the pointers around to optimize growing them again
