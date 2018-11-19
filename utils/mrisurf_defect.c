@@ -12031,270 +12031,330 @@ static void generateDefectMapping(MRIS *mris, int option)
 
 static OPTIMAL_DEFECT_MAPPING *mrisFindOptimalDefectMapping(MRIS *mris_src, DEFECT *defect)
 {
-  int nvertices, nfaces, nchull;
-  int *vertex_trans, *face_trans, *vertex_list;
-  int vno, n, m, i, first_inside_vertex, first_border_vertex;
-  MAPPING *mapping;
-  FS_VERTEX_INFO *vinfo;
-  FACE *face, *face_dst;
-
-  MRIS *mris_dst;
-
-  OPTIMAL_DEFECT_MAPPING *o_d_m;
-  int option = 0, nclusters;
-  EDGE *edge;
-
-  /* first neighbors only */
+  // First neighbors only
+  //
   MRISsetNeighborhoodSizeAndDist(mris_src, 1);
 
-  nvertices = defect->nvertices + defect->nchull;
-  vertex_list = (int *)malloc(nvertices * sizeof(int));
-
-  vertex_trans = (int *)malloc(mris_src->nvertices * sizeof(int));
-  face_trans   = (int *)malloc(mris_src->nfaces * sizeof(int));
-  memset(vertex_trans, -1, mris_src->nvertices * sizeof(int));
-  memset(face_trans,   -1, mris_src->nfaces * sizeof(int));
-
-  nvertices = 0;
-
-  nchull = defect->nchull - defect->nborder; /* number of chull vertices :
-                                                should be zero */
-  for (n = 0; n < nchull; n++) {
-    /* first chull */
-    vertex_list[nvertices] = defect->chull[n + defect->nborder];
-    vertex_trans[defect->chull[defect->nborder + n]] = nvertices;
-    nvertices++;
-  }
-  first_border_vertex = nvertices;
-  for (n = 0; n < defect->nborder; n++) {
-    /* then border */
-    vertex_list[nvertices] = defect->chull[n];
-    vertex_trans[defect->chull[n]] = nvertices;
-    nvertices++;
-  }
-  first_inside_vertex = nvertices;
-  for (n = 0; n < defect->nvertices; n++) {
-    /* finally inside defect vertices */
-    vertex_list[nvertices] = defect->vertices[n];
-    vertex_trans[defect->vertices[n]] = nvertices;
-    nvertices++;
-  }
-
-  /* mark vertices */
+  // Mark vertices
+  //
   mrisMarkDefectConvexHull(mris_src, defect, 1);
-  mrisMarkDefect(mris_src, defect, 1);
+  mrisMarkDefect          (mris_src, defect, 1);
 
-  for (nfaces = n = 0; n < mris_src->nfaces; n++) {
-    face = &mris_src->faces[n];
-    if (mris_src->vertices[face->v[0]].marked && mris_src->vertices[face->v[1]].marked &&
-        mris_src->vertices[face->v[2]].marked) {
-      face_trans[n] = nfaces;
-      nfaces++;
+  // Create the tables that translate from the mris_src to mris_dst entities
+  //
+  int* const vertex_trans = (int *)malloc(mris_src->nvertices * sizeof(int));
+  int* const face_trans   = (int *)malloc(mris_src->nfaces    * sizeof(int));
+  memset(vertex_trans, -1, mris_src->nvertices     * sizeof(int));
+  memset(face_trans,   -1, mris_src->nfaces        * sizeof(int));
+
+  // The inverse of the vertex_trans
+  //
+  int const  vertex_list_capacity = defect->nvertices + defect->nchull;
+  int* const vertex_list = (int *)malloc(vertex_list_capacity * sizeof(int));
+
+  // Choose the vertices to keep
+  //
+  int const nchull = defect->nchull - defect->nborder; 
+    // number of chull vertices : should be zero
+
+  int nvertices = 0, first_inside_vertex, first_border_vertex;
+  { int n, src_vno;
+  
+    for (n = 0; n < nchull; n++) {
+      /* first chull */
+      vertex_list[nvertices] = src_vno = defect->chull[n + defect->nborder];
+      vertex_trans[src_vno] = nvertices;
+      nvertices++;
+    }
+  
+    first_border_vertex = nvertices;
+    for (n = 0; n < defect->nborder; n++) {
+      /* then border */
+      vertex_list[nvertices] = src_vno = defect->chull[n];
+      vertex_trans[src_vno] = nvertices;
+      nvertices++;
+    }
+  
+    first_inside_vertex = nvertices;
+    for (n = 0; n < defect->nvertices; n++) {
+      /* finally inside defect vertices */
+      vertex_list[nvertices] = src_vno = defect->vertices[n];
+      vertex_trans[src_vno] = nvertices;
+      nvertices++;
+    }
+  }
+  
+  // Check that         mris_src->vertices[vno].marked 
+  // is the same as     vertex_trans[src_vno] >= 0
+  //
+  { int vno;
+    for (vno = 0; vno < mris_src->nvertices; vno++) {
+      cheapAssert(!(mris_src->vertices[vno].marked) == !(vertex_trans[vno] >= 0));
+    }
+  }
+  
+  // Choose the faces to keep
+  //
+  int nfaces = 0;
+  {
+    int n;
+    for (n = 0; n < mris_src->nfaces; n++) {
+      FACE const * const face = &mris_src->faces[n];
+
+      cheapAssert(VERTICES_PER_FACE == 3);
+      
+      // The old test
+      bool keep1 = (
+          mris_src->vertices[face->v[0]].marked && 
+          mris_src->vertices[face->v[1]].marked &&
+          mris_src->vertices[face->v[2]].marked); 
+
+      // Bevin thinks this should be the same
+      bool keep2 = (
+          vertex_trans[face->v[0]] >= 0 && 
+          vertex_trans[face->v[1]] >= 0 &&
+          vertex_trans[face->v[2]] >= 0);
+          
+      // See if they are
+      cheapAssert(keep1 == keep2);
+      
+      if (keep1) {
+        face_trans[n] = nfaces;
+        nfaces++;
+      }
     }
   }
 
-  /* allocate temporary surface */
-  mris_dst = MRISalloc(nvertices, nfaces);
+  // allocate temporary surface
+  //
+  MRIS * const mris_dst = MRISalloc(nvertices, nfaces);
   mris_dst->status = MRIS_SPHERICAL_PATCH;
-  mris_dst->type = MRIS_TRIANGULAR_SURFACE;
+  mris_dst->type   = MRIS_TRIANGULAR_SURFACE;
   mris_dst->radius = DEFAULT_RADIUS;
 
-  /* copy faces */
-  for (n = 0; n < mris_src->nfaces; n++) {
-    if (face_trans[n] < 0) {
-      continue;
-    }
-    face = &mris_src->faces[n];
-    face_dst = &mris_dst->faces[face_trans[n]];
-    for (m = 0; m < VERTICES_PER_FACE; m++) {
-      face_dst->v[m] = vertex_trans[face->v[m]];
+  // Copy faces
+  //
+  { int n;
+    for (n = 0; n < mris_src->nfaces; n++) {
+      if (face_trans[n] < 0) continue;
+
+      FACE const * const face_src = &mris_src->faces[           n ];
+      FACE       * const face_dst = &mris_dst->faces[face_trans[n]];
+    
+      int m;
+      for (m = 0; m < VERTICES_PER_FACE; m++) {
+        face_dst->v[m] = vertex_trans[face_src->v[m]];
+      }
     }
   }
 
-  /* copy vertices with their neighbors */
-  for (n = 0; n < mris_dst->nvertices; n++) {
-    int const vno_dst = n;
-    int const vno_src = vertex_list[n];
-    
-    VERTEX_TOPOLOGY       * const v_dstt = &mris_src->vertices_topology[vno_dst];
-    VERTEX                * const v_dst  = &mris_dst->vertices         [vno_dst];
-    VERTEX_TOPOLOGY const * const v_srct = &mris_src->vertices_topology[vno_src];
-    VERTEX          const * const v_src  = &mris_src->vertices         [vno_src];
-    
-    /* useless since we reinitialize the locations */
-    /* making sure the vertices are in canonical space */
-    v_dst->x = v_src->cx;
-    v_dst->y = v_src->cy;
-    v_dst->z = v_src->cz;
-    v_dst->tx = v_src->tx;
-    v_dst->ty = v_src->ty;
-    v_dst->tz = v_src->tz;
-    v_dst->nx = v_src->nx;
-    v_dst->ny = v_src->ny;
-    v_dst->nz = v_src->nz;
-    v_dst->cx = v_src->cx;
-    v_dst->cy = v_src->cy;
-    v_dst->cz = v_src->cz;
-    
-    MRISsetOriginalXYZ(mris_dst, vno_dst, v_src->origx, v_src->origy, v_src->origz);
-    
-    v_dst->ripflag = v_src->ripflag; /* none of them should be ripped */
+  // copy vertices with their neighbors
+  //
+  { int n;
+    for (n = 0; n < mris_dst->nvertices; n++) {
+      int const vno_dst =             n;
+      int const vno_src = vertex_list[n];
 
-    if (n < nchull) /* vertex in the convex hull */
-    {
-      v_dst->flags = VERTEX_CHULL;
-    }
-    else if (n < defect->nchull) /* vertex in the border */
-    {
-      v_dst->flags = VERTEX_BORDER;
-    }
-    else /* vertex inside the defect */
-    {
-      v_dst->flags = VERTEX_INTERIOR;
-    }
+      VERTEX_TOPOLOGY       * const v_dstt = &mris_src->vertices_topology[vno_dst];
+      VERTEX                * const v_dst  = &mris_dst->vertices         [vno_dst];
+      VERTEX_TOPOLOGY const * const v_srct = &mris_src->vertices_topology[vno_src];
+      VERTEX          const * const v_src  = &mris_src->vertices         [vno_src];
 
-    /* count the number of kept neighboring vertices */
-    if (n < nchull) {
-      /* if n < nchull, we need to watch for the
-         right neighboring vertices/faces */
-      /* count # of valid neighbors */
-      
-      int vnum = 0;
-      for (m = 0; m < v_srct->vnum; m++)
-        if (mris_src->vertices[v_srct->v[m]].marked) {
-          vnum++;
-        }
-        
-      mrisVertexReplacingNeighbors(mris_dst, vno_dst, vnum);
-      for (i = m = 0; m < v_srct->vnum; m++)
-        if (mris_src->vertices[v_srct->v[m]].marked) {
-          v_dstt->v[i] = vertex_trans[v_srct->v[m]];
-          v_dst->dist[i] = v_src->dist[m];
-          v_dst->dist_orig[i] = v_src->dist_orig[m];
-          i++;
+      /* count the number of kept neighboring vertices */
+      if (n < nchull) {
+        /* if n < nchull, we need to watch for the
+           right neighboring vertices/faces */
+        /* count # of valid neighbors */
+
+        int vnum = 0;
+        int m;
+        for (m = 0; m < v_srct->vnum; m++)
+          if (mris_src->vertices[v_srct->v[m]].marked) {
+            vnum++;
+          }
+
+        mrisVertexReplacingNeighbors(mris_dst, vno_dst, vnum);
+        int i = 0;
+        for (m = 0; m < v_srct->vnum; m++)
+          if (mris_src->vertices[v_srct->v[m]].marked) {
+            v_dstt->v[i] = vertex_trans[v_srct->v[m]];
+            v_dst->dist[i] = v_src->dist[m];
+            v_dst->dist_orig[i] = v_src->dist_orig[m];
+            i++;
+          }
+
+        /* count # of good triangles attached to this vertex */
+        for (v_dstt->num = m = 0; m < v_srct->num; m++) {
+          FACE const * const face = &mris_src->faces[v_srct->f[m]];
+          if (mris_src->vertices[face->v[0]].marked && 
+              mris_src->vertices[face->v[1]].marked &&
+              mris_src->vertices[face->v[2]].marked) {
+            v_dstt->num++;
+          }
         }
 
-      /* count # of good triangles attached to this vertex */
-      for (v_dstt->num = m = 0; m < v_srct->num; m++) {
-        face = &mris_src->faces[v_srct->f[m]];
-        if (mris_src->vertices[face->v[0]].marked && mris_src->vertices[face->v[1]].marked &&
-            mris_src->vertices[face->v[2]].marked) {
-          v_dstt->num++;
+        v_dstt->f = (int   *)calloc(v_dstt->num, sizeof(int));
+        v_dstt->n = (uchar *)calloc(v_dstt->num, sizeof(uchar));
+        i = 0;
+        for (m = 0; m < v_srct->num; m++) {
+          FACE const * const face = &mris_src->faces[v_srct->f[m]];
+          if (mris_src->vertices[face->v[0]].marked && mris_src->vertices[face->v[1]].marked &&
+              mris_src->vertices[face->v[2]].marked) {
+            v_dstt->n[i] =            v_srct->n[m];
+            v_dstt->f[i] = face_trans[v_srct->f[m]];
+            i++;
+          }
+        }
+      }
+      else {
+        /* neighboring vertices */
+        mrisVertexReplacingNeighbors(mris_dst, vno_dst, v_srct->vnum);
+        int m;
+        for (m = 0; m < v_srct->vnum; m++) {
+          v_dstt->v       [m] = vertex_trans[v_srct->v[m]];
+          v_dst->dist     [m] = v_src->dist           [m];
+          v_dst->dist_orig[m] = v_src->dist_orig      [m];
+        }
+
+        /* neighboring faces */
+        v_dstt->num = v_srct->num;
+        v_dstt->f = (int *)calloc(v_dstt->num, sizeof(int));
+        v_dstt->n = (uchar *)calloc(v_dstt->num, sizeof(uchar));
+        for (m = 0; m < v_srct->num; m++) {
+          v_dstt->n[m] = v_srct->n[m];
+          v_dstt->f[m] = face_trans[v_srct->f[m]];
         }
       }
 
-      v_dstt->f = (int *)calloc(v_dstt->num, sizeof(int));
-      v_dstt->n = (uchar *)calloc(v_dstt->num, sizeof(uchar));
-      for (i = m = 0; m < v_srct->num; m++) {
-        face = &mris_src->faces[v_srct->f[m]];
-        if (mris_src->vertices[face->v[0]].marked && mris_src->vertices[face->v[1]].marked &&
-            mris_src->vertices[face->v[2]].marked) {
-          v_dstt->n[i] = v_srct->n[m];
-          v_dstt->f[i] = face_trans[v_srct->f[m]];
-          i++;
-        }
+      /* useless since we reinitialize the locations */
+      /* making sure the vertices are in canonical space */
+      v_dst->x = v_src->cx;
+      v_dst->y = v_src->cy;
+      v_dst->z = v_src->cz;
+      v_dst->tx = v_src->tx;
+      v_dst->ty = v_src->ty;
+      v_dst->tz = v_src->tz;
+      v_dst->nx = v_src->nx;
+      v_dst->ny = v_src->ny;
+      v_dst->nz = v_src->nz;
+      v_dst->cx = v_src->cx;
+      v_dst->cy = v_src->cy;
+      v_dst->cz = v_src->cz;
+
+      MRISsetOriginalXYZ(mris_dst, vno_dst, v_src->origx, v_src->origy, v_src->origz);
+
+      v_dst->ripflag = v_src->ripflag; /* none of them should be ripped */
+
+      if (n < nchull) /* vertex in the convex hull */
+      {
+        v_dst->flags = VERTEX_CHULL;
       }
-    }
-    else {
-      /* neighboring vertices */
-      mrisVertexReplacingNeighbors(mris_dst, vno_dst, v_srct->vnum);
-      for (m = 0; m < v_srct->vnum; m++) {
-        v_dstt->v[m] = vertex_trans[v_srct->v[m]];
-        v_dst->dist[m] = v_src->dist[m];
-        v_dst->dist_orig[m] = v_src->dist_orig[m];
+      else if (n < defect->nchull) /* vertex in the border */
+      {
+        v_dst->flags = VERTEX_BORDER;
+      }
+      else /* vertex inside the defect */
+      {
+        v_dst->flags = VERTEX_INTERIOR;
       }
 
-      /* neighboring faces */
-      v_dstt->num = v_srct->num;
-      v_dstt->f = (int *)calloc(v_dstt->num, sizeof(int));
-      v_dstt->n = (uchar *)calloc(v_dstt->num, sizeof(uchar));
-      for (m = 0; m < v_srct->num; m++) {
-        v_dstt->n[m] = v_srct->n[m];
-        v_dstt->f[m] = face_trans[v_srct->f[m]];
-      }
     }
   }
 
   mrisCheckVertexFaceTopology(mris_dst);
   
+  
   /* unmark vertices */
   mrisMarkDefectConvexHull(mris_src, defect, 0);
-  mrisMarkDefect(mris_src, defect, 0);
+  mrisMarkDefect          (mris_src, defect, 0);
 
-  o_d_m = (OPTIMAL_DEFECT_MAPPING *)calloc(1, sizeof(OPTIMAL_DEFECT_MAPPING));
-  o_d_m->mris = mris_dst;
+  // Operate on the copy
+  //
+  OPTIMAL_DEFECT_MAPPING * o_d_m = (OPTIMAL_DEFECT_MAPPING *)calloc(1, sizeof(OPTIMAL_DEFECT_MAPPING));
+  o_d_m->mris         = mris_dst;
   o_d_m->vertex_trans = vertex_trans;
-  o_d_m->face_trans = face_trans;
-  o_d_m->orig_mapping.vertices = (FS_VERTEX_INFO *)calloc(mris_dst->nvertices, sizeof(FS_VERTEX_INFO));
+  o_d_m->face_trans   = face_trans;
+  o_d_m->orig_mapping.vertices  = (FS_VERTEX_INFO *)calloc(mris_dst->nvertices, sizeof(FS_VERTEX_INFO));
   o_d_m->orig_mapping.nvertices = mris_dst->nvertices;
-  o_d_m->orig_mapping.ninside = first_inside_vertex;
-  for (n = 0; n < 10; n++) {
-    o_d_m->mappings[n].vertices = (FS_VERTEX_INFO *)calloc(mris_dst->nvertices, sizeof(FS_VERTEX_INFO));
-    o_d_m->mappings[n].nvertices = mris_dst->nvertices;
-    o_d_m->mappings[n].ninside = first_inside_vertex;
+  o_d_m->orig_mapping.ninside   = first_inside_vertex;
+
+  { int n;  
+    for (n = 0; n < 10; n++) {
+      o_d_m->mappings[n].vertices  = (FS_VERTEX_INFO *)calloc(mris_dst->nvertices, sizeof(FS_VERTEX_INFO));
+      o_d_m->mappings[n].nvertices = mris_dst->nvertices;
+      o_d_m->mappings[n].ninside   = first_inside_vertex;
+    }
   }
 
   /* saving original configurations */
-  mapping = &o_d_m->orig_mapping;
-  for (n = 0; n < defect->nvertices; n++) {
-    vinfo = &mapping->vertices[n + mapping->ninside];
-    vinfo->status = defect->status[n];
-  }
   /* initializing border vertices */
-  for (n = 0; n < defect->nedges; n++) {
-    /* init border */
-    edge = &defect->edges[n];
-    vno = vertex_trans[edge->vno1];
-    vinfo = &mapping->vertices[vno];
-    VERTEX const * const v = &mris_dst->vertices[vno];
-    /* circle */
-    vinfo->c_x = 20.0 * cos(2 * PI * (float)n / defect->nedges);
-    vinfo->c_y = 20.0 * sin(2 * PI * (float)n / defect->nedges);
-    vinfo->c_z = 0;
-    vinfo->oc_x = v->origx; /* orig coord */
-    vinfo->oc_y = v->origy;
-    vinfo->oc_z = v->origz;
-  }
-  /* init radius critical distance */
-  mris_dst->radius = 20.0 * cos(PI / (float)defect->nedges);
-  // fprintf(stderr,"critical radius is %f\n",mris_dst->radius);
+  {
+    MAPPING * const mapping = &o_d_m->orig_mapping;
 
-  for (n = 0; n < defect->nvertices; n++) {
-    /* init inside */
-    vno = vertex_trans[defect->vertices[n]];
-    vinfo = &mapping->vertices[vno];
-    VERTEX const * const v = &mris_dst->vertices[vno];
-    vinfo->c_x = 0;
-    vinfo->c_y = 0;
-    vinfo->c_z = 0;
-    vinfo->oc_x = v->origx; /* orig coord */
-    vinfo->oc_y = v->origy;
-    vinfo->oc_z = v->origz;
-  }
+    int n;
 
+    for (n = 0; n < defect->nvertices; n++) {
+      FS_VERTEX_INFO * vinfo = &mapping->vertices[n + mapping->ninside];
+      vinfo->status = defect->status[n];
+    }
+
+    for (n = 0; n < defect->nedges; n++) {
+      /* init border */
+      EDGE *edge = &defect->edges[n];
+      int vno = vertex_trans[edge->vno1];
+      FS_VERTEX_INFO * vinfo = &mapping->vertices[vno];
+      VERTEX const * const v = &mris_dst->vertices[vno];
+      /* circle */
+      vinfo->c_x = 20.0 * cos(2 * PI * (float)n / defect->nedges);
+      vinfo->c_y = 20.0 * sin(2 * PI * (float)n / defect->nedges);
+      vinfo->c_z = 0;
+      vinfo->oc_x = v->origx; /* orig coord */
+      vinfo->oc_y = v->origy;
+      vinfo->oc_z = v->origz;
+    }
+  
+    /* init radius critical distance */
+    mris_dst->radius = 20.0 * cos(PI / (float)defect->nedges);
+    // fprintf(stderr,"critical radius is %f\n",mris_dst->radius);
+
+    for (n = 0; n < defect->nvertices; n++) {
+      /* init inside */
+      int vno = vertex_trans[defect->vertices[n]];
+      FS_VERTEX_INFO * vinfo = &mapping->vertices[vno];
+      VERTEX const * const v = &mris_dst->vertices[vno];
+      vinfo->c_x = 0;
+      vinfo->c_y = 0;
+      vinfo->c_z = 0;
+      vinfo->oc_x = v->origx; /* orig coord */
+      vinfo->oc_y = v->origy;
+      vinfo->oc_z = v->origz;
+    }
+  }
+  
   /* clustering defect vertices into groups */
-  nclusters = clusterDefectVertices(mris_dst);
-
-  o_d_m->nmappings = nclusters + 1; /* 1 = smoothed ; then others */
+  o_d_m->nmappings = clusterDefectVertices(mris_dst) + 1; /* 1 = smoothed ; then others */
 
   /////////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
   // Now, we are ready to generate different mappings...
-
+  int m;
   for (m = 0; m < o_d_m->nmappings; m++) {
     fprintf(stderr, "generating mapping #%d\n", m);
 
     /* transfer initial coordinates into surface */
-    mapping = &o_d_m->orig_mapping;
-    for (n = 0; n < mris_dst->nvertices; n++) {
-      vinfo = &mapping->vertices[n];
-      VERTEX * const v = &mris_dst->vertices[n];
-      v->cx = vinfo->c_x; /* plane xy coord */
-      v->cy = vinfo->c_y;
-      v->cz = vinfo->c_z;
-      v->x = v->cx;
-      v->y = v->cy;
-      v->z = v->cz;
+    {
+      MAPPING * mapping = &o_d_m->orig_mapping;
+      int n;
+      for (n = 0; n < mris_dst->nvertices; n++) {
+        FS_VERTEX_INFO * vinfo = &mapping->vertices[n];
+        VERTEX * const v = &mris_dst->vertices[n];
+        v->cx = vinfo->c_x; /* plane xy coord */
+        v->cy = vinfo->c_y;
+        v->cz = vinfo->c_z;
+        v->x = v->cx;
+        v->y = v->cy;
+        v->z = v->cz;
+      }
     }
     fprintf(stderr, ".");
 #if SAVING_SURFACES
@@ -12303,7 +12363,7 @@ static OPTIMAL_DEFECT_MAPPING *mrisFindOptimalDefectMapping(MRIS *mris_src, DEFE
     }
 #endif
 
-    option = 0;
+    int option = 0;
     if (m) {
       option = m + 1;
     }
@@ -12319,24 +12379,30 @@ static OPTIMAL_DEFECT_MAPPING *mrisFindOptimalDefectMapping(MRIS *mris_src, DEFE
       MRISwrite(mris_dst, fname);
     }
 #endif
+
     /* save the mapping onto the sphere (hack!) */
-    mapping = &o_d_m->mappings[m];
-    for (n = 0; n < mris_dst->nvertices; n++) {
-      vinfo = &mapping->vertices[n];
-      VERTEX * const v = &mris_dst->vertices[n];
-      vinfo->c_x = v->cx; /* spherical coord */
-      vinfo->c_y = v->cy;
-      v->cz = sqrt(10000.0 - SQR(v->cx) - SQR(v->cy));
-      vinfo->c_z = v->cz;
-      v->x = v->cx;
-      v->y = v->cy;
-      v->z = v->cz;
+    {
+      MAPPING * mapping = &o_d_m->mappings[m];
+      int n;
+      for (n = 0; n < mris_dst->nvertices; n++) {
+        FS_VERTEX_INFO * vinfo = &mapping->vertices[n];
+        VERTEX * const v = &mris_dst->vertices[n];
+
+        v->cz = sqrt(10000.0 - SQR(v->cx) - SQR(v->cy));
+
+        vinfo->c_x = v->cx; /* spherical coord */
+        vinfo->c_y = v->cy;
+        vinfo->c_z = v->cz;
+        v->x = v->cx;
+        v->y = v->cy;
+        v->z = v->cz;
+      }
     }
 #if SAVING_SURFACES
     {
       char fname[100];
       sprintf(fname, "lh.tests_%d", m);
-      fprintf(stderr, "writting file into %s\n", fname);
+      fprintf(stderr, "writing file into %s\n", fname);
       MRISwrite(mris_dst, fname);
     }
 #endif
