@@ -550,8 +550,10 @@ typedef struct MRIS
   ELTT(int,nedges) SEP                          /* # of edges on surface*/    \
   ELTT(int,nstrips) SEP    \
   ELTP(VERTEX_TOPOLOGY,vertices_topology) SEP    \
-  ELTT(const int,tempsAssigned) SEP             /* State of various temp fields that can be borrowed if not already in use   */    \
   ELTP(VERTEX,vertices) SEP    \
+  ELTP(void*,dist_storage) SEP                  /* the malloced/realloced vertex dist fields, so those fields can be quickly nulled and restored */ \
+  ELTP(void*,dist_orig_storage) SEP             /* the malloced/realloced vertex dist_orig fields, so those fields can be quickly nulled and restored */ \
+  ELTT(const int,tempsAssigned) SEP             /* State of various temp fields that can be borrowed if not already in use   */    \
   ELTP(FACE,faces) SEP    \
   ELTP(MRI_EDGE,edges) SEP    \
   ELTP(FaceNormCacheEntry,faceNormCacheEntries) SEP \
