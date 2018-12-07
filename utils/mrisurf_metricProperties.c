@@ -30,11 +30,36 @@ int mrisurf_orig_clock;
 //==================================================================================================================
 // Simple properties
 //
+// xyz are set in over 100 places
+//
+void MRISsetXYZwkr(MRIS *mris, int vno, float x, float y, float z, const char * file, int line, bool* laterTime) 
+{
+#if 1 
+  if (mris->dist_alloced_flags & 1) {
+    if (!*laterTime) {
+      *laterTime = true;
+      fprintf(stdout, "%s:%d setting XYZ when dist allocated\n",file,line);
+    }
+    // THIS WOULD CAUSE A DATA RACE ON VERTEX::dist etc.  MRISfreeDistsButNotOrig(mris);
+  }
+#endif
+    
+  cheapAssertValidVno(mris,vno);
+  VERTEX * v = &mris->vertices[vno];
+
+  const float * pcx = &v->x;  float * px = (float*)pcx; *px = x;
+  const float * pcy = &v->y;  float * py = (float*)pcy; *py = y;
+  const float * pcz = &v->z;  float * pz = (float*)pcz; *pz = z;
+}
+
+
 //  orig[xyz] are set during the creation of a surface
-//  and during deformations that create an improved 'original' surface.
+//  and during deformations that create an improved 'original' surface
 //
 void MRISsetOriginalXYZ(MRIS *mris, int vno, float origx, float origy, float origz) 
 {
+  cheapAssert(!(mris->dist_alloced_flags & 2));
+
   cheapAssertValidVno(mris,vno);
   VERTEX * v = &mris->vertices[vno];
     
@@ -47,7 +72,12 @@ void MRISsetOriginalXYZ(MRIS *mris, int vno, float origx, float origy, float ori
   }
 }
 
+
 void MRISsetOriginalXYZfromXYZ(MRIS *mris) {
+  
+  MRISfreeDistOrigs(mris);  
+    // Old values no longer valid
+  
   int vno;
   for (vno = 0; vno < mris->nvertices; vno++) {
     VERTEX * v = &mris->vertices[vno];
@@ -61,29 +91,8 @@ void MRISsetOriginalXYZfromXYZ(MRIS *mris) {
 }
 
 
-// xyz are set in over 100 places
+// These should become invalid when XYZ are changed - NYI
 //
-void MRISsetXYZwkr(MRIS *mris, int vno, float x, float y, float z, const char * file, int line, bool* laterTime) 
-{
-  cheapAssertValidVno(mris,vno);
-  VERTEX * v = &mris->vertices[vno];
-    
-  const float * pcx = &v->x;  float * px = (float*)pcx; *px = x;
-  const float * pcy = &v->y;  float * py = (float*)pcy; *py = y;
-  const float * pcz = &v->z;  float * pz = (float*)pcz; *pz = z;
- 
-#if 0 
-  if (mris->dist_alloced_flags & 1) {
-    if (!*laterTime) {
-      *laterTime = true;
-      fprintf(stdout, "%s:%d setting XYZ when dist allocated\n",file,line);
-    }
-    // THIS WOULD CAUSE A DATA RACE ON VERTEX::dist etc.  MRISfreeDistsButNotOrig(mris);
-  }
-#endif
-}
-
-
 int mrisComputeSurfaceDimensions(MRIS *mris)
 {
   float xlo, ylo, zlo, xhi, yhi, zhi;
@@ -117,7 +126,6 @@ int mrisComputeSurfaceDimensions(MRIS *mris)
   
   return (NO_ERROR);
 }
-
 
 
 int MRISimportVertexCoords(MRIS * const mris, float * locations[3], int const which)
@@ -1187,211 +1195,54 @@ int MRISscaleDistances(MRIS *mris, float scale)
 /*-----------------------------------------------------------------
   Calculate distances between each vertex and each of its neighbors.
   ----------------------------------------------------------------*/
-static bool mrisComputeVertexDistancesWkr(MRIS *mris, int new_dist_nsize, bool check);
+static bool mrisComputeVertexDistancesWkr        (MRIS *mris, int new_dist_nsize, bool check);
+static bool mrisComputeOriginalVertexDistancesWkr(MRIS *mris, int new_dist_nsize, bool check);
 
 bool mrisCheckDist(MRIS const * mris) {
   if (!mris->dist_nsize) return true;
   return mrisComputeVertexDistancesWkr((MRIS*)mris, mris->dist_nsize, true);
 }
 
+bool mrisCheckDistOrig(MRIS const * mris) {
+  if (!mris->dist_orig_nsize) return true;
+  return mrisComputeOriginalVertexDistancesWkr((MRIS*)mris, mris->dist_orig_nsize, true);
+}
+
 int mrisComputeVertexDistances(MRIS *mris) {
-  cheapAssert(0 < mris->nsize);
   mrisComputeVertexDistancesWkr(mris, mris->nsize, false);
   mris->dist_nsize = mris->nsize;
   mrisCheckDist(mris);
   return NO_ERROR;
 }
 
-static bool mrisComputeVertexDistancesWkr(MRIS *mris, int new_dist_nsize, bool check)
-{
-  cheapAssert(0 < new_dist_nsize);
-  cheapAssert(new_dist_nsize <= 3);
-  
-  if (debugNonDeterminism) {
-    fprintf(stdout, "%s:%d stdout ",__FILE__,__LINE__);
-    mris_print_hash(stdout, mris, "mris ", "\n");
-  }
-
-  int errors = 0;
-  
-  int vno;
-
-  switch (mris->status) {
-    default: /* don't really know what to do in other cases */
-
-    case MRIS_PLANE:
-
-      ROMP_PF_begin		// mris_fix_topology
-#ifdef HAVE_OPENMP
-      #pragma omp parallel for if_ROMP(shown_reproducible) reduction(+:errors)
-#endif
-      for (vno = 0; vno < mris->nvertices; vno++) {
-        ROMP_PFLB_begin
-    
-        if (vno == Gdiag_no) DiagBreak();
-
-        VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
-        VERTEX                * const v  = &mris->vertices         [vno];
-        if (v->ripflag) continue;
-
-        if (!check) MRISmakeDist(mris,vno);
-        else if (!v->dist) continue;
-
-        int *pv;
-        int const vtotal = check ? VERTEXvnum(vt,new_dist_nsize) : vt->vtotal;
-        int n;
-        for (pv = vt->v, n = 0; n < vtotal; n++) {
-          VERTEX const * const vn = &mris->vertices[*pv++];
-          // if (vn->ripflag) continue;
-          float xd = v->x - vn->x;
-          float yd = v->y - vn->y;
-          float zd = v->z - vn->z;
-          float d = xd * xd + yd * yd + zd * zd;
-
-          if (!check) 
-            v->dist[n] = sqrt(d);
-          else if (v->dist[n] != (float)(sqrt(d))) 
-            errors++;
-        }
-
-        ROMP_PFLB_end
-      }
-      ROMP_PF_end
-  
-      break;
-
-    case MRIS_PARAMETERIZED_SPHERE:
-    case MRIS_SPHERE: {
-
-      ROMP_PF_begin		// mris_fix_topology
-#ifdef HAVE_OPENMP
-      #pragma omp parallel for if_ROMP(shown_reproducible) reduction(+:errors)
-#endif
-      for (vno = 0; vno < mris->nvertices; vno++) {
-        ROMP_PFLB_begin
-    
-        if (vno == Gdiag_no) DiagBreak();
-
-        VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
-        VERTEX          const * const v  = &mris->vertices         [vno];
-        if (v->ripflag) continue;
-
-        if (!check) MRISmakeDist(mris,vno);
-        else if (!v->dist) continue;
-
-        XYZ xyz1_normalized;
-        float xyz1_length;
-        XYZ_NORMALIZED_LOAD(&xyz1_normalized, &xyz1_length, v->x, v->y, v->z);  // length 1 along radius vector
-
-        float const radius = xyz1_length;
-
-        int *pv;
-        int const vtotal = check ? VERTEXvnum(vt,new_dist_nsize) : vt->vtotal;
-        int n;
-        for (pv = vt->v, n = 0; n < vtotal; n++) {
-          VERTEX const * const vn = &mris->vertices[*pv++];
-          if (vn->ripflag) continue;
-          
-          float angle = fabs(XYZApproxAngle(&xyz1_normalized, vn->x, vn->y, vn->z));
-            // radians, so 2pi around the circumference
-
-          float d = angle * radius;
-            // the length of the arc, rather than the straight line distance
-
-          if (!check) 
-            v->dist[n] = d;
-          else if (v->dist[n] != (float)(d)) 
-            errors++;
-        }
-        ROMP_PFLB_end
-      }
-      ROMP_PF_end
-
-      break;
-    }
-  }
-
-  return (errors == 0);
+int mrisComputeOriginalVertexDistances(MRIS *mris) {
+  mrisComputeOriginalVertexDistancesWkr(mris, mris->nsize, false);
+  mris->dist_orig_nsize = mris->nsize;
+  mrisCheckDistOrig(mris);
+  return NO_ERROR;
 }
 
+// The only difference between these should be
+// whether they use     xyz and write dist
+//                  origxyz and write dist_orig
+// but they diverged when these two did not share code.
+//
+#define FUNCTION_NAME mrisComputeVertexDistancesWkr
+#define INPUT_X x
+#define INPUT_Y y
+#define INPUT_Z z
+#define OUTPUT_DIST dist
+#define OUTPUT_MAKER MRISmakeDist
+#include "mrisComputeVertexDistancesWkr_extracted.h"
 
-int mrisComputeOriginalVertexDistances(MRIS *mris)
-{
-  VECTOR* v1 = VectorAlloc(3, MATRIX_REAL);
-  VECTOR* v2 = VectorAlloc(3, MATRIX_REAL);
+#define FUNCTION_NAME mrisComputeOriginalVertexDistancesWkr
+#define INPUT_X origx
+#define INPUT_Y origy
+#define INPUT_Z origz
+#define OUTPUT_DIST dist_orig
+#define OUTPUT_MAKER MRISmakeDistOrig
+#include "mrisComputeVertexDistancesWkr_extracted.h"
 
-  float circumference = 0.0f;
-  
-  bool allOrigXZero = true;
-  
-  int vno;
-  for (vno = 0; vno < mris->nvertices; vno++) {
-    VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
-    VERTEX          const * const v  = &mris->vertices         [vno];
-
-    if (v->ripflag || v->dist_orig == NULL) {
-      continue;
-    }
-    if (vno == Gdiag_no) {
-      DiagBreak();
-    }
-
-    allOrigXZero &= (v->origx == 0.0f);
-
-    int const vtotal = vt->vtotal;
-
-    switch (mris->status) {
-      default: 
-        // seen to happen - e.g. mris_sphere test   cheapAssert(false);
-      
-      case MRIS_PLANE: {
-        int n, *pv;
-        for (pv = vt->v, n = 0; n < vtotal; n++) {
-          VERTEX const * const vn = &mris->vertices[*pv++];
-          if (vn->ripflag) continue;
-
-          float xd = v->origx - vn->origx;
-          float yd = v->origy - vn->origy;
-          float zd = v->origz - vn->origz;
-          float d = xd * xd + yd * yd + zd * zd;    // should be double
-
-          v->dist_orig[n] = sqrt(d);
-        }
-        DiagBreak();
-      } break;
-  
-      case MRIS_PARAMETERIZED_SPHERE:
-      case MRIS_SPHERE: {
-        VECTOR_LOAD(v1, v->origx, v->origy, v->origz); /* radius vector */
-        if (FZERO(circumference))                      /* only calculate once */
-          circumference = M_PI * 2.0 * V3_LEN(v1);
- 
-        int n, *pv;
-        for (pv = vt->v, n = 0; n < vtotal; n++) {
-          VERTEX const * const vn = &mris->vertices[*pv++];
-          if (vn->ripflag) continue;
- 
-          VECTOR_LOAD(v2, vn->origx, vn->origy, vn->origz); /* radius vector */
-          float angle = fabsf(Vector3Angle(v1, v2));
-          float d     = circumference * angle / (2.0 * M_PI);
-
-          v->dist_orig[n] = d;
-        }
-      } break;
-    }
-  }
-
-  if (allOrigXZero) {
-    static bool laterTime;
-    if (!laterTime) { laterTime = true;
-      fprintf(stdout, "%s:%d origx have not been set - probably a logic error\n",__FILE__,__LINE__);
-    }
-  }
-  
-  VectorFree(&v1);
-  VectorFree(&v2);
-  return (NO_ERROR);
-}
 
 int MRISclearOrigDistances(MRI_SURFACE *mris)
 {
@@ -4780,7 +4631,7 @@ static void MRISsetNeighborhoodSizeAndDistWkr(MRIS *mris, int nsize, bool always
 
   if (alwaysDoDist) {
     mrisComputeVertexDistances(mris);
-    mrisComputeOriginalVertexDistances(mris);
+    if (mris->dist_alloced_flags & 2) mrisComputeOriginalVertexDistances(mris);
   }
 }
 

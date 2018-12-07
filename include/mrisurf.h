@@ -272,14 +272,15 @@ typedef struct vertex_type_
 //
 #define LIST_OF_VERTEX_ELTS_1    \
   LIST_OF_VERTEX_TOPOLOGY_ELTS_IN_VERTEX \
+  \
   /* managed by MRISfreeDists[_orig] and MRISmakeDists[_orig] */ \
-  ELTX(float* const,dist)      SEP                                              /* distance to neighboring vertices */          \
-  ELTX(float* const,dist_orig) SEP                                              /* original distance to neighboring vertices */ \
+  ELTX(float* const,dist)      SEP                                              /* distance to neighboring vertices based on  xyz    */ \
+  ELTX(float* const,dist_orig) SEP                                              /* distance to neighboring vertices based on origxyz */ \
   ELTX(int,dist_orig_capacity) SEP \
   \
-  ELTT(const float,origx)                                       SEP             /* original coordinates */                      \
-  ELTT(const float,origy)                                       SEP             /* use MRISsetOriginalXYZ() to set */           \
-  ELTT(const float,origz)                                       SEP                                                             \
+  ELTT(const float,origx)                                       SEP             /* original coordinates */                          \
+  ELTT(const float,origy)                                       SEP             /* use MRISsetOriginalXYZ() */                      \
+  ELTT(const float,origz)                                       SEP             /* or MRISsetOriginalXYZfromXYZ to set */           \
   \
   ELTT(/*CONST_EXCEPT_MRISURF_METRIC_PROPERTIES*/ float,x)          SEP             /* current coordinates */                       \
   ELTT(/*CONST_EXCEPT_MRISURF_METRIC_PROPERTIES*/ float,y)          SEP             /* use MRISsetXYZ() to set */                   \
@@ -624,7 +625,8 @@ typedef struct MRIS
   ELTT(uchar,vtotalsMightBeTooBig) SEP /* MRISsampleDistances sets this */ \
   ELTX(short,nsizeMaxClock) SEP     /* changed whenever an edge is added or removed, which invalidates the vertex v#num values */ \
   ELTT(char,max_nsize) SEP          /* max the neighborhood size has been set to (typically 3) */    \
-  ELTT(char,dist_nsize) SEP         /* max MRISsetNeighborhoodSizeAndDist has computed distances out to */ \
+  ELTT(char,dist_nsize) SEP         /* max mrisComputeVertexDistances has computed distances out to */ \
+  ELTT(char,dist_orig_nsize) SEP    /* max mrisComputeOriginalVertexDistances has computed distances out to */ \
   ELTT(char,dist_alloced_flags) SEP /* two flags, set when any dist(1) or dist_orig(2) allocated */ \
   \
   ELTT(float,avg_nbrs) SEP          /* mean # of vertex neighbors */    \

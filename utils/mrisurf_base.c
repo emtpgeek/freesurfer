@@ -284,14 +284,6 @@ static void changeDistOrDistOrig(bool doOrig, MRIS *mris, int vno, int oldCapaci
   
   if (doOrig) {
     const int * pc = &v->dist_orig_capacity; *(int*)pc = newCapacity;
-  } else {
-    
-    // historically the v->dist_orig has been at least as large as the v->dist
-    // and breaking this connection would probably lead to all kinds of weird out-of-range reads and writes
-    //
-    if (v->dist_orig_capacity < newCapacity) {
-      changeDistOrDistOrig(true, mris, vno, v->dist_orig_capacity, newCapacity); 
-    }
   }
 }
 
