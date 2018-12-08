@@ -918,6 +918,10 @@ double MRISmomentumTimeStep(MRI_SURFACE *mris, float momentum, float dt, float t
   }
   else
   {
+    MRISfreeDistsButNotOrig(mris);
+        // MRISsetXYZ will invalidate all of these,
+        // so make sure they are recomputed before being used again!
+    
     int vno;
     for (vno = 0; vno < mris->nvertices; vno++) {
       VERTEX * const v = &mris->vertices[vno];
