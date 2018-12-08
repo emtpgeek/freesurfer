@@ -11,7 +11,7 @@ static bool FUNCTION_NAME(MRIS *mris, int new_dist_nsize, bool check)
     mris_print_hash(stdout, mris, "mris ", "\n");
   }
 
-  bool allInputXZero = true;
+  int nonZeroInputXCount = 0;
   
   int errors = 0;
   
@@ -24,7 +24,7 @@ static bool FUNCTION_NAME(MRIS *mris, int new_dist_nsize, bool check)
 
       ROMP_PF_begin		// mris_fix_topology
 #ifdef HAVE_OPENMP
-      #pragma omp parallel for if_ROMP(shown_reproducible) reduction(+:errors)
+      #pragma omp parallel for if_ROMP(shown_reproducible) reduction(+:errors)  reduction(+:nonZeroInputXCount)
 #endif
       for (vno = 0; vno < mris->nvertices; vno++) {
         ROMP_PFLB_begin
@@ -38,7 +38,7 @@ static bool FUNCTION_NAME(MRIS *mris, int new_dist_nsize, bool check)
         if (!check) OUTPUT_MAKER(mris,vno);
         else if (!v->OUTPUT_DIST) continue;
 
-	allInputXZero &= (v->INPUT_X == 0.0f);
+	if (v->INPUT_X != 0.0f) nonZeroInputXCount++;
 
         int *pv;
         int const vtotal = check ? VERTEXvnum(vt,new_dist_nsize) : vt->vtotal;
@@ -68,7 +68,7 @@ static bool FUNCTION_NAME(MRIS *mris, int new_dist_nsize, bool check)
 
       ROMP_PF_begin		// mris_fix_topology
 #ifdef HAVE_OPENMP
-      #pragma omp parallel for if_ROMP(shown_reproducible) reduction(+:errors)
+      #pragma omp parallel for if_ROMP(shown_reproducible) reduction(+:errors) reduction(+:nonZeroInputXCount)
 #endif
       for (vno = 0; vno < mris->nvertices; vno++) {
         ROMP_PFLB_begin
@@ -82,7 +82,7 @@ static bool FUNCTION_NAME(MRIS *mris, int new_dist_nsize, bool check)
         if (!check) OUTPUT_MAKER(mris,vno);
         else if (!v->OUTPUT_DIST) continue;
 
-	allInputXZero &= (v->INPUT_X == 0.0f);
+	if (v->INPUT_X != 0.0f) nonZeroInputXCount++;
 
         XYZ xyz1_normalized;
         float xyz1_length;
@@ -116,7 +116,7 @@ static bool FUNCTION_NAME(MRIS *mris, int new_dist_nsize, bool check)
     }
   }
 
-  if (allInputXZero) {
+  if (nonZeroInputXCount == 0) {
     fprintf(stdout, "%s:%d %s all xyz inputs zero - probable logic problem\n", __FILE__, __LINE__, __FUNCTION__);
     cheapAssert(false);
   }

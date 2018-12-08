@@ -34,15 +34,7 @@ int mrisurf_orig_clock;
 //
 void MRISsetXYZwkr(MRIS *mris, int vno, float x, float y, float z, const char * file, int line, bool* laterTime) 
 {
-#if 1 
-  if (mris->dist_alloced_flags & 1) {
-    if (!*laterTime) {
-      *laterTime = true;
-      fprintf(stdout, "%s:%d setting XYZ when dist allocated\n",file,line);
-    }
-    // THIS WOULD CAUSE A DATA RACE ON VERTEX::dist etc.  MRISfreeDistsButNotOrig(mris);
-  }
-#endif
+  cheapAssert(!(mris->dist_alloced_flags & 1));
     
   cheapAssertValidVno(mris,vno);
   VERTEX * v = &mris->vertices[vno];
