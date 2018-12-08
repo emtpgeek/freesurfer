@@ -4079,7 +4079,7 @@ MRIS* MRISreadOverAlloc(const char *fname, double nVFMultiplier)
           va_0 = vb_0; va_1 = vb_1; va_2 = vb_2;
         }
       }
-      cheapAssert(fno < mris->max_faces);
+      cheapAssert(fno <= mris->max_faces);
       MRISgrowNFaces(mris, fno);
       
       mris->useRealRAS = 0;
