@@ -32,15 +32,16 @@ int mrisurf_orig_clock;
 //
 // xyz are set in over 100 places
 //
-void MRISsetXYZwkr(MRIS *mris, int vno, float x, float y, float z, const char * file, int line, bool* laterTime) 
-{
+static void MRISsetXYZwkr1(MRIS *mris, const char * file, int line, bool* laterTime) {
   if (mris->dist_alloced_flags & 1) {
     if (!*laterTime) { *laterTime = true;
       fprintf(stdout, "%s:%d setXYZ with dist not freed.  Add call to MRISfreeDistsButNotOrig(MRIS*)\n", file,line);
     }
     cheapAssert(true);  // HACK should be true
   }
-    
+}
+
+static void MRISsetXYZwkr2(MRIS *mris, int vno, float x, float y, float z) {
   cheapAssertValidVno(mris,vno);
   VERTEX * v = &mris->vertices[vno];
 
@@ -49,14 +50,10 @@ void MRISsetXYZwkr(MRIS *mris, int vno, float x, float y, float z, const char * 
   const float * pcz = &v->z;  float * pz = (float*)pcz; *pz = z;
 }
 
-void MRIScopyXYZ(MRIS *mris, MRIS* mris_from) {
-  int const nvertices = mris->nvertices;
-  cheapAssert(nvertices == mris_from->nvertices);
-  int vno;
-  for (vno = 0; vno < nvertices; vno++) {
-    VERTEX * v = &mris_from->vertices[vno];
-    MRISsetXYZwkr(mris, vno, v->x, v->y, v->z);
-  }
+void MRISsetXYZwkr(MRIS *mris, int vno, float x, float y, float z, const char * file, int line, bool* laterTime) 
+{
+  MRISsetXYZwkr1(mris, file, line, laterTime);
+  MRISsetXYZwkr2(mris, vno, x, y, z);
 }
 
 void MRISexportXYZ(MRIS *mris,       float*       * ppx,       float*       * ppy,       float*       * ppz) {
@@ -105,6 +102,9 @@ void MRISexportXYZ(MRIS *mris,       float*       * ppx,       float*       * pp
 
 void MRISimportXYZ(MRIS *mris, const float* const    px, const float* const    py, const float* const    pz) 
 {
+  static bool laterTime;
+  MRISsetXYZwkr1(mris, __FILE__, __LINE__, &laterTime);
+
   int const nvertices = mris->nvertices;
 
   SURFACE_DIMENSION_CALC_INIT
@@ -112,7 +112,7 @@ void MRISimportXYZ(MRIS *mris, const float* const    px, const float* const    p
   for (vno = 0; vno < nvertices; vno++) {
     float x = px[vno], y = py[vno], z = pz[vno];
 
-    MRISsetXYZwkr(mris, vno, x,y,z);
+    MRISsetXYZwkr2(mris, vno, x,y,z);
 
     SURFACE_DIMENSION_CALC_ITER
   }
@@ -120,6 +120,27 @@ void MRISimportXYZ(MRIS *mris, const float* const    px, const float* const    p
   SURFACE_DIMENSION_CALC_FINI
 }
 
+
+void MRIScopyXYZ(MRIS *mris, MRIS* mris_from) {
+  static bool laterTime;
+  MRISsetXYZwkr1(mris, __FILE__, __LINE__, &laterTime);
+  
+  int const nvertices = mris->nvertices;
+  cheapAssert(nvertices == mris_from->nvertices);
+  
+  SURFACE_DIMENSION_CALC_INIT
+  int vno;
+  for (vno = 0; vno < nvertices; vno++) {
+    VERTEX * v = &mris_from->vertices[vno];
+    float x = v->x, y = v->y, z = v->z;
+    
+    MRISsetXYZwkr2(mris, vno, x, y, z);
+    
+    SURFACE_DIMENSION_CALC_ITER
+  }
+  
+  SURFACE_DIMENSION_CALC_FINI
+}
 
 
 //  orig[xyz] are set during the creation of a surface

@@ -374,7 +374,7 @@ main(int argc, char *argv[])
   }
 
   if (1) {
-    fprintf(stdout, "%s:%d should but doesn't set orig x et al here \n", __FILE__, __LINE___);
+    fprintf(stdout, "%s:%d should but doesn't set orig x et al here \n", __FILE__, __LINE__);
   } else {
     MRISsetOriginalXYZfromXYZ(mris);
     mrisComputeOriginalVertexDistances(mris);
