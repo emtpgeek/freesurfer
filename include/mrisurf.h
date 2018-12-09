@@ -2843,6 +2843,7 @@ void MRISmakeDistOrig (MRIS *mris, int vno);                        // makes it 
 void MRISgrowDistOrig (MRIS *mris, int vno, int minimumCapacity);   // same size as current or bigger
 void MRISfreeDistOrigs(MRIS *mris);
 
+int mrisComputeVertexDistances(MRIS *mris);
 
 //  Faces
 //
@@ -2912,5 +2913,7 @@ static bool mrisVerticesAreNeighbors(MRIS const * const mris, int const vno1, in
 //
 void MRISsetOriginalXYZ(MRIS *mris, int vno, float x, float y, float z);
 void MRISsetOriginalXYZfromXYZ(MRIS *mris);
+
+int mrisComputeOriginalVertexDistances(MRIS *mris);
 
 void MRIScheckForNans(MRIS *mris);

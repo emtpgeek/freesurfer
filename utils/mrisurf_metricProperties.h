@@ -116,8 +116,6 @@ void mrisDumpFace(MRIS *mris, int fno, FILE *fp);
 
 
 int    MRIScomputeAllDistances           (MRIS *mris);
-int    mrisComputeVertexDistances        (MRIS *mris);
-int    mrisComputeOriginalVertexDistances(MRIS *mris);
 void   MRIScomputeAvgInterVertexDist     (MRIS *Surf, double *StdDev);
 void   mrisSetAvgInterVertexDist         (MRIS *Surf, double to);
 int    mrisTrackTotalDistance            (MRIS *mris);

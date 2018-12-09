@@ -372,7 +372,12 @@ main(int argc, char *argv[])
   {
     MRISwrite(mris, "before") ;
   }
+
+  MRISsetOriginalXYZfromXYZ(mris);
+  mrisComputeOriginalVertexDistances(mris);
+  
   MRISprojectOntoSphere(mris, mris, target_radius) ;
+
   if (Gdiag & DIAG_WRITE && DIAG_VERBOSE_ON)
   {
     MRISwrite(mris, "after") ;

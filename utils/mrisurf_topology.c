@@ -224,8 +224,10 @@ bool mrisCheckVertexVertexTopologyWkr(const char* file, int line, MRIS const *mr
     extern bool mrisCheckDist    (MRIS const * mris);               // gross hack for now
     extern bool mrisCheckDistOrig(MRIS const * mris);               // gross hack for now
     if ((!mrisCheckDist(mris) || !mrisCheckDistOrig(mris))
-      && !(reported & Reported_dd)) { reported |= Reported_dd;
+    && !(reported & Reported_dd)) { reported |= Reported_dd;
+      if (shouldReport(file,line,reported))
         fprintf(stdout, "Bad dist\n");
+      DiagBreak();
     }
   }
 
