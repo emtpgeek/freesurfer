@@ -115,8 +115,6 @@ int mrisMarkIntersections(MRIS *mris);
 void mrisDumpFace(MRIS *mris, int fno, FILE *fp);
 
 
-int    mrisComputeSurfaceDimensions      (MRIS *mris);
-
 int    MRIScomputeAllDistances           (MRIS *mris);
 int    mrisComputeVertexDistances        (MRIS *mris);
 int    mrisComputeOriginalVertexDistances(MRIS *mris);

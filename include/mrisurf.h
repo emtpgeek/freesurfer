@@ -2770,6 +2770,7 @@ static bool mrisVerticesAreNeighbors(MRIS const * mris, int vno1, int vno2);
 void mrisAddEdge   (MRIS* mris, int vno1, int vno2);
 void mrisRemoveEdge(MRIS *mris, int vno1, int vno2);
 
+
 // Neighbourhoods
 //
 #define MAX_NEIGHBORS (400)
@@ -2786,6 +2787,51 @@ int  MRISfindNeighborsAtVertex      (MRIS *mris, int vno, int nlinks, size_t lis
     // sets hops [*] to -1 for [vno] and the number of hops for all entries returned in the vlist
     // returns the number of neighbors
 
+
+// Inputs to the metric properties
+//
+//      It is a good idea to call MRISfreeDistsButNotOrig(MRIS *mris);
+//      before calling these, to invalidate the now-wrong distances
+//
+//      However there are places where the old consequences of xyz are used to compute the new values of xyz
+//      so this tactic isn't always usable - especially when the previous normals are being used to move the xyz
+//
+void MRISsetXYZwkr(MRIS *mris, int vno, float x, float y, float z, const char * file, int line, bool* laterTime);
+#define MRISsetXYZ(_MRIS,_VNO, _X,_Y,_Z) { \
+    static bool _laterTime; \
+    MRISsetXYZwkr((_MRIS),(_VNO),(_X),(_Y),(_Z), __FILE__, __LINE__, &_laterTime); \
+  }
+    //
+    // VERTEX:xyz can be set directly, one at a time, or via one of the following operations
+    // that iterate across many vertices.
+    //
+    // This results in all the derived properties (distances, face areas, normals, angles, ...) being invalid
+    // until recomputed.  However the use of invalid properties is not yet detected.
+
+void mrisFindMiddleOfGray(MRIS *mris);
+
+int  MRIStranslate (MRIS *mris, float dx, float dy, float dz);
+void MRISmoveOrigin(MRIS *mris, float x0, float y0, float z0);
+int  MRISscale     (MRIS *mris, double scale);
+
+void MRISblendXYZandTXYZ(MRIS* mris, float xyzScale, float txyzScale);  // x = x*xyzScale + tx*txyzScale  etc.
+
+void mrisDisturbVertices(MRIS *mris, double amount);
+
+MRIS* MRIScenter(MRIS *mris_src, MRIS *mris_dst) ;
+void  MRIScenterSphere(MRIS *mris);
+void  MRISrecenter(MRIS *mris, int which_move, int which_target) ;
+
+MRIS* MRISprojectOntoTranslatedSphere(MRIS* mris_src, MRIS* mris_dst, 
+    double r,
+    double x0, double y0, double z0);
+
+
+// xyz's immediate consequences
+//
+int mrisComputeSurfaceDimensions(MRIS *mris);
+    // xyz lo/hi  and the cxyz
+
 // dist and dist_orig
 //      can be freed at any time
 // dist is created by calls to MRISsetNeighborhoodSizeAndDist
@@ -2796,6 +2842,7 @@ void MRISfreeDistsButNotOrig(MRIS *mris);
 void MRISmakeDistOrig (MRIS *mris, int vno);                        // makes it the same size as the current VERTEX.dist
 void MRISgrowDistOrig (MRIS *mris, int vno, int minimumCapacity);   // same size as current or bigger
 void MRISfreeDistOrigs(MRIS *mris);
+
 
 //  Faces
 //
@@ -2859,39 +2906,6 @@ static bool mrisVerticesAreNeighbors(MRIS const * const mris, int const vno1, in
 {
   return 0 <= mrisVertexNeighborIndex(mris, vno1, vno2);
 }
-
-
-// Inputs to the metric properties
-//
-void MRISsetXYZwkr(MRIS *mris, int vno, float x, float y, float z, const char * file, int line, bool* laterTime);
-#define MRISsetXYZ(_MRIS,_VNO, _X,_Y,_Z) { \
-    static bool _laterTime; \
-    MRISsetXYZwkr((_MRIS),(_VNO),(_X),(_Y),(_Z), __FILE__, __LINE__, &_laterTime); \
-  }
-    //
-    // VERTEX:xyz can be set directly, one at a time, or via one of the following operations
-    // that iterate across many vertices.
-    //
-    // This results in all the derived properties (distances, face areas, normals, angles, ...) being invalid
-    // until recomputed.  However the use of invalid properties is not yet detected.
-
-void mrisFindMiddleOfGray(MRIS *mris);
-
-int  MRIStranslate (MRIS *mris, float dx, float dy, float dz);
-void MRISmoveOrigin(MRIS *mris, float x0, float y0, float z0);
-int  MRISscale     (MRIS *mris, double scale);
-
-void MRISblendXYZandTXYZ(MRIS* mris, float xyzScale, float txyzScale);  // x = x*xyzScale + tx*txyzScale  etc.
-
-void mrisDisturbVertices(MRIS *mris, double amount);
-
-MRIS* MRIScenter(MRIS *mris_src, MRIS *mris_dst) ;
-void  MRIScenterSphere(MRIS *mris);
-void  MRISrecenter(MRIS *mris, int which_move, int which_target) ;
-
-MRIS* MRISprojectOntoTranslatedSphere(MRIS* mris_src, MRIS* mris_dst, 
-    double r,
-    double x0, double y0, double z0);
 
 
 // Vals

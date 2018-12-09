@@ -1819,7 +1819,8 @@ static MRIS *ICOtoScaledMRIS(ICOSAHEDRON const * const ico, int max_vertices, in
   }
 
   mrisCheckVertexFaceTopology(mris);
-  
+
+  mrisComputeSurfaceDimensions(mris);  
   MRIScomputeMetricProperties(mris);
   mris->radius = MRISaverageRadius(mris);
 
@@ -1950,6 +1951,10 @@ int ICOreadVertexPositions(MRI_SURFACE * const mris, const char * const fname, i
 
   if (ico->nvertices != mris->nvertices || ico->nfaces != mris->nfaces)
     ErrorReturn(ERROR_BADPARM, (ERROR_BADPARM, "ICOreadVertexPositions: different size surfaces"));
+
+  MRISfreeDistsButNotOrig(mris);
+    // MRISsetXYZ will invalidate all of these,
+    // so make sure they are recomputed before being used again!
 
   /* position vertices */
   int vno;

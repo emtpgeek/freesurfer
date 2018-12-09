@@ -2094,6 +2094,10 @@ int MRISexpandSurface(MRI_SURFACE *mris, float distance, INTEGRATION_PARMS *parm
   
   if (parms == NULL) {
 
+    MRISfreeDistsButNotOrig(mris);
+        // MRISsetXYZ will invalidate all of these,
+        // so make sure they are recomputed before being used again!
+
     for (vno = 0; vno < mris->nvertices; vno++) {
       v = &mris->vertices[vno];
       if (v->ripflag) {
@@ -2570,7 +2574,11 @@ static int mrisSmoothingTimeStep(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
            max_dy,
            max_dz,
            sqrt(SQR(max_dx) + SQR(max_dy) + SQR(max_dz)));
-  
+
+  MRISfreeDistsButNotOrig(mris);
+    // MRISsetXYZ will invalidate all of these,
+    // so make sure they are recomputed before being used again!
+
   for (vno = 0; vno < mris->nvertices; vno++) {
     VERTEX * const v = &mris->vertices[vno];
     if (v->ripflag || v->marked == 0) {

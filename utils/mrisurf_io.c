@@ -906,6 +906,11 @@ int MRISreadFlattenedCoordinates(MRI_SURFACE *mris, const char *sname)
     return (Gerror);
   }
   MRISsaveVertexPositions(mris, FLATTENED_VERTICES);
+  
+  MRISfreeDistsButNotOrig(mris);
+    // MRISsetXYZ will invalidate all of these,
+    // so make sure they are recomputed before being used again!
+
   for (vno = 0; vno < mris->nvertices; vno++) {
     v = &mris->vertices[vno];
     if (v->ripflag) {
@@ -1005,6 +1010,10 @@ int MRISreadPatchNoRemove(MRI_SURFACE *mris, const char *pname)
   FILE *fp = NULL;
   char line[256];
   char *cp;
+
+  MRISfreeDistsButNotOrig(mris);
+    // MRISsetXYZ will invalidate all of these,
+    // so make sure they are recomputed before being used again!
 
   // check whether the patch file is ascii or binary
   if (type == MRIS_GIFTI_FILE)    /* .gii */
@@ -2338,6 +2347,10 @@ int mrisWriteSnapshot(MRI_SURFACE *mris, INTEGRATION_PARMS *parms, int t)
   ------------------------------------------------------*/
 int MRISreadVertexPositions(MRI_SURFACE *mris, const char *name)
 {
+  MRISfreeDistsButNotOrig(mris);
+    // MRISsetXYZ will invalidate all of these,
+    // so make sure they are recomputed before being used again!
+
   char fname[STRLEN];
   int vno, nvertices, nfaces, magic, version, tmp, ix, iy, iz, n, type;
   FILE *fp;
@@ -2874,6 +2887,10 @@ MRI_SURFACE *MRISreadVTK(MRI_SURFACE *mris, const char *fname)
   }
 
   /* read vertices... */
+  MRISfreeDistsButNotOrig(mris);
+    // MRISsetXYZ will invalidate all of these,
+    // so make sure they are recomputed before being used again!
+
   int vno;
   for (vno = 0; vno < mris->nvertices; vno++) {
     float x,y,z;
@@ -5283,6 +5300,9 @@ static int mrisReadTriangleFilePositions(MRI_SURFACE *mris, const char *fname)
     fprintf(stdout, "surface %s: %d vertices and %d faces.\n", fname, nvertices, nfaces);
 
   MRISfreeDistsButNotOrig(mris);
+    // MRISsetXYZ will invalidate all of these,
+    // so make sure they are recomputed before being used again!
+
   for (vno = 0; vno < nvertices; vno++) {
     float x = freadFloat(fp);
     float y = freadFloat(fp);
