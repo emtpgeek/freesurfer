@@ -34,7 +34,12 @@ int mrisurf_orig_clock;
 //
 void MRISsetXYZwkr(MRIS *mris, int vno, float x, float y, float z, const char * file, int line, bool* laterTime) 
 {
-  cheapAssert(!(mris->dist_alloced_flags & 1));
+  if (mris->dist_alloced_flags & 1) {
+    if (!*laterTime) { *laterTime = true;
+      fprintf(stdout, "%s:%d setXYZ with dist not freed.  Add call to MRISfreeDistsButNotOrig(MRIS*)\n", file,line);
+    }
+    cheapAssert(true);  // HACK should be true
+  }
     
   cheapAssertValidVno(mris,vno);
   VERTEX * v = &mris->vertices[vno];
@@ -48,9 +53,14 @@ void MRISsetXYZwkr(MRIS *mris, int vno, float x, float y, float z, const char * 
 //  orig[xyz] are set during the creation of a surface
 //  and during deformations that create an improved 'original' surface
 //
-void MRISsetOriginalXYZ(MRIS *mris, int vno, float origx, float origy, float origz) 
+void MRISsetOriginalXYZwkr(MRIS *mris, int vno, float origx, float origy, float origz, const char * file, int line, bool* laterTime) 
 {
-  cheapAssert(!(mris->dist_alloced_flags & 2));
+  if (mris->dist_alloced_flags & 2) {
+    if (!*laterTime) { *laterTime = true;
+      fprintf(stdout, "%s:%d setOriginalXYZ with dist_orig not freed.  Add call to MRISfreeDistOrigs(MRIS*)\n", file,line);
+    }
+    cheapAssert(true);  // HACK should be false
+  }
 
   cheapAssertValidVno(mris,vno);
   VERTEX * v = &mris->vertices[vno];
