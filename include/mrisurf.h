@@ -278,13 +278,13 @@ typedef struct vertex_type_
   ELTX(float* const,dist_orig) SEP                                              /* distance to neighboring vertices based on origxyz */ \
   ELTX(int,dist_orig_capacity) SEP \
   \
-  ELTT(const float,origx)                                       SEP             /* original coordinates */                          \
-  ELTT(const float,origy)                                       SEP             /* use MRISsetOriginalXYZ() */                      \
-  ELTT(const float,origz)                                       SEP             /* or MRISsetOriginalXYZfromXYZ to set */           \
-  \
   ELTT(/*CONST_EXCEPT_MRISURF_METRIC_PROPERTIES*/ float,x)          SEP             /* current coordinates */                       \
   ELTT(/*CONST_EXCEPT_MRISURF_METRIC_PROPERTIES*/ float,y)          SEP             /* use MRISsetXYZ() to set */                   \
   ELTT(/*CONST_EXCEPT_MRISURF_METRIC_PROPERTIES*/ float,z)          SEP                                                             \
+  \
+  ELTT(const float,origx)                                       SEP             /* original coordinates */                          \
+  ELTT(const float,origy)                                       SEP             /* use MRISsetOriginalXYZ() */                      \
+  ELTT(const float,origz)                                       SEP             /* or MRISsetOriginalXYZfromXYZ to set */           \
   \
   ELTT(float,nx) SEP    \
   ELTT(float,ny) SEP    \
@@ -492,7 +492,7 @@ typedef struct vertex_type_
 
 #if defined(__cplusplus)
     // C++ requires const members be initialized
-    vertex_type_() : dist(nullptr), dist_orig(nullptr), origx(0), origy(0), origz(0), x(0), y(0), z(0) {}
+    vertex_type_() : dist(nullptr), dist_orig(nullptr), x(0), y(0), z(0), origx(0), origy(0), origz(0) {}
 #endif
 
 }
@@ -2808,13 +2808,34 @@ void MRISsetXYZwkr(MRIS *mris, int vno, float x, float y, float z, const char * 
     // This results in all the derived properties (distances, face areas, normals, angles, ...) being invalid
     // until recomputed.  However the use of invalid properties is not yet detected.
 
+void MRIScopyXYZ(MRIS *mris, MRIS* mris_from);
+
+void MRISexportXYZ(MRIS *mris,       float*       * ppx,       float*       * ppy,       float*       * ppz);
+void MRISimportXYZ(MRIS *mris, const float* const    px, const float* const    py, const float* const   ppz);
+    //
+    // By importing and exporting into three arrays, it is possible to use h/w vector instructions more effectively.
+    // 
+    // the three vectors are malloced and filled in with the xyz values
+    //       the vectors are cache-block aligned so loops processing them can be very efficient
+    //
+    // the xyz values are set from the vectors, the vectors are NOT freed by this call
+    // the mris [xyz] lo,hi,ctr are set during import
+
+
+// Deforming the MRIS
+//
 void mrisFindMiddleOfGray(MRIS *mris);
+
+
+void MRISscaleThenTranslate (MRIS *mris, double sx, double sy, double sz, double dx, double dy, double dz);   // new = old * s + d
+
 
 int  MRIStranslate (MRIS *mris, float dx, float dy, float dz);
 void MRISmoveOrigin(MRIS *mris, float x0, float y0, float z0);
 int  MRISscale     (MRIS *mris, double scale);
 
 void MRISblendXYZandTXYZ(MRIS* mris, float xyzScale, float txyzScale);  // x = x*xyzScale + tx*txyzScale  etc.
+void MRISblendXYZandNXYZ(MRIS* mris,                 float nxyzScale);  // x = x          + nx*nxyzScale  etc.
 
 void mrisDisturbVertices(MRIS *mris, double amount);
 

@@ -373,8 +373,12 @@ main(int argc, char *argv[])
     MRISwrite(mris, "before") ;
   }
 
-  MRISsetOriginalXYZfromXYZ(mris);
-  mrisComputeOriginalVertexDistances(mris);
+  if (1) {
+    fprintf(stdout, "%s:%d should but doesn't set orig x et al here \n", __FILE__, __LINE___);
+  } else {
+    MRISsetOriginalXYZfromXYZ(mris);
+    mrisComputeOriginalVertexDistances(mris);
+  }
   
   MRISprojectOntoSphere(mris, mris, target_radius) ;
 
@@ -382,8 +386,11 @@ main(int argc, char *argv[])
   {
     MRISwrite(mris, "after") ;
   }
+  
   fprintf(stderr,"surface projected - minimizing metric distortion...\n");
+  
   MRISsetNeighborhoodSize(mris, nbrs) ;
+  
   if (MRIScountNegativeFaces(mris) > nint(.8*mris->nfaces))
   {
     printf("!!!!!!!!!  everted surface detected - correcting !!!!!!!!!!!!!!\n") ;

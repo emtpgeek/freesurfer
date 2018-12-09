@@ -49,6 +49,78 @@ void MRISsetXYZwkr(MRIS *mris, int vno, float x, float y, float z, const char * 
   const float * pcz = &v->z;  float * pz = (float*)pcz; *pz = z;
 }
 
+void MRIScopyXYZ(MRIS *mris, MRIS* mris_from) {
+  int const nvertices = mris->nvertices;
+  cheapAssert(nvertices == mris_from->nvertices);
+  int vno;
+  for (vno = 0; vno < nvertices; vno++) {
+    VERTEX * v = &mris_from->vertices[vno];
+    MRISsetXYZwkr(mris, vno, v->x, v->y, v->z);
+  }
+}
+
+void MRISexportXYZ(MRIS *mris,       float*       * ppx,       float*       * ppy,       float*       * ppz) {
+  int const nvertices = mris->nvertices;
+
+  float* px = (float*)memalign(64, nvertices*sizeof(float));    // cache aligned to improve the performance
+  float* py = (float*)memalign(64, nvertices*sizeof(float));    //      of loops that use the vectors
+  float* pz = (float*)memalign(64, nvertices*sizeof(float));
+  
+  int vno;
+  for (vno = 0; vno < nvertices; vno++) {
+    VERTEX * v = &mris->vertices[vno];
+    px[vno] = v->x; py[vno] = v->y; pz[vno] = v->z;
+  }
+  
+  *ppx = px;
+  *ppy = py;
+  *ppz = pz;
+}
+
+#define SURFACE_DIMENSION_CALC_INIT \
+  float xlo = 10000, ylo = xlo, zlo = ylo, xhi = -xlo, yhi = -ylo, zhi = -zlo;
+
+#define SURFACE_DIMENSION_CALC_ITER \
+    if (x > xhi) xhi = x; \
+    if (x < xlo) xlo = x; \
+    if (y > yhi) yhi = y; \
+    if (y < ylo) ylo = y; \
+    if (z > zhi) zhi = z; \
+    if (z < zlo) zlo = z; \
+    // end of macro
+
+#define SURFACE_DIMENSION_CALC_FINI \
+  mris->xlo = xlo; \
+  mris->xhi = xhi; \
+  mris->ylo = ylo; \
+  mris->yhi = yhi; \
+  mris->zlo = zlo; \
+  mris->zhi = zhi; \
+  \
+  mris->xctr = 0.5f * (float)((double)xlo + (double)xhi); \
+  mris->yctr = 0.5f * (float)((double)ylo + (double)yhi); \
+  mris->zctr = 0.5f * (float)((double)zlo + (double)zhi); \
+  // end of macro
+
+
+void MRISimportXYZ(MRIS *mris, const float* const    px, const float* const    py, const float* const    pz) 
+{
+  int const nvertices = mris->nvertices;
+
+  SURFACE_DIMENSION_CALC_INIT
+  int vno;
+  for (vno = 0; vno < nvertices; vno++) {
+    float x = px[vno], y = py[vno], z = pz[vno];
+
+    MRISsetXYZwkr(mris, vno, x,y,z);
+
+    SURFACE_DIMENSION_CALC_ITER
+  }
+  
+  SURFACE_DIMENSION_CALC_FINI
+}
+
+
 
 //  orig[xyz] are set during the creation of a surface
 //  and during deformations that create an improved 'original' surface
@@ -406,6 +478,69 @@ int MRIStranslate(MRIS *mris, float dx, float dy, float dz)
 }
 
 
+void MRISscaleThenTranslate (MRIS *mris, double sx, double sy, double sz, double dx, double dy, double dz) {
+  //
+  // This uses double because mri_brain_volume was using double,
+  // and because the combined scaling and adding could be much less accurate in float.
+  //
+  int vno;
+  for (vno = 0; vno < mris->nvertices; vno++) {
+    VERTEX *v = &mris->vertices[vno];
+    v->x = v->x*sx + dx;
+    v->y = v->y*sy + dy;
+    v->z = v->z*sz + dz;
+  }
+
+  // Emulate mrisComputeSurfaceDimensions(mris)
+  //
+  double xlo = mris->xlo;
+  double xhi = mris->xhi;
+  double ylo = mris->ylo;
+  double yhi = mris->yhi;
+  double zlo = mris->zlo;
+  double zhi = mris->zhi;
+  double xctr = mris->xctr;
+  double yctr = mris->yctr;
+  double zctr = mris->zctr;
+  
+  xlo *= sx;
+  xhi *= sx;
+  ylo *= sy;
+  yhi *= sy;
+  zlo *= sz;
+  zhi *= sz;
+  
+  if (sx < 0) { double t = xlo; xlo = xhi; xlo = t; }
+  if (sy < 0) { double t = ylo; ylo = yhi; ylo = t; }
+  if (sz < 0) { double t = zlo; zlo = zhi; zlo = t; }
+  
+  xctr *= sx;
+  yctr *= sy;
+  zctr *= sz;
+  
+  xlo += dx;
+  xhi += dx;
+  ylo += dy;
+  yhi += dy;
+  zlo += dz;
+  zhi += dz;
+  
+  xctr += dx;
+  yctr += dy;
+  zctr += dz;
+
+  mris->xlo = (float)xlo;
+  mris->xhi = (float)xhi;
+  mris->ylo = (float)ylo;
+  mris->yhi = (float)yhi;
+  mris->zlo = (float)zlo;
+  mris->zhi = (float)zhi;
+  mris->xctr = (float)xctr;
+  mris->yctr = (float)yctr;
+  mris->zctr = (float)zctr;
+}
+
+
 int MRISanisotropicScale(MRIS *mris, float sx, float sy, float sz)
 {
   mrisComputeSurfaceDimensions(mris);
@@ -624,6 +759,24 @@ void MRISblendXYZandTXYZ(MRIS* mris, float xyzScale, float txyzScale) {
     v->x = xyzScale*v->x + txyzScale*v->tx;
     v->y = xyzScale*v->y + txyzScale*v->ty;
     v->z = xyzScale*v->z + txyzScale*v->tz;
+  }
+
+  // current only user did not have this, but did immediately call MRIScomputeMetricProperties(mris)
+  //
+  // mrisComputeSurfaceDimensions(mris);
+}
+
+
+void MRISblendXYZandNXYZ(MRIS* mris, float nxyzScale) 
+{
+  MRISfreeDistsButNotOrig(mris);  // it is either this or adjust them...
+
+  int vno;
+  for (vno = 0; vno < mris->nvertices; vno++) {
+    VERTEX* v = &mris->vertices[vno];
+    v->x = v->x + nxyzScale*v->nx;
+    v->y = v->y + nxyzScale*v->ny;
+    v->z = v->z + nxyzScale*v->nz;
   }
 
   // current only user did not have this, but did immediately call MRIScomputeMetricProperties(mris)
