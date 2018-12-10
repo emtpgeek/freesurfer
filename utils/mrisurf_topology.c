@@ -29,75 +29,10 @@
 //=============================================================================
 // Support for consistency checking
 //
-typedef enum Reported {
-  Reported_misc= 1<<0, 
-  Reported_nc  = 1<<1, 
-  Reported_no  = 1<<2,  
-  Reported_ns  = 1<<3, 
-  Reported_ns2 = 1<<4,
-  Reported_vt  = 1<<5, 
-  Reported_bv  = 1<<6,
-  Reported_top = 1<<7, 
-  Reported_f2  = 1<<8,  
-  Reported_f0  = 1<<9, 
-  Reported_fv  = 1<<10,  
-  Reported_fn  = 1<<11, 
-  Reported_nf  = 1<<12,
-  Reported_nv  = 1<<13,
-  Reported_dd  = 1<<14,
-  Reported_da  = 1<<15,
-  Reported_mm  = 1<<16 } Reported;
-
-typedef struct ReportEntry { struct ReportEntry* next; const char* file; int reported; int count; int elideUntil; } ReportEntry;
-
-static ReportEntry* reportEntry(const char* file, int line) {
-    static ReportEntry* entries[1000000];
-    if (line >= 1000000) return NULL;
-    ReportEntry** ep = &entries[line];
-    while (*ep && strcmp((*ep)->file,file)) ep = &(*ep)->next;
-    ReportEntry* e = *ep;
-    if (!e) {
-        e = (ReportEntry*)calloc(1,sizeof(ReportEntry)); 
-        e->file = file;
-        e->elideUntil = 1;
-        *ep = e;
-    }
-    return e;
-}
-
-static bool lookForReportable(const char* file, int line) {
-
-    if (0) {
-      static bool laterTime;
-      if (!laterTime) fprintf(stdout, "%s:%d always checking topology\n", __FILE__, __LINE__);
-      laterTime = true;
-      return true;
-    }
-    
-    ReportEntry* e = reportEntry(file, line);
-    if (!e) return false;
-    e->count++;
-    if (e->count < e->elideUntil) return false;
-    e->elideUntil = (e->elideUntil < 32) ? e->elideUntil + 1 : e->elideUntil*2;
-    return true;
-}
-
-static bool shouldReport(const char* file, int line, int reported) {
-    ReportEntry* e = reportEntry(file, line);
-    if (!e) return false;
-
-    if (~e->reported & reported) { 
-        e->reported |= reported; 
-        fprintf(stdout, "ERROR: Bad vertex or face found at %s:%d\n", 
-            strrchr(file,'/'), line);
-        return true; 
-    }
-    
-    return true;
-}
-
-bool MRISshouldReport(const char* file, int line) {
-  return shouldReport(file, line, Reported_misc);
+static bool shouldReportWkr(int line) {
+  bool wasReported;
+  copeWithLogicProblem2(&wasReported, NULL, "Bad vertex or face found", __FILE__, line, "");
+  return wasReported;
 }
 
 //=============================================================================
@@ -105,13 +40,21 @@ bool MRISshouldReport(const char* file, int line) {
 //
 bool mrisCheckVertexVertexTopologyWkr(const char* file, int line, MRIS const *mris, bool always)
 {
-  if (!always && !lookForReportable(file, line)) return true;
+  { static bool laterTime, forceAlways;
+    if (!laterTime) { 
+      laterTime = true; 
+      forceAlways = !!getenv("FREESURFER_always_check_vv"); 
+      if (forceAlways) fprintf(stdout,"%s:%d FREESURFER_always_check_vv set\n", __FILE__, __LINE__);
+    }
+    always |= forceAlways;
+  }
+  if (!always && !spendTimeCheckingForLogicProblem(file, line)) return true;
 
-  Reported reported = 0;
+  int reported = 0;
+  #define shouldReport (shouldReportWkr(__LINE__) && (reported=1))    // sets reported only if should report
   
-  if ((mris->nsize > mris->max_nsize) &&
-      (reported & Reported_mm)) { reported |= Reported_mm; 
-    if (shouldReport(file,line,reported)) {
+  if (mris->nsize > mris->max_nsize) {
+    if (shouldReport) {
       fprintf(stdout, "mris->nsize:%d > mris->max_nsize:%d\n", mris->nsize, mris->max_nsize);
     }
   }
@@ -140,12 +83,9 @@ bool mrisCheckVertexVertexTopologyWkr(const char* file, int line, MRIS const *mr
     
     if ( (v_nontopo->dist      && !(mris->dist_alloced_flags&1))
       || (v_nontopo->dist_orig && !(mris->dist_alloced_flags&2))) {
-      if (true
-      && !(reported & Reported_da)) { reported |= Reported_da;
-        if (shouldReport(file,line,reported))
-          fprintf(stdout, "dist or dist_orig non-null when !mris->dist_alloced\n");
-        DiagBreak();
-      } 
+      if (shouldReport) {
+        fprintf(stdout, "dist or dist_orig non-null when !mris->dist_alloced\n");
+      }
     }
 
     if (mris->vertices[vno1].ripflag) continue;
@@ -154,61 +94,58 @@ bool mrisCheckVertexVertexTopologyWkr(const char* file, int line, MRIS const *mr
 
     if (mris->nsize > 0 
      && mris->nsize != v->nsizeCur 
-     && vSize > 0                                                   // if no neighbors, then these aren't set right
-     && !(reported & Reported_ns2)) { reported |= Reported_ns2;
-      if (shouldReport(file,line,reported))
+     && vSize > 0) {
+      if (shouldReport) {
         fprintf(stdout, "[vno1:%d].nsizeCur:%d != mris->nsize:%d vSize:%d vnum:%d vtotal:%d\n", 
-            vno1, v->nsizeCur, mris->nsize, vSize, v->vnum, v->vtotal);
-      DiagBreak();
+          vno1, v->nsizeCur, mris->nsize, vSize, v->vnum, v->vtotal);
+      }
     }
 
     if (v->nsizeMax > 0 &&
-        v->nsizeCur > v->nsizeMax && 
-        !(reported & Reported_ns)) { reported |= Reported_ns; 
-      if (shouldReport(file,line,reported))
+        v->nsizeCur > v->nsizeMax ) {
+      if (shouldReport) {
         fprintf(stdout, "[vno1:%d].nsizeCur:%d exceeds nsizeMax:%d\n", vno1, v->nsizeCur, v->nsizeMax);
-      DiagBreak();
+      }
     }
 
     int const vtotalExpected = !v->nsizeCur ? 0 : VERTEXvnum(v,v->nsizeCur);
     
     if (v->nsizeCur > 0 
-     && (mris->vtotalsMightBeTooBig ? (v->vtotal < vtotalExpected) : (v->vtotal != vtotalExpected))
-     && !(reported & Reported_vt)) { reported |= Reported_vt;
+     && (mris->vtotalsMightBeTooBig ? (v->vtotal < vtotalExpected) : (v->vtotal != vtotalExpected))) {
       //
-      // MRISsampleDistances sets vtotal beyond vtotalExpected for its own nefarious purposes...
+      // MRISsampleDistances sets vtotal beyond vtotalExpected
       //
-      if (shouldReport(file,line,reported))
+      if (shouldReport) {
         fprintf(stdout, "[vno1:%d].vtotal:%d differs from expected:%d for nsize:%d, ripflag:%d\n", vno1, v->vtotal, vtotalExpected, v->nsizeCur, 0);
-      DiagBreak();
+      }
     }
 
     int n;
     for (n = 0; n < vSize; n++) {
       int vno2 = v->v[n];
 
-      if ((vno2 < 0 || mris->nvertices <= vno2) && !(reported & Reported_bv)) { reported |= Reported_bv;
-        if (shouldReport(file,line,reported))
+      if (vno2 < 0 || mris->nvertices <= vno2) {
+        if (shouldReport) {
           fprintf(stdout, "[vno1:%d].v[%d] is bad vno2:%d\n", vno1, n, vno2);
-        DiagBreak();
+        }
       }
 
       if (v->vnum <= n) continue;
       
       // immediate neighborlyness is commutative
-      if (!mrisVerticesAreNeighbors(mris, vno2, vno1) && !(reported & Reported_nc)) { reported |= Reported_nc;
-        if (shouldReport(file,line,reported))
+      if (!mrisVerticesAreNeighbors(mris, vno2, vno1)) {
+        if (shouldReport) {
           fprintf(stdout, "[vno1:%d].v[%d] not found in [vno2:%d].v[*]\n", vno1, n, vno2);
-        DiagBreak();
+        }
       }
       
       // neighbors should only appear once
       int i;
       for (i = 0; i < n; i++) {
-        if ((vno2 == v->v[i]) && !(reported & Reported_no)) { reported |= Reported_no;
-          if (shouldReport(file,line,reported))
+        if (vno2 == v->v[i]) {
+          if (shouldReport) {
             fprintf(stdout, "[vno1:%d].v[%d]:%d same as [vno1:%d].v[%d]\n", vno1, n, vno2, i, v->v[i]);
-          DiagBreak();
+          }
         }
       }
     }
@@ -223,13 +160,11 @@ bool mrisCheckVertexVertexTopologyWkr(const char* file, int line, MRIS const *mr
   if (checkDist) {
     extern bool mrisCheckDist    (MRIS const * mris);               // gross hack for now
     extern bool mrisCheckDistOrig(MRIS const * mris);               // gross hack for now
-    if ((!mrisCheckDist(mris) || !mrisCheckDistOrig(mris))
-    && !(reported & Reported_dd)) { reported |= Reported_dd;
-      if (shouldReport(file,line,reported))
-        fprintf(stdout, "Bad dist\n");
-      DiagBreak();
-    }
+    if (!mrisCheckDist    (mris)) reported = 1;
+    if (!mrisCheckDistOrig(mris)) reported = 1;
   }
+
+#undef shouldReport
 
   return reported == 0;
 }
@@ -1378,11 +1313,12 @@ static int mrisInitializeNeighborhood(MRI_SURFACE *mris, int vno)
 //
 bool mrisCheckVertexFaceTopologyWkr(const char* file, int line, MRIS const * mris, bool always) {
 
-  if (!always && !lookForReportable(file, line)) return true;
+  if (!always && !spendTimeCheckingForLogicProblem(file, line)) return true;
 
-  Reported reported = 0;
+  int reported = 0;
+  #define shouldReport (shouldReportWkr(__LINE__) && (reported=1))    // sets reported only if should report
   
-  if (!mrisCheckVertexVertexTopologyWkr(file,line,mris,true)) reported |= Reported_top;
+  if (!mrisCheckVertexVertexTopologyWkr(file,line,mris,true)) reported = 1;
   
   int fno;
   for (fno = 0; fno < mris->nfaces; fno++) {
@@ -1402,52 +1338,48 @@ bool mrisCheckVertexFaceTopologyWkr(const char* file, int line, MRIS const * mri
       // The vertex points to the face exactly once
       //
       if (v->num && !v->f) {
-        if (!(reported & Reported_nf)) { reported |= Reported_nf;
-          if (shouldReport(file,line,reported))
-            fprintf(stdout, "nullptr in [vno:%d].f when num:%d\n", vno, v->num);
-          DiagBreak();
+        if (shouldReport) { 
+          fprintf(stdout, "nullptr in [vno:%d].f when num:%d\n", vno, v->num);
         }
       } else {
         int iTrial;
         for (iTrial = 0; iTrial < v->num; iTrial++) {
           if (v->f[iTrial] == fno) {
-            if (i == v->num && !(reported & Reported_f2)) { reported |= Reported_f2;
-              if (shouldReport(file,line,reported))
+            if (i == v->num) {
+              if (shouldReport) {
                 fprintf(stdout, "fno:%d found twice in [vno:%d].f[i:%d && iTrial:%d]\n", fno, vno, i, iTrial);
-              DiagBreak();
+              }
             }
             i = iTrial;
           }
         }
       }
-      if (i < 0 && !(reported & Reported_f0)) { reported |= Reported_f0;
-        if (shouldReport(file,line,reported))
+      if (i < 0) {
+        if (shouldReport) {
           fprintf(stdout, "fno:%d not found in [vno:%d].f[*]\n", fno, vno);
-        DiagBreak();
+        }
       }
 
       if (!v->n) {
-        if (!(reported & Reported_nv)) { reported |= Reported_nv;
-          if (shouldReport(file,line,reported))
-            fprintf(stdout, "nullptr in [vno:%d].n\n", vno);
-          DiagBreak();
+        if (shouldReport) {
+          fprintf(stdout, "nullptr in [vno:%d].n\n", vno);
         }
       } else {
-        if (v->n[i] != n && !(reported & Reported_fv)) { reported |= Reported_fv;
-          if (shouldReport(file,line,reported))
+        if (v->n[i] != n) {
+          if (shouldReport) {
             fprintf(stdout, "[fno:%d].v[n:%d] holds vno:%d but [vno:%d].n[i:%d]:%d != n:%d\n", 
               fno, n, vno, vno, i, v->n[i], n);
-          DiagBreak();
+          }
         }
       }
             
       // The vertices are neighbours
       //
-      if (!mrisVerticesAreNeighbors(mris, vno, prevVno) && !(reported & Reported_fn)) { reported |= Reported_fn;
-        if (shouldReport(file,line,reported))
+      if (!mrisVerticesAreNeighbors(mris, vno, prevVno)) {
+        if (shouldReport) {
           fprintf(stdout, "[fno:%d] holds adjacent vno:%d and vno:%d but they are not neighbours\n", 
             fno, vno, prevVno);
-        DiagBreak();
+        }
       }
       
       prevVno = vno;

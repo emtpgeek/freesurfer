@@ -2938,5 +2938,10 @@ void MRISsetOriginalXYZfromXYZ(MRIS *mris);
     { static bool laterTime; MRISsetOriginalXYZwkr((_MRIS),(_VNO),(_X),(_Y),(_Z),__FILE__,__LINE__, &laterTime); }
 
 int mrisComputeOriginalVertexDistances(MRIS *mris);
+void mrisComputeOriginalVertexDistancesIfNecessaryWkr(MRIS *mris, bool* laterTime, const char* file, int line);
+#define mrisComputeOriginalVertexDistancesIfNecessary(_MRIS) \
+  { static bool laterTime;  \
+    mrisComputeOriginalVertexDistancesIfNecessaryWkr((_MRIS), &laterTime, __FILE__, __LINE__); \
+  }
 
 void MRIScheckForNans(MRIS *mris);

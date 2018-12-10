@@ -3490,9 +3490,10 @@ int MRISinflateBrain(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
     mrisWriteSnapshot(mris, parms, 0);
   }
 
-  if (1) {
-    fprintf(stdout, "%s:%d should set origx et al here\n", __FILE__, __LINE__);
-  } else {
+  switch (copeWithLogicProblem("FREESURFER_fix_inflateBrain","should set origx et al here")) {
+  case LogicProblemResponse_old: 
+    break;
+  case LogicProblemResponse_fix:
     MRISsetOriginalXYZfromXYZ(mris);
     mrisComputeOriginalVertexDistances(mris);
   }

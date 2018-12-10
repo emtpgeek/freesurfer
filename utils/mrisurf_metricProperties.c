@@ -1398,6 +1398,34 @@ int mrisComputeOriginalVertexDistances(MRIS *mris) {
   return NO_ERROR;
 }
 
+void mrisComputeOriginalVertexDistancesIfNecessaryWkr(MRIS *mris, bool* laterTime, const char* file, int line)
+{
+  if (mris->dist_alloced_flags&2) return;
+  
+  bool useOldBehaviour = true;
+  switch (copeWithLogicProblem("FREESURFER_fix_missing_dist_orig","dist_orig not already computed")) {
+  case LogicProblemResponse_old: 
+    break;
+  case LogicProblemResponse_fix:
+    useOldBehaviour = false;
+  }
+
+  // The old code did not compute this distance, but instead had zero's loaded into the already allocated dist_orig
+  // Computing it here may change the result, so the default is to zero the values after computing them
+  //    thereby allocating the correct size, checking the calculation, but reverting to the old behaviour
+  //
+  mrisComputeOriginalVertexDistances(mris);
+
+  if (!useOldBehaviour) return;
+  
+  int vno;
+  for (vno = 0; vno < mris->nvertices; vno++) {
+    VERTEX const * v = &mris->vertices[vno];
+    float* dist_orig = v->dist_orig;
+    bzero(dist_orig, v->dist_orig_capacity*sizeof(float));
+  }
+}
+
 // The only difference between these should be
 // whether they use     xyz and write dist
 //                  origxyz and write dist_orig

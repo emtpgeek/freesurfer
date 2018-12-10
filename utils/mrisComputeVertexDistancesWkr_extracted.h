@@ -117,8 +117,7 @@ static bool FUNCTION_NAME(MRIS *mris, int new_dist_nsize, bool check)
   }
 
   if (nonZeroInputXCount == 0) {
-    fprintf(stdout, "%s:%d %s all xyz inputs zero - probable logic problem\n", __FILE__, __LINE__, __FUNCTION__);
-    cheapAssert(false);
+    copeWithLogicProblem(NULL, "all xyz inputs zero - cant fix");
   }
   
   return (errors == 0);
