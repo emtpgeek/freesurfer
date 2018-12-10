@@ -31,7 +31,10 @@
 //
 static bool shouldReportWkr(int line) {
   bool wasReported;
-  copeWithLogicProblem2(&wasReported, NULL, "Bad vertex or face found", __FILE__, line, "");
+  if (copeWithLogicProblem2(&wasReported, 
+            "FREESURFER_crash_on_bad_topology", "Bad vertex or face found", 
+            __FILE__, line, "") == LogicProblemResponse_fix)
+    cheapAssert(false);
   return wasReported;
 }
 

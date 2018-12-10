@@ -562,7 +562,7 @@ void MRISctr(MRIS *mris, int max_vertices, int max_faces, int nvertices, int nfa
   bzero(mris, sizeof(MRIS));
   MRISoverAllocVerticesAndFaces(mris, max_vertices, max_faces, nvertices, nfaces);
   
-  mris->nsize = 1;      // only 1-connected neighbors initially
+  mris->max_nsize = mris->nsize = 1;      // only 1-connected neighbors initially
 }
 
 void MRISdtr(MRIS *mris) {
