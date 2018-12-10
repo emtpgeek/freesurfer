@@ -1448,6 +1448,7 @@ double MRISpercentDistanceError(MRIS *mris)
     dist_scale = sqrt(mris->orig_area / mris->total_area);
   }
 
+  double mean_dist  = 0.0;
   double mean_odist = 0.0;
   double mean_error = 0.0;
   double pct        = 0.0;
@@ -1461,16 +1462,21 @@ double MRISpercentDistanceError(MRIS *mris)
 
     int n;
     for (n = 0; n < vt->vtotal; n++) {
-      double dist  = v->dist     [n] * dist_scale;
-      double odist = v->dist_orig[n];
+      double dist  = !v->dist      ? 0.0 : v->dist     [n] * dist_scale;
+      double odist = !v->dist_orig ? 0.0 : v->dist_orig[n];
       
       nnbrs++;
+      mean_dist  +=  dist;
       mean_odist += odist;
       mean_error += fabs(dist - odist);
       if (!FZERO(odist)) pct += fabs(dist - odist) / odist;
     }
   }
 
+  if (mean_dist == 0.0f) {
+    fprintf(stdout, "%s:%d MRISpercentDistanceError called when all dist zero\n", __FILE__, __LINE__);
+  }
+  
   if (mean_odist == 0.0f) {
     fprintf(stdout, "%s:%d MRISpercentDistanceError called when all dist_orig zero\n", __FILE__, __LINE__);
   }
