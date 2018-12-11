@@ -2159,6 +2159,8 @@ void mrisCompleteTopology(MRI_SURFACE *mris) {
   if (use_new) mrisCompleteTopology_new(mris);
   else         mrisCompleteTopology_old(mris);
 
+  mrisCheckVertexFaceTopology(mris);
+
   if (debugNonDeterminism) {
     fprintf(stdout, "%s:%d mrisCompleteTopology ",__FILE__,__LINE__);
     mris_print_hash(stdout, mris, "mris ", "\n");

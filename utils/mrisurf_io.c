@@ -3077,8 +3077,6 @@ MRI_SURFACE *MRISreadVTK(MRI_SURFACE *mris, const char *fname)
 
   fclose(fp);
   
-  mrisCheckVertexFaceTopology(mris);
-  
   return (mris);
 }
 
@@ -3379,8 +3377,6 @@ static MRI_SURFACE *mrisReadAsciiFile(const char *fname)
   }
   fclose(fp);
   
-  mrisCheckVertexFaceTopology(mris);
-  
   return (mris);
 }
 
@@ -3453,8 +3449,6 @@ static MRI_SURFACE *mrisReadGeoFile(const char *fname)
   }
 
   fclose(fp);
-  
-  mrisCheckVertexFaceTopology(mris);
   
   return (mris);
 }
@@ -3860,8 +3854,6 @@ static MRI_SURFACE *mrisReadSTLfile(const char *fname)
     }
   }
 #endif
-
-  mrisCheckVertexFaceTopology(mris);
 
   return (mris);
 }

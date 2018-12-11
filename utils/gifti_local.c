@@ -710,7 +710,7 @@ MRIS *mrisReadGIFTIdanum(const char *fname, MRIS *mris, int daNum)
       }
     }
 
-    mrisCheckVertexFaceTopology(mris);
+    mrisCompleteTopology(mris);
     
     // check-for and read coordsys struct for talairach xform
     if (coords->coordsys && (coords->numCS > 0)) {
