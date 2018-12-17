@@ -6829,9 +6829,14 @@ short MRIScomputeSecondFundamentalFormDiscrete(MRIS *apmris, short ab_signedPrin
 
   retKH = 1;
   retk1k2 = 1;
-  MRISclearMarks(apmris);
+
+  MRISclearMarks(apmris);   // not clear this is needed before the next line
   MRIScomputeTriangleProperties(apmris);
-  MRIScomputeGeometricProperties(apmris);
+
+  // maybe this should have been here MRISclearMarks(apmris);
+  MRIS_facesAtVertices_reorder(apmris);
+  // this leaves marked set - don't know if this is required for the next step
+  
   retKH = MRIS_discreteKH_compute(apmris);
   retk1k2 = MRIS_discretek1k2_compute(apmris, ab_signedPrinciples);
   return (retKH | retk1k2);
@@ -15737,16 +15742,19 @@ MRIS* MRISclone(MRIS const * mris_src)
         }
       }
 
-      MRISmakeDist(mris_dst, vno);
-
-      if (vsrc->dist)
+      if (vsrc->dist) {
+        MRISmakeDist(mris_dst, vno);
         for (n = 0; n < vSize; n++) {
           vdst->dist[n] = vsrc->dist[n];
         }
-      if (vsrc->dist_orig)
+      }
+      
+      if (vsrc->dist_orig) {
+        MRISmakeDistOrig(mris_dst, vno);
         for (n = 0; n < vSize; n++) {
           vdst->dist_orig[n] = vsrc->dist_orig[n];
         }
+      }
     }
     
     vdst->border   = vsrc->border;

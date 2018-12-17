@@ -1819,8 +1819,7 @@ static MRIS *ICOtoScaledMRIS(ICOSAHEDRON const * const ico, int max_vertices, in
   }
 
   mrisCheckVertexFaceTopology(mris);
-
-  mrisComputeSurfaceDimensions(mris);  
+  
   MRIScomputeMetricProperties(mris);
   mris->radius = MRISaverageRadius(mris);
 

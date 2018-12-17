@@ -1594,8 +1594,8 @@ bool isFace(MRIS *mris, int vno0, int vno1, int vno2)
 void mrisSetVertexFaceIndex(MRIS *mris, int vno, int fno)
   // HACK - external usage of this should be eliminated!
 {
-  FACE const *      const f = &mris->faces[fno];
-  VERTEX_TOPOLOGY * const v = &mris->vertices_topology[vno];
+  FACE const *      const f  = &mris->faces[fno];
+  VERTEX_TOPOLOGY * const vt = &mris->vertices_topology[vno];
 
   int n;
   for (n = 0; n < VERTICES_PER_FACE; n++) {
@@ -1604,9 +1604,9 @@ void mrisSetVertexFaceIndex(MRIS *mris, int vno, int fno)
   cheapAssert(n < VERTICES_PER_FACE);
 
   int i;
-  for (i = 0; i < v->num; i++)
-    if (v->f[i] == fno) {
-      v->n[i] = n;
+  for (i = 0; i < vt->num; i++)
+    if (vt->f[i] == fno) {
+      vt->n[i] = n;
     }
 }
 
@@ -1620,6 +1620,14 @@ int mrisVertexFaceIndex(MRIS *mris, int vno, int fno) {
   return -1;
 }
 
+int mrisFaceVertexIndex(MRIS *mris, int fno, int vno) {
+  FACE const * const face = &mris->faces[fno];
+  int i;
+  for (i = 0; i < VERTICES_PER_FACE; i++) {
+    if (face->v[i] == vno) return i;
+  }
+  return -1;
+}
 
 int vertexInFace(MRIS *mris, int vno, int fno)
 {
@@ -2781,6 +2789,7 @@ int MRISevertSurface(MRIS *mris)
 }
 
 
+static short FACES_aroundVertex_reorder(MRIS *apmris, int avertex, VECTOR *pv_geometricOrder);
 
 int MRIS_facesAtVertices_reorder(MRIS *apmris)
 {
@@ -2796,42 +2805,52 @@ int MRIS_facesAtVertices_reorder(MRIS *apmris)
   //  o Note that the 'f' FACE array is changed at each vertex by
   //    this function.
   //
-  int vertex = 0;
-  int face = 0;
-  int nfaces = 0;
-  int orderedIndex = -1;
-  int orderedFace = -1;
-  VECTOR *pv_geometricOrderIndx = NULL;
-  VECTOR *pv_logicalOrderFace = NULL;
-  int ret = 1;
-  char *pch_function = "MRIS_facesAtVertices_reorder";
-
+  cheapAssert(MRIScountAllMarked(apmris) == 0);
+  
+  const char * const pch_function = "MRIS_facesAtVertices_reorder";
   DebugEnterFunction((pch_function));
   fprintf(stderr, "\n");
-  for (vertex = 0; vertex < apmris->nvertices; vertex++) {
-    MRIS_vertexProgress_print(apmris, vertex, "Determining geometric order for vertex faces...");
-    VERTEX_TOPOLOGY const * const pVERTEXt = &apmris->vertices_topology[vertex];
-    VERTEX                * const pVERTEX  = &apmris->vertices         [vertex];
-    nfaces = pVERTEXt->num;
-    pv_geometricOrderIndx = VectorAlloc(nfaces, MATRIX_REAL);
-    pv_logicalOrderFace = VectorAlloc(nfaces, MATRIX_REAL);
-    ret = FACES_aroundVertex_reorder(apmris, vertex, pv_geometricOrderIndx);
+
+  int ret = 1;
+  
+  int vno = 0;
+  for (vno = 0; vno < apmris->nvertices; vno++) {
+    MRIS_vertexProgress_print(apmris, vno, "Determining geometric order for vno faces...");
+
+    VERTEX_TOPOLOGY const * const vt = &apmris->vertices_topology[vno];
+    VERTEX                * const v  = &apmris->vertices         [vno];
+    int const nfaces = vt->num;
+    
+    VECTOR *pv_geometricOrderIndx = VectorAlloc(nfaces, MATRIX_REAL);
+    VECTOR *pv_logicalOrderFace   = VectorAlloc(nfaces, MATRIX_REAL);
+
+    ret = FACES_aroundVertex_reorder(apmris, vno, pv_geometricOrderIndx);
+
     if (ret < 0) {
-      pVERTEX->marked = 1;
-      continue;
+
+      v->marked = 1;
+
+    } else {
+
+      int n;
+      for (n = 0; n < nfaces; n++) {
+        VECTOR_ELT(pv_logicalOrderFace, n + 1) = vt->f[n];
+      }
+      for (n = 0; n < nfaces; n++) {
+        int const orderedIndex = VECTOR_ELT(pv_geometricOrderIndx, n + 1);
+        int const orderedFno   = VECTOR_ELT(pv_logicalOrderFace, orderedIndex + 1);
+        
+        vt->f[n] = orderedFno;
+        vt->n[n] = mrisFaceVertexIndex(apmris, orderedFno, vno);
+      }
     }
-    for (face = 0; face < nfaces; face++) {
-      VECTOR_ELT(pv_logicalOrderFace, face + 1) = pVERTEXt->f[face];
-    }
-    for (face = 0; face < nfaces; face++) {
-      orderedIndex = VECTOR_ELT(pv_geometricOrderIndx, face + 1);
-      orderedFace = VECTOR_ELT(pv_logicalOrderFace, orderedIndex + 1);
-      pVERTEXt->f[face] = orderedFace;
-    }
+        
     VectorFree(&pv_geometricOrderIndx);
     VectorFree(&pv_logicalOrderFace);
   }
+  
   MRISdilateMarked(apmris, 1);  // neighbors of vertices we couldn't process are also suspect and should be skipped
+
   xDbg_PopStack();
   
   mrisCheckVertexFaceTopology(apmris);
@@ -2840,24 +2859,7 @@ int MRIS_facesAtVertices_reorder(MRIS *apmris)
 }
 
 
-int MRIScomputeGeometricProperties(MRIS *apmris)
-{
-  //
-  // PRECONDITIONS
-  //  o Needs to be called before computing discrete curvatures.
-  //
-  // POSTCONDITIONS
-  //  o The face array at each vertex is re-ordered in a geometric sense.
-  //  o Each pair of bordering faces at each vertex are processed to
-  //    to determine overall convexity/concavity of "node".
-
-  int ret = 0;
-  ret = MRIS_facesAtVertices_reorder(apmris);
-  return ret;
-}
-
-
-short FACES_aroundVertex_reorder(MRIS *apmris, int avertex, VECTOR *pv_geometricOrder)
+static short FACES_aroundVertex_reorder(MRIS *apmris, int avertex, VECTOR *pv_geometricOrder)
 {
   //
   // PRECONDITIONS

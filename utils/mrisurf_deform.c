@@ -2125,7 +2125,7 @@ int mrisComputeIntensityTerm_mef(MRI_SURFACE *mris,
 int mrisComputeDistanceTerm(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
 {
   mrisComputeOriginalVertexDistancesIfNecessary(mris);
-  
+
   float l_dist, scale, norm;
   int vno, tno;
   int diag_vno1, diag_vno2;
@@ -2213,7 +2213,7 @@ int mrisComputeDistanceTerm(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
       VERTEX const * const vn = &mris->vertices[vt->v[n]];
       if (vn->ripflag) continue;
 
-      float const dist_orig_n = /*!v->dist_orig ? 0.0 : */v->dist_orig[n];
+      float const dist_orig_n = !v->dist_orig ? 0.0 : v->dist_orig[n];
 
       d0 = dist_orig_n / scale;
       dt = v->dist[n];
@@ -2287,7 +2287,7 @@ int mrisComputeDistanceTerm(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
       VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[Gdiag_no];
       VERTEX          const * const v  = &mris->vertices         [Gdiag_no];
       for (i = 0; i < vt->vtotal; i++) {
-        float const dist_orig_i = /*!v->dist_orig ? 0.0 : */ v->dist_orig[i];
+        float const dist_orig_i = !v->dist_orig ? 0.0 : v->dist_orig[i];
         fprintf(fp,
                 "%03d: %05d, %f   %f   %f\n",
                 i,
@@ -8582,7 +8582,7 @@ double mrisComputeDistanceError(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
       if (mris->vertices[vn_vno].neg) continue;
 
 #endif
-      float const dist_orig_n = /*!v->dist_orig ? 0.0 : */ v->dist_orig[n];
+      float const dist_orig_n = !v->dist_orig ? 0.0 : v->dist_orig[n];
       
       if (dist_orig_n >= UNFOUND_DIST) continue;
 

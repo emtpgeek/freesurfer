@@ -2455,12 +2455,6 @@ void	cprintd(
 	int		a_right
 );
 
-short	FACES_aroundVertex_reorder(
-	MRIS*			apmris,
-    	int			avertex,
-    	VECTOR*			pv_geometricOrder
-);
-
 short	FACE_vertexIndex_find(
     	FACE*			pFace,
     	int 			avertex 
@@ -2516,16 +2510,6 @@ int	VERTEX_faceMinMaxAngles_determine(
 
 int	MRIS_facesAtVertices_reorder(
     	MRIS*			apmris
-);
-
-int	MRIScomputeGeometricProperties(
-    	MRIS*			apmris
-);
-
-short	FACES_aroundVertex_reorder(
-    	MRIS*			apmris,
-    	int			avertex,
-    	VECTOR*			pv_geometricOrder
 );
 
 float	FACES_angleNormal_find(
