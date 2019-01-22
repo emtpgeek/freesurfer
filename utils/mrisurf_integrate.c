@@ -2075,6 +2075,7 @@ static double mrisLineMinimize(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
   }
   double const min_dt = MIN_MM / mean_delta;
 
+  struct MRIScomputeSSE_asThoughGradientApplied_ctx* sseCtx = NULL;
 
   double const starting_sse = MRIScomputeSSE(mris, parms);
 
@@ -2090,11 +2091,7 @@ static double mrisLineMinimize(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
     for (delta_t = delta; delta_t <= max_dt; delta_t += delta) {
       double predicted_sse = starting_sse - grad * delta_t;
 
-      MRISapplyGradient(mris, delta_t);
-      mrisProjectSurface(mris);
-      MRIScomputeMetricProperties(mris);
-      double sse = MRIScomputeSSE(mris, parms);
-      MRISrestoreOldPositions(mris);
+      double sse = MRIScomputeSSE_asThoughGradientApplied(mris, delta_t, parms, &sseCtx);
 
       fprintf(fp2, "%f  %f  %f\n", delta_t, sse, predicted_sse);
       fflush(fp);
@@ -2111,11 +2108,7 @@ static double mrisLineMinimize(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
   double delta_t;
   for (delta_t = min_dt; delta_t < max_dt; delta_t *= 10.0) {
 
-    MRISapplyGradient(mris, delta_t);
-    mrisProjectSurface(mris);
-    MRIScomputeMetricProperties(mris);
-    double sse = MRIScomputeSSE(mris, parms);
-    MRISrestoreOldPositions(mris);
+    double sse = MRIScomputeSSE_asThoughGradientApplied(mris, delta_t, parms, &sseCtx);
 
     if (sse <= min_sse) /* new minimum found */
     {
@@ -2128,11 +2121,7 @@ static double mrisLineMinimize(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
   {
     delta_t = min_dt / 10.0; /* start at smallest step */
 
-    MRISapplyGradient(mris, delta_t);
-    mrisProjectSurface(mris);
-    MRIScomputeMetricProperties(mris);
-    double sse = MRIScomputeSSE(mris, parms);
-    MRISrestoreOldPositions(mris);
+    double sse = MRIScomputeSSE_asThoughGradientApplied(mris, delta_t, parms, &sseCtx);
     
     min_sse = sse;
     min_delta = delta_t;
@@ -2156,17 +2145,8 @@ static double mrisLineMinimize(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
   double const dt0 = min_delta - (min_delta / 2);
   double const dt2 = min_delta + (min_delta / 2);
   
-  MRISapplyGradient(mris, dt0);
-  mrisProjectSurface(mris);
-  MRIScomputeMetricProperties(mris);
-  double const sse0 = MRIScomputeSSE(mris, parms);
-  MRISrestoreOldPositions(mris);
-
-  MRISapplyGradient(mris, dt2);
-  mrisProjectSurface(mris);
-  MRIScomputeMetricProperties(mris);
-  double const sse2 = MRIScomputeSSE(mris, parms);
-  MRISrestoreOldPositions(mris);
+  double sse0 = MRIScomputeSSE_asThoughGradientApplied(mris, dt0, parms, &sseCtx);
+  double sse2 = MRIScomputeSSE_asThoughGradientApplied(mris, dt2, parms, &sseCtx);
 
   /* now fit a quadratic form to these values */
   double dt_in[MAX_ENTRIES], sse_out[MAX_ENTRIES];
@@ -2226,11 +2206,7 @@ static double mrisLineMinimize(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
       
       if (new_min_delta < 10.0f * min_delta && new_min_delta > min_delta / 10.0f) {
 
-        MRISapplyGradient(mris, new_min_delta);
-        mrisProjectSurface(mris);
-        MRIScomputeMetricProperties(mris);
-        double const sse = MRIScomputeSSE(mris, parms);
-        MRISrestoreOldPositions(mris);
+        double sse = MRIScomputeSSE_asThoughGradientApplied(mris, new_min_delta, parms, &sseCtx);
 
         dt_in  [N] = new_min_delta;
         sse_out[N] = sse;
@@ -2245,6 +2221,9 @@ static double mrisLineMinimize(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
   MatrixFree(&m_xT);
   VectorFree(&vY);
   MatrixFree(&mX);
+
+  MRIScomputeSSE_asThoughGradientApplied_ctx_free(&sseCtx);
+
 
   if (Gdiag & DIAG_SHOW && DIAG_VERBOSE_ON) {
     fprintf(stdout, "sses: %2.2f  ", sse_out[0]);

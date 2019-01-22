@@ -8613,6 +8613,28 @@ int MRISapplyGradient(MRI_SURFACE *mris, double dt)
   return (NO_ERROR);
 }
 
+struct MRIScomputeSSE_asThoughGradientApplied_ctx {
+};
+
+void MRIScomputeSSE_asThoughGradientApplied_ctx_free(MRIScomputeSSE_asThoughGradientApplied_ctx** ctx) {
+  freeAndNULL(*ctx);
+}
+
+double MRIScomputeSSE_asThoughGradientApplied(
+  MRIS*                                           mris, 
+  double                                          delta_t, 
+  INTEGRATION_PARMS *                             parms,
+  MRIScomputeSSE_asThoughGradientApplied_ctx **   ctx) {
+  
+  MRISapplyGradient(mris, delta_t);
+  mrisProjectSurface(mris);
+  MRIScomputeMetricProperties(mris);
+  double sse = MRIScomputeSSE(mris, parms);
+  MRISrestoreOldPositions(mris);
+  
+  return sse;
+}
+
 
 /*-----------------------------------------------------
   Parameters:
