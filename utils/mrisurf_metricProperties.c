@@ -663,8 +663,44 @@ MRIS* MRIStalairachTransform(MRIS* mris_src, MRIS* mris)
   return mris;
 }
 
+MRIS* MRIStranslate_along_vertex_dxdydz(MRIS* mris_src, MRIS* mris_dst, double dt)
+{
+  if (!mris_dst) {
+    mris_dst = MRISclone(mris_src);
+  }
 
-MRIS* MRISrotate(MRIS *mris_src, MRIS *mris_dst, float alpha, float beta, float gamma)
+  MRISfreeDistsButNotOrig(mris_dst);  // it is either this or adjust them...
+
+  int const nvertices = mris_dst->nvertices;    cheapAssert(nvertices == mris_src->nvertices);
+  int vno;
+  ROMP_PF_begin
+#ifdef HAVE_OPENMP
+  #pragma omp parallel for if_ROMP(assume_reproducible) schedule(guided)
+#endif
+  for (vno = 0; vno < nvertices; vno++) {
+    ROMP_PFLB_begin
+
+    VERTEX const * const v_src = &mris_src->vertices[vno];
+    VERTEX       * const v_dst = &mris_dst->vertices[vno];
+    if (v_src->ripflag) ROMP_PF_continue;
+
+    if (!isfinite(v_src->x) || !isfinite(v_src->y) || !isfinite(v_src->z))
+      ErrorPrintf(ERROR_BADPARM, "vertex %d position is not finite!\n", vno);
+    if (!isfinite(v_src->dx) || !isfinite(v_src->dy) || !isfinite(v_src->dz))
+      ErrorPrintf(ERROR_BADPARM, "vertex %d position is not finite!\n", vno);
+
+    v_dst->x = v_src->x + dt * v_src->dx;
+    v_dst->y = v_src->y + dt * v_src->dy;
+    v_dst->z = v_src->z + dt * v_src->dz;
+
+    ROMP_PFLB_end
+  }
+  ROMP_PF_end
+  
+  return mris_dst;
+}
+
+MRIS* MRISrotate(MRIS* mris_src, MRIS* mris_dst, float alpha, float beta, float gamma)
 {
   if (!mris_dst) {
     mris_dst = MRISclone(mris_src);
@@ -1812,7 +1848,7 @@ int MRIScomputeMetricProperties(MRIS *mris)
   if (useNewBehaviour) {
     MRISfreeDistsButNotOrig(mris);                                      // So they can be stolen to avoid unnecessary mallocs and frees
   
-    MRISMP_load(mris, &mp);                                             // Copy the input data before MRIScomputeMetricPropertiesWkr changes it
+    MRISMP_load(&mp, mris);                                             // Copy the input data before MRIScomputeMetricPropertiesWkr changes it
     MRISMP_computeMetricProperties(&mp);                                // It should not matter the order these are done in
   }
   

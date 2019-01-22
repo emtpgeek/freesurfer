@@ -1448,7 +1448,10 @@ MRI_SURFACE  *MRISremoveNegativeVertices(MRI_SURFACE *mris,
     int min_neg, float min_neg_pct) ;
 int          MRIScomputeFaceAreas(MRI_SURFACE *mris) ;
 int          MRISupdateEllipsoidSurface(MRI_SURFACE *mris) ;
-MRI_SURFACE  *MRISrotate(MRI_SURFACE *mris_src, MRI_SURFACE *mris_dst,
+
+MRIS* MRIStranslate_along_vertex_dxdydz(MRIS* mris_src, MRIS* mris_dst, double dt);
+
+MRIS* MRISrotate(MRIS* mris_src, MRIS* mris_dst,
                          float alpha, float beta, float gamma) ;
 
 MRI          *MRISwriteIntoVolume(MRI_SURFACE *mris, MRI *mri, int which) ;

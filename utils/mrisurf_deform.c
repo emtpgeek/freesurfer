@@ -8577,62 +8577,65 @@ int mrisApplyGradientPositiveAreaMaximizing(MRI_SURFACE *mris, double dt)
   return mrisApplyGradientPositiveAreaPreserving(mris, dt);
 }
 
-int MRISapplyGradient(MRI_SURFACE *mris, double dt)
+int MRISapplyGradient(MRIS* mris, double dt)
 {
-  int vno, nvertices;
-
-  nvertices = mris->nvertices;
   MRISstoreCurrentPositions(mris);
+
   if (mris->status == MRIS_RIGID_BODY) {
     MRISrotate(mris, mris, dt * mris->alpha, dt * mris->beta, dt * mris->gamma);
-  }
-  else {
-    ROMP_PF_begin
-#ifdef HAVE_OPENMP
-    #pragma omp parallel for if_ROMP(assume_reproducible) schedule(static, 1)
-#endif
-    for (vno = 0; vno < nvertices; vno++) {
-      ROMP_PFLB_begin
-      
-      VERTEX *v;
-      v = &mris->vertices[vno];
-      if (v->ripflag) ROMP_PF_continue;
-
-      if (!isfinite(v->x) || !isfinite(v->y) || !isfinite(v->z))
-        ErrorPrintf(ERROR_BADPARM, "vertex %d position is not finite!\n", vno);
-      if (!isfinite(v->dx) || !isfinite(v->dy) || !isfinite(v->dz))
-        ErrorPrintf(ERROR_BADPARM, "vertex %d position is not finite!\n", vno);
-      v->x += dt * v->dx;
-      v->y += dt * v->dy;
-      v->z += dt * v->dz;
-      
-      ROMP_PFLB_end
-    }
-    ROMP_PF_end
+  } else {
+    MRIStranslate_along_vertex_dxdydz(mris, mris, dt);
   }
   return (NO_ERROR);
 }
 
 struct MRIScomputeSSE_asThoughGradientApplied_ctx {
+  MRIS_MP orig, curr;
 };
 
-void MRIScomputeSSE_asThoughGradientApplied_ctx_free(MRIScomputeSSE_asThoughGradientApplied_ctx** ctx) {
-  freeAndNULL(*ctx);
+void MRIScomputeSSE_asThoughGradientApplied_ctx_free(MRIScomputeSSE_asThoughGradientApplied_ctx** pctx) {
+  MRIScomputeSSE_asThoughGradientApplied_ctx* ctx = *pctx;
+  MRISMP_dtr(&ctx->curr);
+  MRISMP_dtr(&ctx->orig);
+  freeAndNULL(*pctx);
 }
 
 double MRIScomputeSSE_asThoughGradientApplied(
   MRIS*                                           mris, 
   double                                          delta_t, 
   INTEGRATION_PARMS *                             parms,
-  MRIScomputeSSE_asThoughGradientApplied_ctx **   ctx) {
+  MRIScomputeSSE_asThoughGradientApplied_ctx **   pctx) {
   
-  MRISapplyGradient(mris, delta_t);
-  mrisProjectSurface(mris);
-  MRIScomputeMetricProperties(mris);
-  double sse = MRIScomputeSSE(mris, parms);
-  MRISrestoreOldPositions(mris);
+  MRIScomputeSSE_asThoughGradientApplied_ctx* ctx = *pctx;
+  if (!ctx) {
+    ctx = *pctx = (MRIScomputeSSE_asThoughGradientApplied_ctx*)malloc(sizeof(MRIScomputeSSE_asThoughGradientApplied_ctx));
+    MRISMP_ctr(&ctx->orig);
+    MRISMP_ctr(&ctx->curr);
+    MRISMP_load(&ctx->orig, mris);
+  }
+  MRISMP_copy(&ctx->curr, &ctx->orig, true);    // copy the in and in_out fields only
+
+  bool const useOldBehaviour = !!getenv("FREESURFER_OLD_MRIScomputeSSE_asThoughGradientApplied");
+  bool const useNewBehaviour = !!getenv("FREESURFER_NEW_MRIScomputeSSE_asThoughGradientApplied") || !useOldBehaviour;
+
+  double old_result = 0.0;
+  if (useOldBehaviour) {
+    MRISapplyGradient(mris, delta_t);
+    mrisProjectSurface(mris);
+    MRIScomputeMetricProperties(mris);
+    old_result = MRIScomputeSSE(mris, parms);
+    MRISrestoreOldPositions(mris);
+  }
   
-  return sse;
+  double new_result = old_result;
+  if (useNewBehaviour) {
+    new_result = old_result;
+  }
+  
+  if (useOldBehaviour && useNewBehaviour && (old_result != new_result)) {
+  }
+  
+  return new_result;
 }
 
 
