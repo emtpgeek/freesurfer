@@ -18,8 +18,9 @@
  *
  */
 
-#include "mrisurf_base.h"
-
+#include "mrisurf_metricProperties.h"
 void mrisSphericalProjectXYZ(float xs, float ys, float zs, float *xd, float *yd, float *zd);
 
 void mrisSphericalProjection(MRIS *mris);
+
+void MRISMP_projectOntoSphere(MRIS_MP* mris, double r);

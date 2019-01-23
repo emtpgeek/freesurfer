@@ -198,11 +198,9 @@ typedef struct MRIS_MP {
 #define ELT(C,T,N) T C N;
 
   #define MRIS_MP__LIST_MRIS_IN \
-    ELT(const,  int,    status      ) SEP \
     ELT(const,  int,    nvertices   ) SEP \
     ELT(const,  int,    nfaces      ) SEP \
     ELT(const,  int,    nsize       ) SEP \
-    ELT(const,  double, radius      ) SEP \
     ELT(const,  VERTEX_TOPOLOGY const *, vertices_topology) \
     ELTX(const, FACE_TOPOLOGY   const *, faces_topology)
 
@@ -210,6 +208,8 @@ typedef struct MRIS_MP {
     
   // In out
   #define MRIS_MP__LIST_MRIS_IN_OUT \
+    ELT(,       int,    status      ) SEP \
+    ELT(,       double, radius      ) SEP \
     ELT(,       int,    dist_nsize  ) \
 
     MRIS_MP__LIST_MRIS_IN_OUT
@@ -307,3 +307,6 @@ void MRISMP_load(MRIS_MP* mp, MRIS* mris,
 void MRISMP_translate_along_vertex_dxdydz(MRIS_MP* mris_src, MRIS_MP* mris_dst, 
   double dt,
   float const* dx, float const* dy, float const* dz);               // the dx,dy,dz for ripped should be zero
+
+void MRISMP_computeMetricProperties(MRIS_MP* mris);
+void MRISMP_updateEllipsoidSurface(MRIS_MP* mris);

@@ -90,3 +90,51 @@ void mrisSphericalProjection(MRIS *mris)
   }
 }
 
+
+/*-----------------------------------------------------
+  Parameters:
+
+  Returns value:
+
+  Description
+  Perform a projection onto an sphere moving each
+  point on the cortical surface to the closest spherical
+  coordinate.
+  ------------------------------------------------------*/
+  
+#define FUNCTION_NAME MRISprojectOntoSphereWkr
+#include "mrisurf_project_projectOntoSphereWkr.h"
+
+#define COMPILING_MRIS_MP
+#define FUNCTION_NAME MRISMP_projectOntoSphereWkr
+#include "mrisurf_project_projectOntoSphereWkr.h"
+#undef  COMPILING_MRIS_MP
+
+
+MRIS* MRISprojectOntoSphere(MRIS* mris_src, MRIS* mris_dst, double r)
+{
+  if (!mris_dst) {
+    mris_dst = MRISclone(mris_src);
+    mris_dst->status = mris_src->status;    // added this, think it right - Bevin
+  }
+
+  if ((mris_dst->status != MRIS_SPHERE) && (mris_dst->status != MRIS_PARAMETERIZED_SPHERE)) {
+    MRIScenter(mris_dst, mris_dst);
+  }
+
+  MRISfreeDistsButNotOrig(mris_dst);
+
+  MRISprojectOntoSphereWkr(mris_dst, r);
+  
+  return (mris_dst);
+}
+
+
+void MRISMP_projectOntoSphere(MRIS_MP* mris, double r) 
+{
+  if ((mris->status != MRIS_SPHERE) && (mris->status != MRIS_PARAMETERIZED_SPHERE)) {
+    cheapAssert(false);
+  }
+
+  MRISMP_projectOntoSphereWkr(mris, r);
+}
