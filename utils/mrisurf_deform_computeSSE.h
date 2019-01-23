@@ -51,6 +51,13 @@ static double MRIScomputeSSE_CUDA(MRIS *mris, MRI_CUDA_SURFACE *mrisc, INTEGRATI
     #define COMPUTE_DISTANCE_ERROR mrisComputeDistanceErrorCUDA(mris, mrisc, parms)
 #endif
 
+// ELT  are only doable using MRIS
+// ELTM are also doable using MRIS_MP
+//
+#ifndef COMPILING_MRIS_MP
+#define ELTM(NAME,MULTIPLIER,COND,EXPR,EXPRM) ELT(NAME, MULTIPLIER, COND, EXPR)
+#endif
+
 #define SSE_TERMS \
       ELT(sse_area                  , parms->l_parea,                            true,    computed_area                                                                   ) SEP \
       ELT(sse_neg_area              , parms->l_area,                             true,    computed_neg_area                                                               ) SEP \
@@ -84,15 +91,41 @@ static double MRIScomputeSSE_CUDA(MRIS *mris, MRI_CUDA_SURFACE *mrisc, INTEGRATI
       ELT(sse_vectorCorrelationError, 1.0,                    use_multiframes,            mrisComputeVectorCorrelationError(mris, parms, 1)                               )     \
       // end of list
 
-
 #if defined(MRIS_COMPUTESSE_CUDA)
 static double MRIScomputeSSE_CUDA_new(MRIS *mris, MRI_CUDA_SURFACE *mrisc, INTEGRATION_PARMS *parms)
+
 #elif defined(COMPILING_MRIS_MP)
+bool MRISMP_computeSSE_canDo(INTEGRATION_PARMS *parms)
+{
+  bool   const use_multiframes  = !!(parms->flags & IP_USE_MULTIFRAMES);
+  double const l_corr           = (double)(parms->l_corr + parms->l_pcorr);
+
+  bool result = true;
+#define SEP
+#define ELT(NAME, MULTIPLIER, COND, EXPR) \
+  if (COND) { static bool reported = false; \
+    if (!reported) { reported = true; fprintf(stdout, "%s:%d can't do %s %s\n", __FILE__,__LINE__,#NAME,#EXPR); } \
+    result = false; \
+  }
+  SSE_TERMS
+#undef ELT
+#undef SEP
+  return result;
+}
+
+
 double MRISMP_computeSSE(MRIS_MP* mris, INTEGRATION_PARMS *parms, bool debug)
+
 #else
 double MRIScomputeSSE_new(MRIS* mris, INTEGRATION_PARMS *parms, bool debug)
 #endif
 
+#if defined(COMPILING_MRIS_MP)
+{
+  cheapAssert(false);
+  return 0.0;
+}
+#else
 {
   bool   const use_multiframes  = !!(parms->flags & IP_USE_MULTIFRAMES);
   double const l_corr           = (double)(parms->l_corr + parms->l_pcorr);
@@ -167,10 +200,14 @@ double MRIScomputeSSE_new(MRIS* mris, INTEGRATION_PARMS *parms, bool debug)
   MHT* mht_v_current = NULL;
   MHT* mht_f_current = NULL;
   if (!FZERO(parms->l_repulse)) {
+#ifdef COMPILING_MRIS_MP
+    cheapAssert(false);
+#else
     double vmean, vsigma;
     vmean = MRIScomputeTotalVertexSpacingStats(mris, &vsigma, NULL, NULL, NULL, NULL);
     mht_v_current = MHTcreateVertexTable_Resolution(mris, CURRENT_VERTICES, vmean);
     mht_f_current = MHTcreateFaceTable_Resolution  (mris, CURRENT_VERTICES, vmean);
+#endif
   }
 
 
@@ -225,10 +262,13 @@ double MRIScomputeSSE_new(MRIS* mris, INTEGRATION_PARMS *parms, bool debug)
 
   return sse;
 }
+#endif
 
 
 // OLD CODE
 
+
+#ifdef COMPILING_MRIS_MP
 
 #ifndef MRIS_COMPUTESSE_CUDA
 double MRIScomputeSSE_old(MRI_SURFACE *mris, INTEGRATION_PARMS *parms, bool debug)
@@ -506,6 +546,9 @@ static double MRIScomputeSSE_CUDA_old(MRI_SURFACE *mris, MRI_CUDA_SURFACE *mrisc
   }
   return (sse);
 }
+
+#endif
+
 
 #undef COMPUTE_DISTANCE_ERROR
 #undef SSE_TERMS

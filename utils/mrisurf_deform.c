@@ -8560,7 +8560,7 @@ double MRIScomputeSSE_asThoughGradientApplied(
   INTEGRATION_PARMS *                             parms,
   MRIScomputeSSE_asThoughGradientApplied_ctx **   pctx) {
   
-  bool const canUseNewBehaviour = mrismp_ProjectSurface_canDo(mris->status);
+  bool const canUseNewBehaviour = mrismp_ProjectSurface_canDo(mris->status) && MRISMP_computeSSE_canDo(parms);
 
   bool useOldBehaviour = !!getenv("FREESURFER_OLD_MRIScomputeSSE_asThoughGradientApplied");
   bool useNewBehaviour = !!getenv("FREESURFER_NEW_MRIScomputeSSE_asThoughGradientApplied") || !useOldBehaviour;
@@ -8599,7 +8599,7 @@ double MRIScomputeSSE_asThoughGradientApplied(
     
     mrismp_ProjectSurface(&ctx->curr);
     MRISMP_computeMetricProperties(&ctx->curr);
-    new_result = MRISMP_computeSSE(&ctx->curr, parms);
+    new_result = MRISMP_computeSSE(&ctx->curr, parms, false);
   }
 
   double old_result = 0.0;

@@ -202,5 +202,5 @@ int MRISrestoreExtraGradients(MRI_SURFACE *mris);
 
 int mrisLogStatus(MRI_SURFACE *mris, INTEGRATION_PARMS *parms, FILE *fp, float dt, float old_sse);
 
-
-double MRISMP_computeSSE(MRIS_MP* mris, INTEGRATION_PARMS *parms, bool debug);
+bool   MRISMP_computeSSE_canDo(               INTEGRATION_PARMS *parms);
+double MRISMP_computeSSE      (MRIS_MP* mris, INTEGRATION_PARMS *parms, bool debug);

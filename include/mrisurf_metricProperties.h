@@ -201,6 +201,9 @@ typedef struct MRIS_MP {
     ELT(const,  int,    nvertices   ) SEP \
     ELT(const,  int,    nfaces      ) SEP \
     ELT(const,  int,    nsize       ) SEP \
+    ELT(const,  int,    patch       ) SEP \
+    ELT(const,  int,    noscale     ) SEP \
+    ELT(const,  float,  orig_area   ) SEP \
     ELT(const,  VERTEX_TOPOLOGY const *, vertices_topology) \
     ELTX(const, FACE_TOPOLOGY   const *, faces_topology)
 
