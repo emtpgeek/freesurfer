@@ -8546,6 +8546,7 @@ struct MRIScomputeSSE_asThoughGradientApplied_ctx {
 
 void MRIScomputeSSE_asThoughGradientApplied_ctx_free(MRIScomputeSSE_asThoughGradientApplied_ctx** pctx) {
   MRIScomputeSSE_asThoughGradientApplied_ctx* ctx = *pctx;
+  if (!ctx) return;
   freeAndNULL(ctx->dx);
   freeAndNULL(ctx->dy);
   freeAndNULL(ctx->dz);
