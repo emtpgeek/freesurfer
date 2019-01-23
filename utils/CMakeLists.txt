@@ -159,6 +159,7 @@ set(SOURCES
   mrisurf_metricProperties.c
   mrisurf_mri.c
   mrisurf_obsolete.c
+  mrisurf_project.c
   mrisurf_timeStep.c
   mrisurf_topology.c
   mrisurf_vals.c

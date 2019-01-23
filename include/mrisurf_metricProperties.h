@@ -297,6 +297,13 @@ typedef struct MRIS_MP {
 
 void MRISMP_ctr(MRIS_MP* mp);
 void MRISMP_dtr(MRIS_MP* mp);
-void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src, bool only_inputs);     // if true, copy the in and in_out fields only
-void MRISMP_load(MRIS_MP* mp, MRIS* mris);
+void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src, 
+    bool only_inputs,           // if true, copy the in and in_out fields only
+    bool ignore_xyz);           // if true, don't copy the v_x[*] v_y[*] v_z[*]     NYI
+    
+void MRISMP_load(MRIS_MP* mp, MRIS* mris,
+  float * dx_or_NULL, float * dy_or_NULL, float * dz_or_NULL);      // loaded if not NULL, the dx,dy,dz for ripped set to zero
 
+void MRISMP_translate_along_vertex_dxdydz(MRIS_MP* mris_src, MRIS_MP* mris_dst, 
+  double dt,
+  float const* dx, float const* dy, float const* dz);               // the dx,dy,dz for ripped should be zero

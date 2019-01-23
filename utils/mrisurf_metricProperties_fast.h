@@ -57,7 +57,10 @@ void MRISMP_dtr(MRIS_MP* mp) {
   bzero(mp, sizeof(*mp));
 }
 
-void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src, bool only_inputs) {    // if true, copy the in and in_out fields only
+void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src, 
+  bool only_inputs,
+  bool ignore_xyz) {    // NYI
+  
   dst->underlyingMRIS = src->underlyingMRIS;
 
   // MRIS
@@ -106,7 +109,7 @@ void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src, bool only_inputs) {    // if true, 
 #undef ELTX
 #undef SEP
   }
-    
+
   // Faces
   //
 #define SEP
@@ -131,7 +134,12 @@ void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src, bool only_inputs) {    // if true, 
   }
 }
 
-void MRISMP_load(MRIS_MP* mp, MRIS* mris) {
+void MRISMP_load(MRIS_MP* mp, MRIS* mris,
+  float * dx_or_NULL, float * dy_or_NULL, float * dz_or_NULL) {
+
+  cheapAssert(!dx_or_NULL == !dy_or_NULL);
+  cheapAssert(!dx_or_NULL == !dz_or_NULL);
+  
   MRISMP_dtr(mp);
   MRISMP_ctr(mp);
 
@@ -184,6 +192,16 @@ void MRISMP_load(MRIS_MP* mp, MRIS* mris) {
 #undef ELT
 #undef ELTX
 #undef SEP
+    if (!dx_or_NULL) continue;
+    if (v->ripflag) {
+      dx_or_NULL[vno] = 0.0f;
+      dy_or_NULL[vno] = 0.0f;
+      dz_or_NULL[vno] = 0.0f;
+    } else {
+      dx_or_NULL[vno] = v->dx;
+      dy_or_NULL[vno] = v->dy;
+      dz_or_NULL[vno] = v->dz;
+    }
   }
     
   // Faces

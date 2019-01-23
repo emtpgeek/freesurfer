@@ -19,6 +19,7 @@
  *
  */
 #include "mrisurf_deform.h"
+#include "mrisurf_project.h"
 #include "mrisurf_io.h"
 
 
@@ -80,80 +81,55 @@ int MRISremoveTopologicalDefects(MRI_SURFACE *mris, float curv_thresh)
   return (NO_ERROR);
 }
 
-
-/* project onto the sphere of radius DEFAULT_RADIUS */
-static void sphericalProjection(float xs, float ys, float zs, float *xd, float *yd, float *zd)
+int MRISsmoothOnSphere(MRIS *mris, int niters)
 {
-  double dist, lambda;
+  int n, p;
+  float x, y, z;
 
-  dist = sqrt(SQR(xs) + SQR(ys) + SQR(zs));
-  lambda = DEFAULT_RADIUS / dist;
+  while (niters--) {
+    for (n = 0; n < mris->nvertices; n++) {
+      VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[n];
+      VERTEX                * const v  = &mris->vertices         [n];
 
-  /* making sure things are stable : double projection */
-  *xd = xs * lambda;
-  *yd = ys * lambda;
-  *zd = zs * lambda;
+      x = y = z = 0.0f;
 
-  xs = *xd;
-  ys = *yd;
-  zs = *zd;
-  dist = sqrt(SQR(xs) + SQR(ys) + SQR(zs));
-  lambda = DEFAULT_RADIUS / dist;
-
-  *xd = xs * lambda;
-  *yd = ys * lambda;
-  *zd = zs * lambda;
-}
-
-
-static int mrisSphericalProjection(MRIS *mris)
-{
-  int n;
-  VERTEX *v;
-  //    fprintf(stderr,"spherical projection\n");
-  for (n = 0; n < mris->nvertices; n++) {
-    v = &mris->vertices[n];
-    if (v->ripflag) {
-      continue;
+      for (p = 0; p < vt->vnum; p++) {
+        VERTEX * const vp = &mris->vertices[vt->v[p]];
+        x += vp->x;
+        y += vp->y;
+        z += vp->z;
+      }
+      if (vt->vnum == 0) {
+        v->tx = v->x;
+        v->ty = v->y;
+        v->tz = v->z;
+        DiagBreak();
+      }
+      else {
+        v->tx = x / vt->vnum;
+        v->ty = y / vt->vnum;
+        v->tz = z / vt->vnum;
+      }
+      if (!isfinite(v->tx)) {
+        DiagBreak();
+      }
     }
 
-    /*
-      if(n == 88 )
-      fprintf(stderr,"bf sp: vertex %d (%f,%f,%f)\n",n,v->x,v->y,v->z);
-      if(n == 89 )
-      fprintf(stderr,"bf sp: vertex %d (%f,%f,%f)\n",n,v->x,v->y,v->z);
-      if(n == 209 )
-      fprintf(stderr,"bf sp: nvertex %d (%f,%f,%f)\n",n,v->x,v->y,v->z);
-    */
-
-    sphericalProjection(v->x, v->y, v->z, &v->x, &v->y, &v->z);
-    v->cx = v->x;
-    v->cy = v->y;
-    v->cz = v->z;
-
-    /*
-      if(n == 88 )
-      fprintf(stderr,"af sp: vertex %d (%f,%f,%f)\n",n,v->x,v->y,v->z);
-      if(n == 89 )
-      fprintf(stderr,"af sp: vertex %d (%f,%f,%f)\n",n,v->x,v->y,v->z);
-      if(n == 209 )
-      fprintf(stderr,"af sp: nvertex %d (%f,%f,%f)\n",n,v->x,v->y,v->z);
-
-      sphericalProjection(v->x,v->y,v->z,&v->x,&v->y,&v->z);
-
-      if(n == 88 )
-      fprintf(stderr,"af 2 sp: vertex %d (%f,%f,%f)\n",n,v->x,v->y,v->z);
-      if(n == 89 )
-      fprintf(stderr,"af 2 sp: vertex %d (%f,%f,%f)\n",n,v->x,v->y,v->z);
-      if(n == 209 )
-      fprintf(stderr,"af 2 sp: nvertex %d (%f,%f,%f)\n",n,v->x,v->y,v->z);
-    */
+    for (n = 0; n < mris->nvertices; n++) {
+      VERTEX * const v  = &mris->vertices[n];
+      mrisSphericalProjectXYZ(v->tx, v->ty, v->tz, &v->x, &v->y, &v->z);
+      if (!isfinite(v->x)) {
+        DiagBreak();
+      }
+    }
   }
+
   return NO_ERROR;
 }
 
-static int mris_project_point_into_face(
-    MRI_SURFACE *mris, FACE *face, int which, double x, double y, double z, double *px, double *py, double *pz)
+
+static void mris_project_point_into_face(
+  MRIS *mris, FACE *face, int which, double x, double y, double z, double *px, double *py, double *pz)
 {
   double point[3], V0[3], V1[3], V2[3], proj[3];
 
@@ -214,12 +190,9 @@ static int mris_project_point_into_face(
   *px = proj[0];
   *py = proj[1];
   *pz = proj[2];
-
-  return (NO_ERROR);
 }
 
-
-static int mrisProjectOntoSurface(MRI_SURFACE *mris, int which_vertices)
+static void mrisProjectOntoSurface(MRI_SURFACE *mris, int which_vertices)
 {
   int vno, fno;
   double px, py, pz, fdist;
@@ -305,18 +278,9 @@ static int mrisProjectOntoSurface(MRI_SURFACE *mris, int which_vertices)
       DiagBreak();
     }
   }
-
-  return (NO_ERROR);
 }
 
 
-/*-----------------------------------------------------
-  Parameters:
-
-  Returns value:
-
-  Description
-  ------------------------------------------------------*/
 int mrisProjectSurface(MRI_SURFACE *mris)
 {
   /*  MRISupdateSurface(mris) ;*/
@@ -353,50 +317,32 @@ int mrisProjectSurface(MRI_SURFACE *mris)
 }
 
 
-int MRISsmoothOnSphere(MRIS *mris, int niters)
+bool mrismp_ProjectSurface_canDo(int mris_status)
 {
-  int n, p;
-  float x, y, z;
-
-  while (niters--) {
-    for (n = 0; n < mris->nvertices; n++) {
-      VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[n];
-      VERTEX                * const v  = &mris->vertices         [n];
-
-      x = y = z = 0.0f;
-
-      for (p = 0; p < vt->vnum; p++) {
-        VERTEX * const vp = &mris->vertices[vt->v[p]];
-        x += vp->x;
-        y += vp->y;
-        z += vp->z;
-      }
-      if (vt->vnum == 0) {
-        v->tx = v->x;
-        v->ty = v->y;
-        v->tz = v->z;
-        DiagBreak();
-      }
-      else {
-        v->tx = x / vt->vnum;
-        v->ty = y / vt->vnum;
-        v->tz = z / vt->vnum;
-      }
-      if (!isfinite(v->tx)) {
-        DiagBreak();
-      }
-    }
-
-    for (n = 0; n < mris->nvertices; n++) {
-      VERTEX * const v  = &mris->vertices[n];
-      sphericalProjection(v->tx, v->ty, v->tz, &v->x, &v->y, &v->z);
-      if (!isfinite(v->x)) {
-        DiagBreak();
-      }
-    }
+  switch (mris_status) {
+    case MRIS_PARAMETERIZED_SPHERE:
+      break;
+    case MRIS_SPHERE:
+      break;
+    default:
+      return false;
   }
+  return true;
+}
 
-  return NO_ERROR;
+
+void mrismp_ProjectSurface(MRIS_MP* mris)
+{
+  switch (mris->status) {
+    case MRIS_PARAMETERIZED_SPHERE:
+      MRISprojectOntoSphere(mris, mris, mris->radius);
+      break;
+    case MRIS_SPHERE:
+      MRISprojectOntoSphere(mris, mris, mris->radius);
+      break;
+    default:
+      cheapAssert(false);
+  }
 }
 
 
@@ -8534,14 +8480,14 @@ int mrisApplyGradientPositiveAreaPreserving(MRI_SURFACE *mris, double dt)
     step = 0;
     /* preserve triangle area */
     for (n = 0; n < vt->num && step < last_step; n++) {
-      sphericalProjection(x, y, z, &v->x, &v->y, &v->z);
+      mrisSphericalProjectXYZ(x, y, z, &v->x, &v->y, &v->z);
       orig_area = mrisComputeArea(mris, vt->f[n], (int)vt->n[n]);
       if (orig_area <= 0) {
         continue;
       }
       while (step < last_step) {
         eps = epsilon[step];
-        sphericalProjection(x + eps * dx, y + eps * dy, z + eps * dz, &v->x, &v->y, &v->z);
+        mrisSphericalProjectXYZ(x + eps * dx, y + eps * dy, z + eps * dz, &v->x, &v->y, &v->z);
         area = mrisComputeArea(mris, vt->f[n], (int)vt->n[n]);
         if (area > 0) {
           break; /* we can stop here */
@@ -8551,7 +8497,7 @@ int mrisApplyGradientPositiveAreaPreserving(MRI_SURFACE *mris, double dt)
     }
 
     eps = epsilon[step];
-    sphericalProjection(x + eps * dx, y + eps * dy, z + eps * dz, &v->x, &v->y, &v->z);
+    mrisSphericalProjectXYZ(x + eps * dx, y + eps * dy, z + eps * dz, &v->x, &v->y, &v->z);
   }
 
   neg_area = 0.0;
@@ -8591,10 +8537,14 @@ int MRISapplyGradient(MRIS* mris, double dt)
 
 struct MRIScomputeSSE_asThoughGradientApplied_ctx {
   MRIS_MP orig, curr;
+  float const *dx, *dy, *dz;
 };
 
 void MRIScomputeSSE_asThoughGradientApplied_ctx_free(MRIScomputeSSE_asThoughGradientApplied_ctx** pctx) {
   MRIScomputeSSE_asThoughGradientApplied_ctx* ctx = *pctx;
+  freeAndNULL(ctx->dx);
+  freeAndNULL(ctx->dy);
+  freeAndNULL(ctx->dz);
   MRISMP_dtr(&ctx->curr);
   MRISMP_dtr(&ctx->orig);
   freeAndNULL(*pctx);
@@ -8606,17 +8556,47 @@ double MRIScomputeSSE_asThoughGradientApplied(
   INTEGRATION_PARMS *                             parms,
   MRIScomputeSSE_asThoughGradientApplied_ctx **   pctx) {
   
-  MRIScomputeSSE_asThoughGradientApplied_ctx* ctx = *pctx;
-  if (!ctx) {
-    ctx = *pctx = (MRIScomputeSSE_asThoughGradientApplied_ctx*)malloc(sizeof(MRIScomputeSSE_asThoughGradientApplied_ctx));
-    MRISMP_ctr(&ctx->orig);
-    MRISMP_ctr(&ctx->curr);
-    MRISMP_load(&ctx->orig, mris);
-  }
-  MRISMP_copy(&ctx->curr, &ctx->orig, true);    // copy the in and in_out fields only
+  bool const canUseNewBehaviour = mrismp_ProjectSurface_canDo(mris->status);
 
-  bool const useOldBehaviour = !!getenv("FREESURFER_OLD_MRIScomputeSSE_asThoughGradientApplied");
-  bool const useNewBehaviour = !!getenv("FREESURFER_NEW_MRIScomputeSSE_asThoughGradientApplied") || !useOldBehaviour;
+  bool useOldBehaviour = !!getenv("FREESURFER_OLD_MRIScomputeSSE_asThoughGradientApplied");
+  bool useNewBehaviour = !!getenv("FREESURFER_NEW_MRIScomputeSSE_asThoughGradientApplied") || !useOldBehaviour;
+
+  if (!canUseNewBehaviour) {
+    useNewBehaviour = false;
+    useOldBehaviour = true;
+
+    static int shown = 0;
+    int shownMask = (1 << mris->status);
+    if (!(shown&shownMask)) { shown |= shownMask;
+      fprintf(stdout, "%s:%d need to process MRIS::status %d\n", __FILE__, __LINE__, mris->status);
+    }
+  }
+  
+  double new_result = 0.0;
+  if (useNewBehaviour) {
+    MRIScomputeSSE_asThoughGradientApplied_ctx* ctx = *pctx;
+    
+    if (!ctx) {
+      ctx = *pctx = (MRIScomputeSSE_asThoughGradientApplied_ctx*)malloc(sizeof(MRIScomputeSSE_asThoughGradientApplied_ctx));
+      MRISMP_ctr(&ctx->orig);
+      MRISMP_ctr(&ctx->curr);
+
+      float *dx, *dy, *dz;
+      MRISmemalignNFloats(mris->nvertices, &dx, &dy, &dz);
+      MRISMP_load(&ctx->orig, mris, dx,dy,dz);
+      ctx->dx = dx; ctx->dy = dy; ctx->dz = dz; 
+    }
+    
+    MRISMP_copy(&ctx->curr, &ctx->orig, 
+      true,   // copy the in and in_out fields only
+      true);  // no need to copy v_x[*] etc. because they are obtained by the translate_along_vertex_dxdydxz below
+
+    MRISMP_translate_along_vertex_dxdydz(&ctx->orig, &ctx->curr, delta_t, ctx->dx, ctx->dy, ctx->dz);
+    
+    mrismp_ProjectSurface(&ctx->curr);
+    MRISMP_computeMetricProperties(&ctx->curr);
+    new_result = MRISMP_computeSSE(&ctx->curr, parms);
+  }
 
   double old_result = 0.0;
   if (useOldBehaviour) {
@@ -8627,12 +8607,8 @@ double MRIScomputeSSE_asThoughGradientApplied(
     MRISrestoreOldPositions(mris);
   }
   
-  double new_result = old_result;
-  if (useNewBehaviour) {
-    new_result = old_result;
-  }
-  
   if (useOldBehaviour && useNewBehaviour && (old_result != new_result)) {
+    cheapAssert(false);
   }
   
   return new_result;
@@ -8816,7 +8792,7 @@ int mrisApplyTopologyPreservingGradient(MRI_SURFACE *mris, double dt, int which_
         step = 0;
         /* preserve triangle area */
         for (n = 0; n < vt->num && step < last_step; n++) {
-          sphericalProjection(x, y, z, &v->x, &v->y, &v->z);
+          mrisSphericalProjectXYZ(x, y, z, &v->x, &v->y, &v->z);
           v->cx = v->x;
           v->cy = v->y;
           v->cz = v->z;
@@ -8857,7 +8833,7 @@ int mrisApplyTopologyPreservingGradient(MRI_SURFACE *mris, double dt, int which_
             ErrorExit(ERROR_BADPARM, "mrisApplyTopologyPreservingGradient:SHOULD NOT HAPPEN\n");
           }
           while (step < last_step) {
-            sphericalProjection(
+            mrisSphericalProjectXYZ(
                 x + epsilon[step] * dx, y + epsilon[step] * dy, z + epsilon[step] * dz, &v->x, &v->y, &v->z);
             v->cx = v->x;
             v->cy = v->y;
@@ -8880,7 +8856,7 @@ int mrisApplyTopologyPreservingGradient(MRI_SURFACE *mris, double dt, int which_
           fprintf(stderr, ".");
         }
 #endif
-        sphericalProjection(
+        mrisSphericalProjectXYZ(
             x + epsilon[step] * dx, y + epsilon[step] * dy, z + epsilon[step] * dz, &v->x, &v->y, &v->z);
         v->cx = v->x;
         v->cy = v->y;
@@ -8898,7 +8874,7 @@ int mrisApplyTopologyPreservingGradient(MRI_SURFACE *mris, double dt, int which_
             continue;
           }
           /* test : could be removed */
-          sphericalProjection(x, y, z, &v->x, &v->y, &v->z);
+          mrisSphericalProjectXYZ(x, y, z, &v->x, &v->y, &v->z);
           v->cx = v->x;
           v->cy = v->y;
           v->cz = v->z;
@@ -8939,7 +8915,7 @@ int mrisApplyTopologyPreservingGradient(MRI_SURFACE *mris, double dt, int which_
           }
           /* end of test */
           while (step < last_step) {
-            sphericalProjection(
+            mrisSphericalProjectXYZ(
                 x + epsilon[step] * dx, y + epsilon[step] * dy, z + epsilon[step] * dz, &v->x, &v->y, &v->z);
             v->cx = v->x;
             v->cy = v->y;
@@ -8968,7 +8944,7 @@ int mrisApplyTopologyPreservingGradient(MRI_SURFACE *mris, double dt, int which_
           }
           e1.vno1 = vno;
           e1.vno2 = vt->v[n];
-          sphericalProjection(x, y, z, &v->x, &v->y, &v->z);
+          mrisSphericalProjectXYZ(x, y, z, &v->x, &v->y, &v->z);
           v->cx = v->x;
           v->cy = v->y;
           v->cz = v->z;
@@ -9005,7 +8981,7 @@ int mrisApplyTopologyPreservingGradient(MRI_SURFACE *mris, double dt, int which_
         while (step < last_step) {
           intersect = 0;
           /* new coordinates */
-          sphericalProjection(
+          mrisSphericalProjectXYZ(
               x + epsilon[step] * dx, y + epsilon[step] * dy, z + epsilon[step] * dz, &v->x, &v->y, &v->z);
           v->cx = v->x;
           v->cy = v->y;
@@ -9045,7 +9021,7 @@ int mrisApplyTopologyPreservingGradient(MRI_SURFACE *mris, double dt, int which_
           fprintf(stderr, ":");
         }
 #endif
-        sphericalProjection(
+        mrisSphericalProjectXYZ(
             x + epsilon[step] * dx, y + epsilon[step] * dy, z + epsilon[step] * dz, &v->x, &v->y, &v->z);
         v->cx = v->x;
         v->cy = v->y;
@@ -9070,7 +9046,7 @@ int mrisApplyTopologyPreservingGradient(MRI_SURFACE *mris, double dt, int which_
           }
           e1.vno1 = vno;
           e1.vno2 = vt->v[n];
-          sphericalProjection(x, y, z, &v->x, &v->y, &v->z);
+          mrisSphericalProjectXYZ(x, y, z, &v->x, &v->y, &v->z);
           v->cx = v->x;
           v->cy = v->y;
           v->cz = v->z;
@@ -9094,7 +9070,7 @@ int mrisApplyTopologyPreservingGradient(MRI_SURFACE *mris, double dt, int which_
         while (step < last_step) {
           intersect = 0;
           /* new coordinates */
-          sphericalProjection(
+          mrisSphericalProjectXYZ(
               x + epsilon[step] * dx, y + epsilon[step] * dy, z + epsilon[step] * dz, &v->x, &v->y, &v->z);
           v->cx = v->x;
           v->cy = v->y;
@@ -9134,7 +9110,7 @@ int mrisApplyTopologyPreservingGradient(MRI_SURFACE *mris, double dt, int which_
           fprintf(stderr, ",");
         }
 #endif
-        sphericalProjection(
+        mrisSphericalProjectXYZ(
             x + epsilon[step] * dx, y + epsilon[step] * dy, z + epsilon[step] * dz, &v->x, &v->y, &v->z);
         v->cx = v->x;
         v->cy = v->y;

@@ -663,6 +663,29 @@ MRIS* MRIStalairachTransform(MRIS* mris_src, MRIS* mris)
   return mris;
 }
 
+
+void MRISMP_translate_along_vertex_dxdydz(MRIS_MP* mris_src, MRIS_MP* mris_dst, 
+  double dt,
+  float const *dx, float const *dy, float const *dz)                            // the dx,dy,dz for ripped should be zero
+{
+  int const nvertices = mris_dst->nvertices;    cheapAssert(nvertices == mris_src->nvertices);
+
+  // This is not worth going parallel for
+  // since moving from one core's L2 cache to another is too expensive
+  //
+  int vno;
+  for (vno = 0; vno < nvertices; vno++) {
+
+    // the dx,dy,dz for ripped should be zero
+    // so this loop has a good chance to be vectorized if important
+    //
+    mris_dst->v_x[vno] = mris_src->v_x[vno] + dt * dx[vno];
+    mris_dst->v_y[vno] = mris_src->v_y[vno] + dt * dy[vno];
+    mris_dst->v_z[vno] = mris_src->v_z[vno] + dt * dz[vno];
+  }
+}
+
+
 MRIS* MRIStranslate_along_vertex_dxdydz(MRIS* mris_src, MRIS* mris_dst, double dt)
 {
   if (!mris_dst) {
@@ -1848,8 +1871,8 @@ int MRIScomputeMetricProperties(MRIS *mris)
   if (useNewBehaviour) {
     MRISfreeDistsButNotOrig(mris);                                      // So they can be stolen to avoid unnecessary mallocs and frees
   
-    MRISMP_load(&mp, mris);                                             // Copy the input data before MRIScomputeMetricPropertiesWkr changes it
-    MRISMP_computeMetricProperties(&mp);                                // It should not matter the order these are done in
+    MRISMP_load(&mp, mris, NULL, NULL, NULL);                           // Copy the input data before MRIScomputeMetricPropertiesWkr changes it
+    MRISMP_computeMetricProperties(&mp);                                // It should not matter the order old and new are done in
   }
   
   if (useOldBehaviour) {
