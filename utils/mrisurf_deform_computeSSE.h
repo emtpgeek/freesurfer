@@ -2,6 +2,7 @@
 
 #ifndef MRIS_COMPUTESSE_CUDA
 
+#ifndef COMPILING_MRIS_MP
 static double MRIScomputeSSE_new(MRIS *mris, INTEGRATION_PARMS *parms, bool debug);
 static double MRIScomputeSSE_old(MRIS *mris, INTEGRATION_PARMS *parms, bool debug);
 
@@ -18,6 +19,7 @@ double MRIScomputeSSE(MRIS *mris, INTEGRATION_PARMS *parms) {
     }
     return new_sse;
 }
+#endif
 
 #else
 
@@ -83,11 +85,14 @@ static double MRIScomputeSSE_CUDA(MRIS *mris, MRI_CUDA_SURFACE *mrisc, INTEGRATI
       // end of list
 
 
-#ifndef MRIS_COMPUTESSE_CUDA
-double MRIScomputeSSE_new(MRI_SURFACE *mris, INTEGRATION_PARMS *parms, bool debug)
+#if defined(MRIS_COMPUTESSE_CUDA)
+static double MRIScomputeSSE_CUDA_new(MRIS *mris, MRI_CUDA_SURFACE *mrisc, INTEGRATION_PARMS *parms)
+#elif defined(COMPILING_MRIS_MP)
+double MRISMP_computeSSE(MRIS_MP* mris, INTEGRATION_PARMS *parms, bool debug)
 #else
-static double MRIScomputeSSE_CUDA_new(MRI_SURFACE *mris, MRI_CUDA_SURFACE *mrisc, INTEGRATION_PARMS *parms)
+double MRIScomputeSSE_new(MRIS* mris, INTEGRATION_PARMS *parms, bool debug)
 #endif
+
 {
   bool   const use_multiframes  = !!(parms->flags & IP_USE_MULTIFRAMES);
   double const l_corr           = (double)(parms->l_corr + parms->l_pcorr);
@@ -103,16 +108,7 @@ static double MRIScomputeSSE_CUDA_new(MRI_SURFACE *mris, MRI_CUDA_SURFACE *mrisc
 
   if (!FZERO(parms->l_angle) || !FZERO(parms->l_area) || (!FZERO(parms->l_parea))) {
 
-#ifdef BEVIN_MRISCOMPUTESSE_CHECK
-    int trial; 
-    double relevant_angle_trial0, computed_neg_area_trial0, computed_area_trial0;
-    for (trial = 0; trial < 2; trial++) {
-
-#endif
-
     relevant_angle = 0; computed_neg_area = 0; computed_area = 0;
-
-#ifdef BEVIN_MRISCOMPUTESSE_REPRODUCIBLE
 
   #define ROMP_VARIABLE       fno
   #define ROMP_LO             0
@@ -134,23 +130,6 @@ static double MRIScomputeSSE_CUDA_new(MRI_SURFACE *mris, MRI_CUDA_SURFACE *mrisc
     #define computed_neg_area ROMP_PARTIALSUM(1)
     #define computed_area     ROMP_PARTIALSUM(2)
 
-#else
-
-    int fno;
-    
-    ROMP_PF_begin       // mris_register
-
-#ifdef BEVIN_MRISCOMPUTESSE_CHECK
-    #pragma omp parallel for if(trial==0) reduction(+ : relevant_angle, computed_neg_area, computed_area)
-#else
-#ifdef HAVE_OPENMP
-    #pragma omp parallel for if_ROMP(fast) reduction(+ : relevant_angle, computed_neg_area, computed_area)
-#endif
-#endif
-    for (fno = 0; fno < mris->nfaces; fno++) {
-      ROMP_PFLB_begin
-
-#endif      
       FACE const * const face = &mris->faces[fno];
       if (face->ripflag) ROMP_PF_continue;
       FaceNormCacheEntry const * const fNorm = getFaceNorm(mris, fno);
@@ -176,44 +155,12 @@ static double MRIScomputeSSE_CUDA_new(MRI_SURFACE *mris, MRI_CUDA_SURFACE *mrisc
       if (!isfinite(computed_area) || !isfinite(relevant_angle)) {
         ErrorExit(ERROR_BADPARM, "sse not finite at face %d!\n", fno);
       }
-#ifdef BEVIN_MRISCOMPUTESSE_REPRODUCIBLE
 
     #undef relevant_angle
     #undef computed_neg_area
     #undef computed_area
 
   #include "romp_for_end.h"
-
-#else
-      ROMP_PFLB_end
-    }
-    ROMP_PF_end
-#endif
-    
-#ifdef BEVIN_MRISCOMPUTESSE_CHECK
-
-    if (trial == 0) {
-       
-      relevant_angle_trial0 = relevant_angle;
-      computed_neg_area_trial0   = computed_neg_area;
-      computed_area_trial0       = computed_area;
-    } else { 
-      if (relevant_angle_trial0 != relevant_angle) {
-        fprintf(stderr, "%s:%d diff thread count, diff result %g %g %g\n",__FILE__,__LINE__,
-           relevant_angle_trial0, relevant_angle, relevant_angle_trial0-relevant_angle);
-      }
-      if (computed_neg_area_trial0 != computed_neg_area) {
-        fprintf(stderr, "%s:%d diff thread count, diff result %g %g %g\n",__FILE__,__LINE__,
-           computed_neg_area_trial0, computed_neg_area, computed_neg_area_trial0-computed_neg_area);
-      }
-      if (computed_area_trial0 != computed_area) {
-        fprintf(stderr, "%s:%d diff thread count, diff result %g %g %g\n",__FILE__,__LINE__,
-           computed_area_trial0, computed_area, computed_area_trial0-computed_area);
-      }
-    }
-    
-    } // trial
-#endif
 
   }
 
@@ -329,16 +276,7 @@ static double MRIScomputeSSE_CUDA_old(MRI_SURFACE *mris, MRI_CUDA_SURFACE *mrisc
 
   if (!FZERO(parms->l_angle) || !FZERO(parms->l_area) || (!FZERO(parms->l_parea))) {
 
-#ifdef BEVIN_MRISCOMPUTESSE_CHECK
-    int trial; 
-    double sse_angle_trial0, sse_neg_area_trial0, sse_area_trial0;
-    for (trial = 0; trial < 2; trial++) {
-
-#endif
-
     sse_angle = 0; sse_neg_area = 0; sse_area = 0;
-
-#ifdef BEVIN_MRISCOMPUTESSE_REPRODUCIBLE
 
   #define ROMP_VARIABLE       fno
   #define ROMP_LO             0
@@ -360,23 +298,6 @@ static double MRIScomputeSSE_CUDA_old(MRI_SURFACE *mris, MRI_CUDA_SURFACE *mrisc
     #define sse_neg_area ROMP_PARTIALSUM(1)
     #define sse_area     ROMP_PARTIALSUM(2)
 
-#else
-
-    int fno;
-    
-    ROMP_PF_begin       // mris_register
-
-#ifdef BEVIN_MRISCOMPUTESSE_CHECK
-    #pragma omp parallel for if(trial==0) reduction(+ : sse_angle, sse_neg_area, sse_area)
-#else
-#ifdef HAVE_OPENMP
-    #pragma omp parallel for if_ROMP(fast) reduction(+ : sse_angle, sse_neg_area, sse_area)
-#endif
-#endif
-    for (fno = 0; fno < mris->nfaces; fno++) {
-      ROMP_PFLB_begin
-
-#endif      
       FACE *face;
       double delta;
 
@@ -402,44 +323,12 @@ static double MRIScomputeSSE_CUDA_old(MRI_SURFACE *mris, MRI_CUDA_SURFACE *mrisc
       if (!isfinite(sse_area) || !isfinite(sse_angle)) {
         ErrorExit(ERROR_BADPARM, "sse not finite at face %d!\n", fno);
       }
-#ifdef BEVIN_MRISCOMPUTESSE_REPRODUCIBLE
 
     #undef sse_angle
     #undef sse_neg_area
     #undef sse_area
 
   #include "romp_for_end.h"
-
-#else
-      ROMP_PFLB_end
-    }
-    ROMP_PF_end
-#endif
-    
-#ifdef BEVIN_MRISCOMPUTESSE_CHECK
-
-    if (trial == 0) {
-       
-      sse_angle_trial0    = sse_angle;
-      sse_neg_area_trial0 = sse_neg_area;
-      sse_area_trial0     = sse_area;
-    } else { 
-      if (sse_angle_trial0 != sse_angle) {
-        fprintf(stderr, "%s:%d diff thread count, diff result %g %g %g\n",__FILE__,__LINE__,
-           sse_angle_trial0, sse_angle, sse_angle_trial0-sse_angle);
-      }
-      if (sse_neg_area_trial0 != sse_neg_area) {
-        fprintf(stderr, "%s:%d diff thread count, diff result %g %g %g\n",__FILE__,__LINE__,
-           sse_neg_area_trial0, sse_neg_area, sse_neg_area_trial0-sse_neg_area);
-      }
-      if (sse_area_trial0 != sse_area) {
-        fprintf(stderr, "%s:%d diff thread count, diff result %g %g %g\n",__FILE__,__LINE__,
-           sse_area_trial0, sse_area, sse_area_trial0-sse_area);
-      }
-    }
-    
-    } // trial
-#endif
 
   }
   

@@ -7704,7 +7704,11 @@ int mrisComputePosterior2DTerm(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
 #include "mrisurf_deform_computeSSE.h"
 #include "mrisurf_deform_computeSSE_CUDA.h"
 
-double MRIScomputeSSEExternal(MRI_SURFACE *mris, INTEGRATION_PARMS *parms, double *ext_sse)
+#define COMPILING_MRIS_MP
+#include "mrisurf_deform_computeSSE.h"
+#undef  COMPILING_MRIS_MP
+
+double MRIScomputeSSEExternal(MRIS* mris, INTEGRATION_PARMS *parms, double *ext_sse)
 {
   double sse;
 
