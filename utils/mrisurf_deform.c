@@ -8616,7 +8616,7 @@ double MRIScomputeSSE_asThoughGradientApplied(
     cheapAssert(false);
   }
   
-  return new_result;
+  return useOldBehaviour ? old_result : new_result;
 }
 
 
