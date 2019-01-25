@@ -36,18 +36,117 @@
 //====================================================================================
 // VERTEX SSE TERMS
 //
-double mrisComputeCorrelationError(MRIS *mris, INTEGRATION_PARMS *parms, int use_stds) {
-    return mrisComputeCorrelationErrorTraceable(mris, parms, use_stds, false);
+static double mrisComputeCorrelationErrorTerm(MRIS *mris, int vno, INTEGRATION_PARMS *parms, int use_stds, bool vertexTrace) {
+  VERTEX const * const v  = &mris->vertices[vno];
+  
+  float const x = v->x;
+  float const y = v->y;
+  float const z = v->z;
+
+#if 0
+  double const src = MRISPfunctionVal(parms->mrisp, mris, x, y, z, 0, vertexTrace) ;                                      // YUCK
+#else
+  double const src = v->curv;
+#endif
+
+  double const target = MRISPfunctionValTraceable(parms->mrisp_template, mris, x, y, z, parms->frame_no, vertexTrace);    // YUCK
+
+#define DEFAULT_STD 4.0f
+#define DISABLE_STDS 0
+#if DISABLE_STDS
+  double const std = 1.0f;
+#else
+  double std = MRISPfunctionValTraceable(parms->mrisp_template, mris, x, y, z, parms->frame_no + 1, vertexTrace);         // YUCK
+  std = sqrt(std);
+  if (FZERO(std)) {
+    std = DEFAULT_STD /*FSMALL*/;
+  }
+  if (!use_stds) {
+    std = 1.0f;
+  }
+#endif
+
+  double const delta = (src - target) / std;
+  if (!isfinite(target) || !isfinite(delta)) {
+    DiagBreak();
+  }
+
+  if (parms->geometry_error) {
+    parms->geometry_error[vno] = (delta * delta);                                                                         // YUCK
+  }
+
+  if (parms->abs_norm) {
+    return fabs(delta);
+  } else {
+    return delta * delta;
+  }
 }
 
-double mrisComputeCorrelationErrorTraceable(MRIS *mris, INTEGRATION_PARMS *parms, int use_stds, bool trace)
-{
-  float l_corr;
 
-  l_corr = parms->l_corr + parms->l_pcorr; /* only one will be nonzero */
-  if (FZERO(l_corr)) {
-    return (0.0);
+static double mrisComputeRepulsiveRatioEnergyTerm(MRIS *mris, int vno) {
+  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+  VERTEX          const * const v  = &mris->vertices         [vno];
+  
+  float const x = v->x;
+  float const y = v->y;
+  float const z = v->z;
+  float const cx = v->cx;
+  float const cy = v->cy;
+  float const cz = v->cz;
+  
+  double v_sse = 0.0;
+
+  int n;
+  for (n = 0; n < vt->vnum; n++) {
+    VERTEX const * const vn = &mris->vertices[vt->v[n]];
+
+    if (vn->ripflag) continue;
+
+    double dx = x - vn->x;
+    double dy = y - vn->y;
+    double dz = z - vn->z;
+    double dist = sqrt(dx * dx + dy * dy + dz * dz);
+    
+    double cdx = cx - vn->cx;
+    double cdy = cy - vn->cy;
+    double cdz = cz - vn->cz;
+    double canon_dist = sqrt(cdx * cdx + cdy * cdy + cdz * cdz) + REPULSE_E;
+    
+    dist /= canon_dist;
+    dist += REPULSE_E;
+
+#if 0
+    v_sse += REPULSE_K / (dist*dist*dist*dist) ;
+#else
+    v_sse += REPULSE_K / (dist * dist);
+#endif
   }
+
+  return v_sse;
+}
+
+
+static double mrisComputeSpringEnergyTerm(MRIS *mris, int vno, double area_scale) {
+  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+  VERTEX          const * const v  = &mris->vertices         [vno];
+  
+  double v_sse = 0.0;
+  int n;
+  for (n = 0; n < vt->vnum; n++) {
+    v_sse += (v->dist[n] * v->dist[n]);
+  }
+
+  return area_scale * v_sse;
+}
+
+
+// WALK ALL THE VERTICES
+//
+double mrisComputeCorrelationError(MRIS *mris, INTEGRATION_PARMS *parms, int use_stds, bool trace)
+{
+  float const l_corr = parms->l_corr + parms->l_pcorr; /* only one will be nonzero */
+
+  if (FZERO(l_corr)) return (0.0);
 
   double sse = 0.0;
   
@@ -70,52 +169,12 @@ double mrisComputeCorrelationErrorTraceable(MRIS *mris, INTEGRATION_PARMS *parms
     bool const vertexTrace = trace && (vno == 0);
     
     VERTEX *v = &mris->vertices[vno];
-    if (vno == Gdiag_no) {
-      DiagBreak();
-    }
+
     if (v->ripflag) {
       ROMP_PF_continue;
     }
 
-    double src, target, delta, std;
-    float x, y, z;
-
-    x = v->x;
-    y = v->y;
-    z = v->z;
-#if 0
-    src = MRISPfunctionVal(parms->mrisp, mris, x, y, z, 0, vertexTrace) ;
-#else
-    src = v->curv;
-#endif
-    target = MRISPfunctionValTraceable(parms->mrisp_template, mris, x, y, z, parms->frame_no, vertexTrace);
-#define DEFAULT_STD 4.0f
-#define DISABLE_STDS 0
-#if DISABLE_STDS
-    std = 1.0f;
-#else
-    std = MRISPfunctionValTraceable(parms->mrisp_template, mris, x, y, z, parms->frame_no + 1, vertexTrace);
-    std = sqrt(std);
-    if (FZERO(std)) {
-      std = DEFAULT_STD /*FSMALL*/;
-    }
-    if (!use_stds) {
-      std = 1.0f;
-    }
-#endif
-    delta = (src - target) / std;
-    if (!isfinite(target) || !isfinite(delta)) {
-      DiagBreak();
-    }
-    if (parms->geometry_error) {
-      parms->geometry_error[vno] = (delta * delta);
-    }
-    if (parms->abs_norm) {
-      sse += fabs(delta);
-    }
-    else {
-      sse += delta * delta;
-    }
+    sse += mrisComputeCorrelationErrorTerm(mris, vno, parms, use_stds, vertexTrace);
 
     #undef sse
   #include "romp_for_end.h"
@@ -126,52 +185,28 @@ double mrisComputeCorrelationErrorTraceable(MRIS *mris, INTEGRATION_PARMS *parms
 
 double mrisComputeRepulsiveRatioEnergy(MRIS *mris, double l_repulse)
 {
-  int vno, n;
-  double sse_repulse, v_sse, dist, dx, dy, dz, x, y, z, canon_dist, cdx, cdy, cdz;
+  int vno;
+  double sse_repulse;
 
   if (FZERO(l_repulse))
     return (0.0);
 
   for (sse_repulse = 0.0, vno = 0; vno < mris->nvertices; vno++) {
-    VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
-    VERTEX          const * const v  = &mris->vertices         [vno];
+    VERTEX const * const v  = &mris->vertices[vno];
 
     if (v->ripflag) 
       continue;
 
-    x = v->x;
-    y = v->y;
-    z = v->z;
-    for(v_sse = 0.0, n = 0; n < vt->vnum; n++) {
-      VERTEX const * const vn = &mris->vertices[vt->v[n]];
-      if (!vn->ripflag) {
-        dx = x - vn->x;
-        dy = y - vn->y;
-        dz = z - vn->z;
-        dist = sqrt(dx * dx + dy * dy + dz * dz);
-        cdx = vn->cx - v->cx;
-        cdy = vn->cy - v->cy;
-        cdz = vn->cz - v->cz;
-        canon_dist = sqrt(cdx * cdx + cdy * cdy + cdz * cdz) + REPULSE_E;
-        dist /= canon_dist;
-        dist += REPULSE_E;
-#if 0
-        v_sse += REPULSE_K / (dist*dist*dist*dist) ;
-#else
-        v_sse += REPULSE_K / (dist * dist);
-#endif
-      }
-    }
-    sse_repulse += v_sse;
+    sse_repulse += mrisComputeRepulsiveRatioEnergyTerm(mris, vno);
   }
+  
   return (l_repulse * sse_repulse);
 }
 
 
 double mrisComputeSpringEnergy(MRIS *mris)
 {
-  int vno, n;
-  double area_scale, sse_spring, v_sse;
+  double area_scale;
 
 #if METRIC_SCALE
   if (mris->patch) {
@@ -184,19 +219,17 @@ double mrisComputeSpringEnergy(MRIS *mris)
   area_scale = 1.0;
 #endif
 
-  for (sse_spring = 0.0, vno = 0; vno < mris->nvertices; vno++) {
-    VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
-    VERTEX          const * const v  = &mris->vertices         [vno];
-    if (v->ripflag) {
-      continue;
-    }
+  double sse_spring = 0.0;
 
-    for (v_sse = 0.0, n = 0; n < vt->vnum; n++) {
-      v_sse += (v->dist[n] * v->dist[n]);
-    }
-    sse_spring += area_scale * v_sse;
+  int vno;
+  for (vno = 0; vno < mris->nvertices; vno++) {
+    VERTEX const * const v = &mris->vertices[vno];
+    if (v->ripflag) continue;
+
+    sse_spring += mrisComputeSpringEnergyTerm(mris, vno, area_scale);
   }
-  return (sse_spring);
+  
+  return sse_spring;
 }
 
 

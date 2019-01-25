@@ -7313,7 +7313,7 @@ double mrisComputeError(MRI_SURFACE *mris,
       ErrorExit(ERROR_BADPARM, "sse (%f, %f) is not finite at face %d!\n", sse_area, sse_angle, fno);
   }
 
-  sse_corr = mrisComputeCorrelationError(mris, parms, 1);
+  sse_corr = mrisComputeCorrelationError(mris, parms, 1, false);
   if (!DZERO(parms->l_dist)) {
     sse_dist = mrisComputeDistanceError(mris, parms);
   }
@@ -8146,7 +8146,7 @@ double MRIScomputeSSE_asThoughGradientApplied(
     
     mrismp_ProjectSurface(&ctx->curr);
     MRISMP_computeMetricProperties(&ctx->curr);
-    new_result = MRISMP_computeSSE(&ctx->curr, parms, false);
+    new_result = MRISMP_computeSSE(&ctx->curr, parms);
   }
 
   double old_result = 0.0;
@@ -12292,7 +12292,7 @@ int MRISrigidBodyAlignGlobal(
                 vertex0->x,vertex0->y,vertex0->z); 
             }
             
-            double sse = mrisComputeCorrelationErrorTraceable(mris, parms, 1, trace);
+            double sse = mrisComputeCorrelationError(mris, parms, 1, trace);
             if (trace) fprintf(stdout, "%s:%d sse:%g\n", __FILE__, __LINE__, sse);
             
             MRISrestoreVertexPositions(mris, TMP_VERTICES);
@@ -12842,7 +12842,7 @@ double MRIScomputeCorrelationError(MRIS *mris, MRI_SP *mrisp_template, int fno)
   parms.mrisp_template = mrisp_template;
   parms.l_corr = 1.0f;
   parms.frame_no = fno;
-  error = mrisComputeCorrelationError(mris, &parms, 1);
+  error = mrisComputeCorrelationError(mris, &parms, 1, false);
   return (sqrt(error / (double)MRISvalidVertices(mris)));
 }
 

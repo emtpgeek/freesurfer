@@ -40,8 +40,7 @@ int mrisTearStressedRegions(MRI_SURFACE *mris, INTEGRATION_PARMS *parms);
 int mrisSmoothBoundaryNormals(MRI_SURFACE *mris, int niter);
 
 
-double mrisComputeCorrelationError              (MRI_SURFACE *mris, INTEGRATION_PARMS *parms, int use_stds);
-double mrisComputeCorrelationErrorTraceable     (MRI_SURFACE *mris, INTEGRATION_PARMS *parms, int use_stds, bool trace);
+double mrisComputeCorrelationError              (MRI_SURFACE *mris, INTEGRATION_PARMS *parms, int use_stds, bool trace);
 double mrisComputeDistanceError                 (MRI_SURFACE *mris, INTEGRATION_PARMS *parms);
 double mrisComputeDuraError                     (MRI_SURFACE *mris, INTEGRATION_PARMS *parms);
 double mrisComputeExpandwrapError               (MRI_SURFACE *mris, MRI *mri_brain, double l_expandwrap, double target_radius);
@@ -203,4 +202,4 @@ int MRISrestoreExtraGradients(MRI_SURFACE *mris);
 int mrisLogStatus(MRI_SURFACE *mris, INTEGRATION_PARMS *parms, FILE *fp, float dt, float old_sse);
 
 bool   MRISMP_computeSSE_canDo(               INTEGRATION_PARMS *parms);
-double MRISMP_computeSSE      (MRIS_MP* mris, INTEGRATION_PARMS *parms, bool debug);
+double MRISMP_computeSSE      (MRIS_MP* mris, INTEGRATION_PARMS *parms);
