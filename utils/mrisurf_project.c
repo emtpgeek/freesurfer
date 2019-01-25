@@ -138,3 +138,36 @@ void MRISMP_projectOntoSphere(MRIS_MP* mris, double r)
 
   MRISMP_projectOntoSphereWkr(mris, r);
 }
+
+
+void mrisAssignFaces(MRIS *mris, MHT *mht, int which_vertices)
+{
+  int vno;
+
+  ROMP_PF_begin
+#ifdef HAVE_OPENMP
+  #pragma omp parallel for if_ROMP(experimental)
+#endif
+  for (vno = 0; vno < mris->nvertices; vno++) {
+    ROMP_PFLB_begin 
+    
+    VERTEX *v = &mris->vertices[vno];
+    if (v->ripflag) continue;
+
+    if (vno == Gdiag_no) DiagBreak();
+
+    project_point_onto_sphere(v->x, v->y, v->z, mris->radius, &v->x, &v->y, &v->z);
+
+    int fno;
+    FACE *face;
+    double fdist;
+
+    MHTfindClosestFaceGeneric(mht, mris, v->x, v->y, v->z, 8, 8, 1, &face, &fno, &fdist);
+    if (fno < 0) MHTfindClosestFaceGeneric(mht, mris, v->x, v->y, v->z, 1000, -1, -1, &face, &fno, &fdist);
+
+    v->fno = fno;
+    
+    ROMP_PFLB_end
+  }
+  ROMP_PF_end
+}

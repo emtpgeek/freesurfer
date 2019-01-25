@@ -27,7 +27,6 @@
 
 #include "mrisurf_metricProperties.h"
 
-double MRIScomputeCorrelationError              (MRIS *mris, MRI_SP *mrisp_template, int fno);
 double mrisComputeCorrelationError              (MRIS *mris, INTEGRATION_PARMS *parms, int use_stds);
 double mrisComputeCorrelationErrorTraceable     (MRIS *mris, INTEGRATION_PARMS *parms, int use_stds, bool trace);
 double mrisComputeRepulsiveRatioEnergy          (MRIS *mris, double l_repulse);
@@ -38,6 +37,3 @@ double mrisComputeThicknessSpringEnergy         (MRIS *mris, double l_thick_spri
 double mrisComputeThicknessParallelEnergy       (MRIS *mris, double l_thick_parallel,   INTEGRATION_PARMS *parms);
 double mrisComputeThicknessSmoothnessEnergy     (MRIS *mris, double l_tsmooth,          INTEGRATION_PARMS *parms);
 double mrisComputeNonlinearAreaSSE              (MRIS *mris);
-
-
-void mrisAssignFaces(MRIS *mris, MHT *mht, int which_vertices);

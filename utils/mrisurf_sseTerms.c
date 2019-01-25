@@ -13,6 +13,7 @@
  *
  */
 #include "mrisurf_sseTerms.h"
+#include "mrisurf_project.h"
 
 
 // The SSE terms are either computed by iterating over the vertices or the faces
@@ -29,60 +30,12 @@
 
 // Utilities
 //
-void mrisAssignFaces(MRIS *mris, MHT *mht, int which_vertices)
-{
-  int vno;
-
-  ROMP_PF_begin
-#ifdef HAVE_OPENMP
-  #pragma omp parallel for if_ROMP(experimental)
-#endif
-  for (vno = 0; vno < mris->nvertices; vno++) {
-    ROMP_PFLB_begin 
-    
-    int fno;
-    VERTEX *v;
-    double fdist;
-    FACE *face;
-
-    v = &mris->vertices[vno];
-    if (v->ripflag) continue;
-
-    if (vno == Gdiag_no) DiagBreak();
-
-    project_point_onto_sphere(v->x, v->y, v->z, mris->radius, &v->x, &v->y, &v->z);
-    MHTfindClosestFaceGeneric(mht, mris, v->x, v->y, v->z, 8, 8, 1, &face, &fno, &fdist);
-    if (fno < 0) MHTfindClosestFaceGeneric(mht, mris, v->x, v->y, v->z, 1000, -1, -1, &face, &fno, &fdist);
-
-    v->fno = fno;
-    
-    ROMP_PFLB_end
-  }
-  ROMP_PF_end
-}
 
 
 
 //====================================================================================
 // VERTEX SSE TERMS
 //
-double MRIScomputeCorrelationError(MRIS *mris, MRI_SP *mrisp_template, int fno)
-{
-  INTEGRATION_PARMS parms;
-  float error;
-
-  if (!mrisp_template) {
-    return (0.0);
-  }
-
-  memset(&parms, 0, sizeof(parms));
-  parms.mrisp_template = mrisp_template;
-  parms.l_corr = 1.0f;
-  parms.frame_no = fno;
-  error = mrisComputeCorrelationError(mris, &parms, 1);
-  return (sqrt(error / (double)MRISvalidVertices(mris)));
-}
-
 double mrisComputeCorrelationError(MRIS *mris, INTEGRATION_PARMS *parms, int use_stds) {
     return mrisComputeCorrelationErrorTraceable(mris, parms, use_stds, false);
 }
@@ -98,8 +51,6 @@ double mrisComputeCorrelationErrorTraceable(MRIS *mris, INTEGRATION_PARMS *parms
 
   double sse = 0.0;
   
-#ifdef BEVIN_MRISCOMPUTECORRELATIONERROR_REPRODUCIBLE
-
   #define ROMP_VARIABLE       vno
   #define ROMP_LO             0
   #define ROMP_HI             mris->nvertices
@@ -115,20 +66,6 @@ double mrisComputeCorrelationErrorTraceable(MRIS *mris, INTEGRATION_PARMS *parms
   ROMP_for_begin
     
     #define sse  ROMP_PARTIALSUM(0)
-    
-#else
-  int vno;
-
-  ROMP_PF_begin         // Important during mris_register
- 
-#ifdef HAVE_OPENMP
-  #pragma omp parallel for if_ROMP(fast) reduction(+ : sse)
-#endif
-
-  for (vno = 0; vno < mris->nvertices; vno++) {
-    ROMP_PFLB_begin
-
-#endif
     
     bool const vertexTrace = trace && (vno == 0);
     
@@ -179,16 +116,9 @@ double mrisComputeCorrelationErrorTraceable(MRIS *mris, INTEGRATION_PARMS *parms
     else {
       sse += delta * delta;
     }
-#ifdef BEVIN_MRISCOMPUTECORRELATIONERROR_REPRODUCIBLE
 
     #undef sse
   #include "romp_for_end.h"
-
-#else
-    ROMP_PFLB_end
-  }
-  ROMP_PF_end
-#endif
 
   return (sse);
 }
@@ -570,15 +500,8 @@ double mrisComputeNonlinearAreaSSE(MRIS *mris)
 
   double sse;
 
-#ifdef BEVIN_MRISCOMPUTENONLINEARAREASSE_CHECK
-  int trial; 
-  double sse_trial0;
-  for (trial = 0; trial < 2; trial++) {
-#endif
-
   sse = 0;
   
-#ifdef BEVIN_MRISCOMPUTENONLINEARAREASSE_REPRODUCIBLE
   #define ROMP_VARIABLE       fno
   #define ROMP_LO             0
   #define ROMP_HI             mris->nfaces
@@ -595,23 +518,6 @@ double mrisComputeNonlinearAreaSSE(MRIS *mris)
     
     #define sse  ROMP_PARTIALSUM(0)
 
-#else
-  int fno;
-  
-  ROMP_PF_begin     // mris_register
-  
-#ifdef BEVIN_MRISCOMPUTENONLINEARAREASSE_CHECK
-  #pragma omp parallel for if(trial==0) reduction(+ : sse)
-#else
-#ifdef HAVE_OPENMP
-  #pragma omp parallel for if_ROMP(fast) reduction(+ : sse)
-#endif
-#endif
-  for (fno = 0; fno < mris->nfaces; fno++) {
-    ROMP_PFLB_begin
-
-#endif
-    
     double error, ratio;
     FACE *face;
 
@@ -647,28 +553,8 @@ double mrisComputeNonlinearAreaSSE(MRIS *mris)
       ErrorExit(ERROR_BADPARM, "nlin area sse not finite at face %d!\n", fno);
     }
     
-#ifdef BEVIN_MRISCOMPUTENONLINEARAREASSE_REPRODUCIBLE
-
     #undef sse
   #include "romp_for_end.h"
-#else
   
-    ROMP_PFLB_end
-  }
-  ROMP_PF_end
-#endif
-  
-#ifdef BEVIN_MRISCOMPUTENONLINEARAREASSE_CHECK
-    if (trial == 0) {
-        sse_trial0 = sse;
-    } else { 
-        if (sse_trial0 != sse) {
-            fprintf(stderr, "%s:%d diff thread count, diff result %g %g %g\n",__FILE__,__LINE__,
-               sse_trial0, sse, sse_trial0-sse);
-        }
-    }
-  } // trial
-#endif
-
   return (sse);
 }

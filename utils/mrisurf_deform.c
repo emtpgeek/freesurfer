@@ -12828,3 +12828,21 @@ int mrisAddFace(MRI_SURFACE *mris, int vno0, int vno1, int vno2)
   return (NO_ERROR);
 }
 
+
+double MRIScomputeCorrelationError(MRIS *mris, MRI_SP *mrisp_template, int fno)
+{
+  INTEGRATION_PARMS parms;
+  float error;
+
+  if (!mrisp_template) {
+    return (0.0);
+  }
+
+  memset(&parms, 0, sizeof(parms));
+  parms.mrisp_template = mrisp_template;
+  parms.l_corr = 1.0f;
+  parms.frame_no = fno;
+  error = mrisComputeCorrelationError(mris, &parms, 1);
+  return (sqrt(error / (double)MRISvalidVertices(mris)));
+}
+
