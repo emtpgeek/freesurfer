@@ -173,7 +173,7 @@ double MRIScomputeSSE(MRIS* mris, INTEGRATION_PARMS *parms)
   }
 
   float* v_thick_sq = NULL;
-#define INIT_V_THICK_SQ (v_thick_sq = (float*)calloc(mris->nvertices, sizeof(float)))
+#define INIT_V_THICK_SQ NULL    //  keeps the old behaviour     new would be   (v_thick_sq = (float*)calloc(mris->nvertices, sizeof(float)))
     //
     // This detects whether the current weird behavior of the code is used:
     // one of the early terms overwrites Vertex::curv and a later term reads the overwritten values
@@ -216,7 +216,9 @@ double MRIScomputeSSE(MRIS* mris, INTEGRATION_PARMS *parms)
 #undef ELT
 #undef SEP
 
-  if (false) {
+  static bool laterTime, logSSE;
+  if (!laterTime) { laterTime = true; logSSE = !!getenv("FREESURFER_logSSE"); }
+  if (false || logSSE) {
     #define SEP
     double sum = 0;
     #define ELT(NAME, MULTIPLIER, COND, EXPR) fprintf(stdout, "new %s : %f \n", #NAME, (MULTIPLIER) * (NAME));  sum += (MULTIPLIER) * (NAME);
