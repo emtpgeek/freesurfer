@@ -46,17 +46,17 @@ static double mrisComputeCorrelationErrorTerm(MRIS *mris, int vno, INTEGRATION_P
 #if 0
   double const src = MRISPfunctionVal(parms->mrisp, mris, x, y, z, 0, vertexTrace) ;                                      // YUCK
 #else
-  double const src = v->curv;
+  double const src = v->curv;                                                                                             // YUCK - this is written by mrisComputeThicknessMinimizationEnergyTerm
 #endif
 
-  double const target = MRISPfunctionValTraceable(parms->mrisp_template, mris, x, y, z, parms->frame_no, vertexTrace);    // YUCK
+  double const target = MRISPfunctionValTraceable(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no, vertexTrace);    // YUCK
 
 #define DEFAULT_STD 4.0f
 #define DISABLE_STDS 0
 #if DISABLE_STDS
   double const std = 1.0f;
 #else
-  double std = MRISPfunctionValTraceable(parms->mrisp_template, mris, x, y, z, parms->frame_no + 1, vertexTrace);         // YUCK
+  double std = MRISPfunctionValTraceable(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no + 1, vertexTrace);         // YUCK
   std = sqrt(std);
   if (FZERO(std)) {
     std = DEFAULT_STD /*FSMALL*/;
@@ -137,6 +137,96 @@ static double mrisComputeSpringEnergyTerm(MRIS *mris, int vno, double area_scale
   }
 
   return area_scale * v_sse;
+}
+
+
+static double mrisComputeThicknessMinimizationEnergyTerm(MRIS *mris, int vno, INTEGRATION_PARMS *parms) {
+  VERTEX /* const */ * const v = &mris->vertices[vno];                                      // YUCK
+
+  float thick_sq = mrisSampleMinimizationEnergy(mris, v, parms, v->x, v->y, v->z);
+  v->curv = sqrt(thick_sq);                                                                 // YUCK
+
+  return thick_sq;
+}
+
+
+static double mrisComputeThicknessNormalEnergyTerm(MRIS *mris, int vno, INTEGRATION_PARMS *parms) {
+  VERTEX const * const v = &mris->vertices[vno];
+  return mrisSampleNormalEnergy(mris, v, parms, v->x, v->y, v->z);
+}
+
+
+static double mrisComputeThicknessSpringEnergyTerm(MRIS *mris, int vno, INTEGRATION_PARMS *parms) {
+  VERTEX const * const v = &mris->vertices[vno];
+  return mrisSampleSpringEnergy(mris, vno, v->x, v->y, v->z, parms);
+}
+
+
+static double mrisComputeThicknessParallelEnergyTerm(MRIS *mris, int vno, INTEGRATION_PARMS *parms) {
+  VERTEX * const v = &mris->vertices[vno];
+  return mrisSampleParallelEnergy(mris, vno, parms, v->x, v->y, v->z);
+}
+
+
+static double mrisComputeThicknessSmoothnessEnergyTerm(MRIS *mris, int vno, INTEGRATION_PARMS *parms) {
+  VERTEX * const v = &mris->vertices[vno];
+  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+
+  float xp,yp,zp;
+  MRISsampleFaceCoordsCanonical((MHT *)(parms->mht), mris, v->x, v->y, v->z, PIAL_VERTICES, &xp, &yp, &zp);
+
+  double d0 = SQR(xp - v->whitex) + SQR(yp - v->whitey) + SQR(zp - v->whitez);
+  double v_sse = 0.0;
+  
+  int n;
+  for (n = 0; n < vt->vnum; n++) {
+    VERTEX const * const vn = &mris->vertices[vt->v[n]];
+    if (vn->ripflag) continue;
+
+    float xp, yp, zp;
+    MRISsampleFaceCoordsCanonical((MHT *)(parms->mht), mris, vn->x, vn->y, vn->z, PIAL_VERTICES, &xp, &yp, &zp);
+
+    double dx = xp - vn->whitex;
+    double dy = yp - vn->whitey;
+    double dz = zp - vn->whitez;
+    double dn = (dx * dx + dy * dy + dz * dz);
+    v_sse += (dn - d0) * (dn - d0);
+  }
+
+  return v_sse;
+}
+
+
+static double mrisComputeNonlinearAreaSSETerm(MRIS *mris, int fno, double area_scale) {
+  FACE *face = &mris->faces[fno];
+  
+  double ratio;
+#define SCALE_NONLINEAR_AREA 0
+#if SCALE_NONLINEAR_AREA
+  if (!FZERO(face->orig_area)) {
+    ratio = area_scale * face->area / face->orig_area;
+  } else {
+    ratio = 0.0f;
+  }
+#else
+  ratio = area_scale * face->area;
+#endif
+
+  if (ratio > MAX_NEG_RATIO) {
+    ratio = MAX_NEG_RATIO;
+  } else if (ratio < -MAX_NEG_RATIO) {
+    ratio = -MAX_NEG_RATIO;
+  }
+  
+#if 0
+  double error = (1.0 / NEG_AREA_K) * log(1.0+exp(-NEG_AREA_K*ratio)) ;
+#else
+  double error = (log(1.0 + exp(NEG_AREA_K * ratio)) / NEG_AREA_K) - ratio;
+#endif
+
+#undef SCALE_NONLINEAR_AREA
+
+  return error;
 }
 
 
@@ -235,182 +325,63 @@ double mrisComputeSpringEnergy(MRIS *mris)
 
 double mrisComputeThicknessMinimizationEnergy(MRIS *mris, double l_thick_min, INTEGRATION_PARMS *parms)
 {
-  int vno;
-  double sse_tmin;
-  static int cno = 0;
-  static double last_sse[MAXVERTICES];
-
   if (FZERO(l_thick_min)) {
     return (0.0);
   }
 
-  if (cno == 0) {
-    memset(last_sse, 0, sizeof(last_sse));
-  }
-  cno++;
-
-  sse_tmin = 0.0;
-  ROMP_PF_begin
-#ifdef HAVE_OPENMP
-  #pragma omp parallel for if_ROMP(experimental) reduction(+ : sse_tmin)
-#endif
+  double sse_tmin = 0.0;
+  int vno;
   for (vno = 0; vno < mris->nvertices; vno++) {
-    ROMP_PFLB_begin
-    
-    float thick_sq;
-    VERTEX *v;
-    v = &mris->vertices[vno];
+    VERTEX* v = &mris->vertices[vno];
     if (v->ripflag) continue;
-
-    thick_sq = mrisSampleMinimizationEnergy(mris, v, parms, v->x, v->y, v->z);
-
-    if (vno < MAXVERTICES && thick_sq > last_sse[vno] && cno > 1 && vno == Gdiag_no) DiagBreak();
-
-    if (vno < MAXVERTICES && (thick_sq > last_sse[vno] && cno > 1)) DiagBreak();
-
-    if (vno < MAXVERTICES) last_sse[vno] = thick_sq;
-    // diagnostics end
-
-    v->curv = sqrt(thick_sq);
-    sse_tmin += thick_sq;
-    if (Gdiag_no == vno) {
-      printf("E_thick_min:  v %d @ (%2.2f, %2.2f, %2.2f): thick = %2.5f\n", vno, v->x, v->y, v->z, v->curv);
-    }
-    ROMP_PFLB_end
+    
+    sse_tmin += mrisComputeThicknessMinimizationEnergyTerm(mris, vno, parms);
   }
-  ROMP_PF_end
 
   sse_tmin /= 2;
+
   return (sse_tmin);
 }
 
 
-static double big_sse = 10.0;
 double mrisComputeThicknessNormalEnergy(MRIS *mris, double l_thick_normal, INTEGRATION_PARMS *parms)
 {
-  int vno;
-  double sse_tnormal;
-  static int cno = 0;
-  static double last_sse[MAXVERTICES];
-
   if (FZERO(l_thick_normal)) return (0.0);
 
-  if (cno == 0) memset(last_sse, 0, sizeof(last_sse));
+  double sse_tnormal = 0.0;
 
-  cno++;
-
-  sse_tnormal = 0.0;
-  ROMP_PF_begin
-#ifdef HAVE_OPENMP
-  #pragma omp parallel for if_ROMP(experimental) reduction(+ : sse_tnormal)
-#endif
+  int vno;
   for (vno = 0; vno < mris->nvertices; vno++) {
-    ROMP_PFLB_begin
-    
-    double sse;
-    VERTEX *v;
-
-    v = &mris->vertices[vno];
-    if (vno == Gdiag_no) DiagBreak();
-
+    VERTEX *v = &mris->vertices[vno];
     if (v->ripflag) continue;
 
-    sse = mrisSampleNormalEnergy(mris, v, parms, v->x, v->y, v->z);
-    if (sse > big_sse) DiagBreak();
-
-    if (vno < MAXVERTICES && ((sse > last_sse[vno] && cno > 1 && vno == Gdiag_no) || (sse > last_sse[vno] && cno > 1)))
-      DiagBreak();
-
-    sse_tnormal += sse;
-    if (vno < MAXVERTICES) last_sse[vno] = sse;
-    if (Gdiag_no == vno) {
-      float E;
-      float dx, dy, dz, len, xw, yw, zw, xp, yp, zp, cx, cy, cz;
-
-      cx = v->x;
-      cy = v->y;
-      cz = v->z;
-      E = mrisSampleNormalEnergy(mris, v, parms, v->x, v->y, v->z);
-      MRISvertexCoord2XYZ_float(v, WHITE_VERTICES, &xw, &yw, &zw);
-      MRISsampleFaceCoordsCanonical((MHT *)(parms->mht), mris, cx, cy, cz, PIAL_VERTICES, &xp, &yp, &zp);
-      dx = xp - xw;
-      dy = yp - yw;
-      dz = zp - zw;
-      len = sqrt(dx * dx + dy * dy + dz * dz);
-      if (FZERO(len) == 0) {
-        dx /= len;
-        dy /= len;
-        dz /= len;
-      }
-      printf("E_thick_normal: vno %d, E=%f, N = (%2.2f, %2.2f, %2.2f), D = (%2.2f, %2.2f, %2.2f), dot= %f\n",
-             vno,
-             E,
-             v->wnx,
-             v->wny,
-             v->wnz,
-             dx,
-             dy,
-             dz,
-             v->wnx * dx + v->wny * dy + v->wnz * dz);
-    }
-    ROMP_PFLB_end
+    sse_tnormal += mrisComputeThicknessNormalEnergyTerm(mris, l_thick_normal, parms);
   }
-  ROMP_PF_end
 
   sse_tnormal /= 2;
+
   return (sse_tnormal);
 }
 
+
 double mrisComputeThicknessSpringEnergy(MRIS *mris, double l_thick_spring, INTEGRATION_PARMS *parms)
 {
-  int vno;
-  double sse_spring, sse;
-  VERTEX *v;
-
   if (FZERO(l_thick_spring)) {
     return (0.0);
   }
 
-  for (sse_spring = 0.0, vno = 0; vno < mris->nvertices; vno++) {
-    v = &mris->vertices[vno];
+  double sse_spring = 0.0;
+
+  int vno;
+  for (vno = 0; vno < mris->nvertices; vno++) {
+    VERTEX *v = &mris->vertices[vno];
     if (vno == Gdiag_no) DiagBreak();
 
     if (v->ripflag) continue;
 
-    sse = mrisSampleSpringEnergy(mris, vno, v->x, v->y, v->z, parms);
-
-    sse_spring += sse;
-    if (Gdiag_no == vno) {
-      float E;
-      float dx, dy, dz, len, xw, yw, zw, xp, yp, zp, cx, cy, cz;
-
-      cx = v->x;
-      cy = v->y;
-      cz = v->z;
-      E = mrisSampleSpringEnergy(mris, vno, v->x, v->y, v->z, parms);
-      MRISvertexCoord2XYZ_float(v, WHITE_VERTICES, &xw, &yw, &zw);
-      MRISsampleFaceCoordsCanonical((MHT *)(parms->mht), mris, cx, cy, cz, PIAL_VERTICES, &xp, &yp, &zp);
-      dx = xp - xw;
-      dy = yp - yw;
-      dz = zp - zw;
-      len = sqrt(dx * dx + dy * dy + dz * dz);
-      if (FZERO(len) == 0) {
-        dx /= len;
-        dy /= len;
-        dz /= len;
-      }
-      printf("E_thick_spring: vno %d, E=%f, N = (%2.2f, %2.2f, %2.2f), D = (%2.2f, %2.2f, %2.2f), dot= %f\n",
-             vno,
-             E,
-             v->wnx,
-             v->wny,
-             v->wnz,
-             dx,
-             dy,
-             dz,
-             v->wnx * dx + v->wny * dy + v->wnz * dz);
-    }
+    sse_spring += mrisComputeThicknessSpringEnergyTerm(mris,vno,parms);
   }
+
   sse_spring /= 2;
   return (sse_spring);
 }
@@ -418,57 +389,21 @@ double mrisComputeThicknessSpringEnergy(MRIS *mris, double l_thick_spring, INTEG
 
 double mrisComputeThicknessParallelEnergy(MRIS *mris, double l_thick_parallel, INTEGRATION_PARMS *parms)
 {
-  int vno, max_vno;
-  double sse_tparallel, max_inc;
-  static int cno = 0;
-  static double last_sse[MAXVERTICES];
-
   if (FZERO(l_thick_parallel)) {
     return (0.0);
   }
-  if (cno == 0) {
-    memset(last_sse, 0, sizeof(last_sse));
-  }
-  cno++;
 
   mrisAssignFaces(mris, (MHT *)(parms->mht), CANONICAL_VERTICES);  // don't look it up every time
 
-  max_inc = 0;
-  max_vno = 0;
-  sse_tparallel = 0.0;
-  ROMP_PF_begin
-  // ifdef HAVE_OPENMP
-  // pragma omp parallel for if_ROMP(experimental) reduction(+:sse_tparallel)
-  // endif
-  for (vno = 0; vno < mris->nvertices; vno++) {
-    ROMP_PFLB_begin
-    
-    
-    double sse;
+  double sse_tparallel = 0.0;
 
+  int vno;
+  for (vno = 0; vno < mris->nvertices; vno++) {
     VERTEX * const v = &mris->vertices[vno];
     if (v->ripflag) continue;
-    if (vno == Gdiag_no) DiagBreak();
 
-    sse = mrisSampleParallelEnergy(mris, vno, parms, v->x, v->y, v->z);
-    if ((vno < MAXVERTICES) && (sse > last_sse[vno] && cno > 1 && vno == Gdiag_no)) DiagBreak();
-
-    if ((vno < MAXVERTICES) && (sse > last_sse[vno] && cno > 1)) {
-      if (sse - last_sse[vno] > max_inc) {
-        max_inc = sse - last_sse[vno];
-        max_vno = vno;
-      }
-      DiagBreak();
-    }
-
-    if (vno < MAXVERTICES) last_sse[vno] = sse;
-    sse_tparallel += sse;
-    if (vno == Gdiag_no) {
-      printf("E_parallel: vno = %d, E = %f\n", vno, sse);
-    }
-    ROMP_PFLB_end
+    sse_tparallel += mrisComputeThicknessParallelEnergyTerm(mris, vno, parms);
   }
-  ROMP_PF_end
   
   sse_tparallel /= 2;
   return (sse_tparallel);
@@ -477,38 +412,20 @@ double mrisComputeThicknessParallelEnergy(MRIS *mris, double l_thick_parallel, I
 
 double mrisComputeThicknessSmoothnessEnergy(MRIS *mris, double l_tsmooth, INTEGRATION_PARMS *parms)
 {
-  int vno, n;
-  double sse_tsmooth, v_sse, dn, dx, dy, dz, d0;
-  float xp, yp, zp;
-
   if (FZERO(l_tsmooth)) {
     return (0.0);
   }
 
-  for (sse_tsmooth = 0.0, vno = 0; vno < mris->nvertices; vno++) {
-    VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+  double sse_tsmooth = 0.0;
+
+  int vno;
+  for (vno = 0; vno < mris->nvertices; vno++) {
     VERTEX          const * const v  = &mris->vertices         [vno];
-    if (v->ripflag) {
-      continue;
-    }
+    if (v->ripflag) continue;
 
-    MRISsampleFaceCoordsCanonical((MHT *)(parms->mht), mris, v->x, v->y, v->z, PIAL_VERTICES, &xp, &yp, &zp);
-
-    d0 = SQR(xp - v->whitex) + SQR(yp - v->whitey) + SQR(zp - v->whitez);
-    for (v_sse = 0.0, n = 0; n < vt->vnum; n++) {
-      VERTEX const * const vn = &mris->vertices[vt->v[n]];
-      if (!vn->ripflag) {
-        MRISsampleFaceCoordsCanonical((MHT *)(parms->mht), mris, vn->x, vn->y, vn->z, PIAL_VERTICES, &xp, &yp, &zp);
-
-        dx = xp - vn->whitex;
-        dy = yp - vn->whitey;
-        dz = zp - vn->whitez;
-        dn = (dx * dx + dy * dy + dz * dz);
-        v_sse += (dn - d0) * (dn - d0);
-      }
-    }
-    sse_tsmooth += v_sse;
+    sse_tsmooth += mrisComputeThicknessSmoothnessEnergyTerm(mris,vno,parms);
   }
+  
   return (sse_tsmooth);
 }
 
@@ -519,7 +436,6 @@ double mrisComputeThicknessSmoothnessEnergy(MRIS *mris, double l_tsmooth, INTEGR
 double mrisComputeNonlinearAreaSSE(MRIS *mris)
 {
   double area_scale;
-
 #if METRIC_SCALE
   if (mris->patch) {
     area_scale = 1.0;
@@ -531,9 +447,7 @@ double mrisComputeNonlinearAreaSSE(MRIS *mris)
   area_scale = 1.0;
 #endif
 
-  double sse;
-
-  sse = 0;
+  double sse = 0;
   
   #define ROMP_VARIABLE       fno
   #define ROMP_LO             0
@@ -548,43 +462,12 @@ double mrisComputeNonlinearAreaSSE(MRIS *mris)
 #endif
   #include "romp_for_begin.h"
   ROMP_for_begin
-    
     #define sse  ROMP_PARTIALSUM(0)
 
-    double error, ratio;
-    FACE *face;
+    FACE *face = &mris->faces[fno];
+    if (face->ripflag) ROMP_PF_continue;
 
-    face = &mris->faces[fno];
-    if (face->ripflag) {
-      ROMP_PF_continue;
-    }
-#define SCALE_NONLINEAR_AREA 0
-#if SCALE_NONLINEAR_AREA
-    if (!FZERO(face->orig_area)) {
-      ratio = area_scale * face->area / face->orig_area;
-    }
-    else {
-      ratio = 0.0f;
-    }
-#else
-    ratio = area_scale * face->area;
-#endif
-    if (ratio > MAX_NEG_RATIO) {
-      ratio = MAX_NEG_RATIO;
-    }
-    else if (ratio < -MAX_NEG_RATIO) {
-      ratio = -MAX_NEG_RATIO;
-    }
-#if 0
-    error = (1.0 / NEG_AREA_K) * log(1.0+exp(-NEG_AREA_K*ratio)) ;
-#else
-    error = (log(1.0 + exp(NEG_AREA_K * ratio)) / NEG_AREA_K) - ratio;
-#endif
-
-    sse += error;
-    if (!isfinite(sse) || !isfinite(error)) {
-      ErrorExit(ERROR_BADPARM, "nlin area sse not finite at face %d!\n", fno);
-    }
+    sse += mrisComputeNonlinearAreaSSETerm(mris, fno, area_scale);
     
     #undef sse
   #include "romp_for_end.h"

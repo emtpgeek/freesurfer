@@ -16,6 +16,10 @@
 #define ELTM(NAME,MULTIPLIER,COND,EXPR,EXPRM) ELT(NAME, MULTIPLIER, COND, EXPR)
 #endif
 
+// Note: mrisComputeCorrelationError reads v->curv, which is written by mrisComputeThicknessMinimizationEnergy!
+//      but the definition of curv here seems totally unrelated to that used elsewhere in the code
+//      so I suspect it is being used as a convenient temporary... 
+//
 #define SSE_TERMS \
       ELT(sse_area                  , parms->l_parea,                            true,    computed_area                                                                   ) SEP \
       ELT(sse_neg_area              , parms->l_area,                             true,    computed_neg_area                                                               ) SEP \
@@ -35,7 +39,7 @@
       ELT(sse_tspring               , parms->l_tspring,       !DZERO(parms->l_tspring),   mrisComputeTangentialSpringEnergy(mris)                                         ) SEP \
       ELT(sse_nlspring              , parms->l_nlspring,      !DZERO(parms->l_nlspring),  mrisComputeNonlinearSpringEnergy(mris, parms)                                   ) SEP \
       ELT(sse_curv                  , l_curv_scaled,          !DZERO(parms->l_curv),      mrisComputeQuadraticCurvatureSSE(mris, parms->l_curv)                           ) SEP \
-      ELT(sse_corr                  , l_corr,                 !DZERO(l_corr),             mrisComputeCorrelationError(mris, parms, 1, false)                                     ) SEP \
+      ELT(sse_corr                  , l_corr,                 !DZERO(l_corr),             mrisComputeCorrelationError(mris, parms, 1, false)                              ) SEP \
       ELT(sse_val                   , parms->l_intensity,     !DZERO(parms->l_intensity), mrisComputeIntensityError(mris, parms)                                          ) SEP \
       ELT(sse_loc                   , parms->l_location,      !DZERO(parms->l_location),  mrisComputeTargetLocationError(mris, parms)                                     ) SEP \
       ELT(sse_dura                  , parms->l_dura,          !DZERO(parms->l_dura),      mrisComputeDuraError(mris, parms)                                               ) SEP \

@@ -2675,8 +2675,8 @@ int mrisComputeCorrelationTerm(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
 #else
     src = v->curv;
 #endif
-    target = MRISPfunctionVal(parms->mrisp_template, mris, x, y, z, parms->frame_no);
-    std = MRISPfunctionVal(parms->mrisp_template, mris, x, y, z, parms->frame_no + 1);
+    target = MRISPfunctionVal(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no);
+    std    = MRISPfunctionVal(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no + 1);
     std = sqrt(std);
     if (FZERO(std)) {
       std = DEFAULT_STD /*FSMALL*/;
@@ -2717,10 +2717,10 @@ int mrisComputeCorrelationTerm(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
 #endif
 
     /* compute target term */
-    up1 = MRISPfunctionVal(parms->mrisp_template, mris, x + ux, y + uy, z + uz, fno);
-    um1 = MRISPfunctionVal(parms->mrisp_template, mris, x - ux, y - uy, z - uz, fno);
-    vp1 = MRISPfunctionVal(parms->mrisp_template, mris, x + vx, y + vy, z + vz, fno);
-    vm1 = MRISPfunctionVal(parms->mrisp_template, mris, x - vx, y - vy, z - vz, fno);
+    up1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x + ux, y + uy, z + uz, fno);
+    um1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x - ux, y - uy, z - uz, fno);
+    vp1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x + vx, y + vy, z + vz, fno);
+    vm1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x - vx, y - vy, z - vz, fno);
     du = (up1 - um1) / (2 * d_dist);
     dv = (vp1 - vm1) / (2 * d_dist);
     v->dx -= coef * (du * e1x + dv * e2x);
@@ -3040,8 +3040,8 @@ int mrisComputePolarCorrelationTerm(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
 #else
     src = v->curv;
 #endif
-    target = MRISPfunctionVal(parms->mrisp_template, mris, x, y, z, parms->frame_no);
-    std = MRISPfunctionVal(parms->mrisp_template, mris, x, y, z, parms->frame_no + 1);
+    target = MRISPfunctionVal(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no);
+    std    = MRISPfunctionVal(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no + 1);
     std = sqrt(std);
     if (FZERO(std)) {
       std = DEFAULT_STD /*FSMALL*/;
@@ -3063,24 +3063,24 @@ int mrisComputePolarCorrelationTerm(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
     dx = y * D_ANGLE;
     dy = -x * D_ANGLE;
     dz = 0;
-    am1 = MRISPfunctionVal(parms->mrisp_template, mris, x - dx, y - dy, z - dz, 0);
-    ap1 = MRISPfunctionVal(parms->mrisp_template, mris, x + dx, y + dy, z + dz, 0);
+    am1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x - dx, y - dy, z - dz, 0);
+    ap1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x + dx, y + dy, z + dz, 0);
     da = (ap1 - am1) / (2 * D_ANGLE);
 
     /* compute beta term - differential rotation around y axis */
     dx = -z * D_ANGLE;
     dy = 0;
     dz = x * D_ANGLE;
-    bm1 = MRISPfunctionVal(parms->mrisp_template, mris, x - dx, y - dy, z - dz, 0);
-    bp1 = MRISPfunctionVal(parms->mrisp_template, mris, x + dx, y + dy, z + dz, 0);
+    bm1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x - dx, y - dy, z - dz, 0);
+    bp1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x + dx, y + dy, z + dz, 0);
     db = (bp1 - bm1) / (2 * D_ANGLE);
 
     /* compute gamma term - differential rotation around x axis */
     dx = 0;
     dy = -z * D_ANGLE;
     dz = y * D_ANGLE;
-    gm1 = MRISPfunctionVal(parms->mrisp_template, mris, x - dx, y - dy, z - dz, 0);
-    gp1 = MRISPfunctionVal(parms->mrisp_template, mris, x + dx, y + dy, z + dz, 0);
+    gm1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x - dx, y - dy, z - dz, 0);
+    gp1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x + dx, y + dy, z + dz, 0);
     dg = (gp1 - gm1) / (2 * D_ANGLE);
 
     mris->gamma -= coef * dg; /* around x-axis */

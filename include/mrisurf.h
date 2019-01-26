@@ -1585,17 +1585,16 @@ typedef struct MRISPfunctionValResultForAlpha {
 void MRISPfunctionVal_radiusR(                                                      // returns the value that would be stored in resultsForEachFno[0] for fnoLo
                               MRI_SURFACE_PARAMETERIZATION *mrisp,  
                               MRISPfunctionValResultForAlpha* resultsForEachAlpha,  // must be numAlphas elements
-                              MRI_SURFACE *mris,
                               float r, float x, float y, float z, 
                               int fno, bool getNextAlso,                            // always fills in resultsForEachAlpha.curr for fno, optionally fills in .next for fno+1
                               const float* alphas, float numAlphas,                 // rotate x,y,z by these alphas (radians) and get the values
                               bool trace) ;                                         // note: this rotation is around the z axis, hence z does not change
                              
 double       MRISPfunctionValTraceable(MRI_SURFACE_PARAMETERIZATION *mrisp,
-                              MRI_SURFACE *mris,
+                              float desired_radius,
                               float x, float y, float z, int fno, bool trace) ;
 double       MRISPfunctionVal(MRI_SURFACE_PARAMETERIZATION *mrisp,
-                              MRI_SURFACE *mris,
+                              float desired_radius,
                               float x, float y, float z, int fno) ;
                               
 MRI_SP       *MRIStoParameterizationBarycentric(MRI_SURFACE *mris, MRI_SP *mrisp,
