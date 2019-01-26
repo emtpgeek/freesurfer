@@ -186,8 +186,13 @@ double MRIScomputeSSE(MRIS* mris, INTEGRATION_PARMS *parms)
 #undef SEP
 
 #undef INIT_V_THICK_SQ
-
-  freeAndNULL(v_thick_sq);
+  if (v_thick_sq) {
+    int vno;
+    for (vno = 0; vno < mris->nvertices; vno++) {
+      mris->vertices[vno].curv = v_thick_sq[vno];
+    }  
+    freeAndNULL(v_thick_sq);
+  }
   
   if (parms->l_thick_spring > 0 || parms->l_thick_min > 0 || parms->l_thick_parallel > 0 /* && DIAG_VERBOSE_ON*/)
     printf("min=%2.3f, parallel=%2.4f, normal=%2.4f, spring=%2.4f, ashburner=%2.3f, tsmooth=%2.3f\n",
