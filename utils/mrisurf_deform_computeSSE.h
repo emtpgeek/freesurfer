@@ -26,7 +26,7 @@
       ELT(sse_repulse               , 1.0,                     (parms->l_repulse > 0),    mrisComputeRepulsiveEnergy(mris, parms->l_repulse, mht_v_current, mht_f_current)) SEP \
       ELT(sse_repulsive_ratio       , 1.0,                                       true,    mrisComputeRepulsiveRatioEnergy(mris, parms->l_repulse_ratio)                   ) SEP \
       ELT(sse_tsmooth               , 1.0,                                       true,    mrisComputeThicknessSmoothnessEnergy(mris, parms->l_tsmooth, parms)             ) SEP \
-      ELT(sse_thick_min             , parms->l_thick_min,                        true,    mrisComputeThicknessMinimizationEnergy(mris, parms->l_thick_min, v_thick_sq, parms) ) SEP \
+      ELT(sse_thick_min             , parms->l_thick_min,                        true,    mrisComputeThicknessMinimizationEnergy(mris, parms->l_thick_min, INIT_V_THICK_SQ, parms) ) SEP \
       ELT(sse_ashburner_triangle    , parms->l_ashburner_triangle,               false,   mrisComputeAshburnerTriangleEnergy(mris, parms->l_ashburner_triangle, parms)    ) SEP \
       ELT(sse_thick_parallel        , parms->l_thick_parallel,                   true,    mrisComputeThicknessParallelEnergy(mris, parms->l_thick_parallel, parms)        ) SEP \
       ELT(sse_thick_normal          , parms->l_thick_normal,                     true,    mrisComputeThicknessNormalEnergy(mris, parms->l_thick_normal, parms)            ) SEP \
@@ -172,13 +172,20 @@ double MRIScomputeSSE(MRIS* mris, INTEGRATION_PARMS *parms)
 #endif
   }
 
-  float* v_thick_sq = (float*)calloc(mris->nvertices, sizeof(float));
-  
+  float* v_thick_sq = NULL;
+#define INIT_V_THICK_SQ (v_thick_sq = (float*)calloc(mris->nvertices, sizeof(float)))
+    //
+    // This detects whether the current weird behavior of the code is used:
+    // one of the early terms overwrites Vertex::curv and a later term reads the overwritten values
+    // but if the earlier term is not used, then the initial Vertex::curv values are used
+      
 #define SEP
 #define ELT(NAME, MULTIPLIER, COND, EXPR) double const NAME = (COND) ? (EXPR) : 0.0;
     SSE_TERMS
 #undef ELT
 #undef SEP
+
+#undef INIT_V_THICK_SQ
 
   freeAndNULL(v_thick_sq);
   
