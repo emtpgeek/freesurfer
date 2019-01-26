@@ -733,8 +733,10 @@ static void MRIScomputeMetricPropertiesWkr(MRIS *mris)
 
 
 float mrisSampleMinimizationEnergy(
-    MRIS *mris, VERTEX *v, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
+    MRIS *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
 {
+  VERTEX const * const v = &mris->vertices[vno];
+  
   float xw, yw, zw, dx, dy, dz, thick_sq, xp, yp, zp;
 
   project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
@@ -750,8 +752,10 @@ float mrisSampleMinimizationEnergy(
 }
 
 float mrisSampleNormalEnergy(
-    MRIS *mris, VERTEX *v, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
+    MRIS *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
 {
+  VERTEX const * const v = &mris->vertices[vno];
+
   float dx, dy, dz, len, xw, yw, zw, xp, yp, zp, pnx, pny, pnz;
   double sse;
 

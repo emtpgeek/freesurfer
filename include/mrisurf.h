@@ -2035,6 +2035,8 @@ int MRISsetRegistrationSigmas(float *sigmas, int nsigmas) ;
 
 int MRISextractVertexCoords(MRI_SURFACE *mris, float *locations[3], int which_vertices) ;
 int MRISimporttVertexCoords(MRI_SURFACE *mris, float *locations[3], int which_vertices) ;
+
+float* MRISexportCurv(MRIS* mris);
 int MRISextractCurvatureVector(MRI_SURFACE *mris, float *curvs) ;
 int MRISextractCurvatureDoubleVector(MRI_SURFACE *mris, double *curvs) ;
 int MRISextractCurvatureVectorDouble(MRI_SURFACE *mris, double *curvs, int offset) ;
@@ -2629,10 +2631,10 @@ int MRISmeasureDistanceBetweenSurfaces(MRI_SURFACE *mris,
 int MRISwriteCoordsToIco(MRI_SURFACE *mris,
                          MRI_SURFACE *mris_ico,
                          int which_vertices);
-int MRISvertexCoord2XYZ_float (VERTEX * v,
+int MRISvertexCoord2XYZ_float (VERTEX const * v,
                                int which,
                                float  *x, float  *y, float  *z);
-int MRISvertexCoord2XYZ_double (VERTEX * v,
+int MRISvertexCoord2XYZ_double (VERTEX const * v,
                                int which,
                                double  *x, double  *y, double  *z);
 int MRISsampleFaceNormal(MRI_SURFACE *mris, int fno, double x, double y, double z, 

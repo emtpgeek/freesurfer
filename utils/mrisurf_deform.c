@@ -3954,10 +3954,9 @@ int mrisComputeThicknessMinimizationTerm(MRI_SURFACE *mris, double l_thick_min, 
     
     float dE_de1, dE_de2, e1p, e1m, e2p, e2m;
     float e1x, e1y, e1z, e2x, e2y, e2z, norm, dx, dy, dz, E0, E1;
-    VERTEX *v;
     double d_dist = D_DIST * mris->avg_vertex_dist;
 
-    v = &mris->vertices[vno];
+    VERTEX * const v = &mris->vertices[vno];
     if (v->ripflag) ROMP_PF_continue;
 
     if (vno == Gdiag_no) DiagBreak();
@@ -3973,10 +3972,10 @@ int mrisComputeThicknessMinimizationTerm(MRI_SURFACE *mris, double l_thick_min, 
       sample the coordinate functions along the tangent plane axes and
       compute the derivates using them.
     */
-    e1p = mrisSampleMinimizationEnergy(mris, v, parms, v->x + d_dist * e1x, v->y + d_dist * e1y, v->z + d_dist * e1z);
-    e1m = mrisSampleMinimizationEnergy(mris, v, parms, v->x - d_dist * e1x, v->y - d_dist * e1y, v->z - d_dist * e1z);
-    e2p = mrisSampleMinimizationEnergy(mris, v, parms, v->x + d_dist * e2x, v->y + d_dist * e2y, v->z + d_dist * e2z);
-    e2m = mrisSampleMinimizationEnergy(mris, v, parms, v->x - d_dist * e2x, v->y - d_dist * e2y, v->z - d_dist * e2z);
+    e1p = mrisSampleMinimizationEnergy(mris, vno, parms, v->x + d_dist * e1x, v->y + d_dist * e1y, v->z + d_dist * e1z);
+    e1m = mrisSampleMinimizationEnergy(mris, vno, parms, v->x - d_dist * e1x, v->y - d_dist * e1y, v->z - d_dist * e1z);
+    e2p = mrisSampleMinimizationEnergy(mris, vno, parms, v->x + d_dist * e2x, v->y + d_dist * e2y, v->z + d_dist * e2z);
+    e2m = mrisSampleMinimizationEnergy(mris, vno, parms, v->x - d_dist * e2x, v->y - d_dist * e2y, v->z - d_dist * e2z);
     dE_de1 = (e1p - e1m) / (2 * d_dist);
     dE_de2 = (e2p - e2m) / (2 * d_dist);
 
@@ -3989,9 +3988,9 @@ int mrisComputeThicknessMinimizationTerm(MRI_SURFACE *mris, double l_thick_min, 
     dx = -l_thick_min * (dE_de1 * e1x + dE_de2 * e2x);
     dy = -l_thick_min * (dE_de1 * e1y + dE_de2 * e2y);
     dz = -l_thick_min * (dE_de1 * e1z + dE_de2 * e2z);
-    E0 = mrisSampleMinimizationEnergy(mris, v, parms, v->x, v->y, v->z);
+    E0 = mrisSampleMinimizationEnergy(mris, vno, parms, v->x, v->y, v->z);
     E1 = mrisSampleMinimizationEnergy(
-        mris, v, parms, v->x + parms->dt * dx, v->y + parms->dt * dy, v->z + parms->dt * dz);
+        mris, vno, parms, v->x + parms->dt * dx, v->y + parms->dt * dy, v->z + parms->dt * dz);
 
     if (E1 > E0) {
       double E2;
@@ -4001,7 +4000,7 @@ int mrisComputeThicknessMinimizationTerm(MRI_SURFACE *mris, double l_thick_min, 
         DiagBreak();
       }
       E2 = mrisSampleMinimizationEnergy(
-          mris, v, parms, v->x - parms->dt * dx, v->y - parms->dt * dy, v->z - parms->dt * dz);
+          mris, vno, parms, v->x - parms->dt * dx, v->y - parms->dt * dy, v->z - parms->dt * dz);
       if (E2 < E0) {
         dx *= -1;
         dy *= -1;
@@ -4170,10 +4169,9 @@ int mrisComputeThicknessNormalTerm(MRI_SURFACE *mris, double l_thick_normal, INT
     float dE_de1, dE_de2, e1p, e1m, e2p, e2m, cx, cy, cz;
     float E0, E1, dx, dy, dz;
     float e1x, e1y, e1z, e2x, e2y, e2z, norm;
-    VERTEX *v;
     double d_dist = D_DIST * mris->avg_vertex_dist;
 
-    v = &mris->vertices[vno];
+    VERTEX * const v = &mris->vertices[vno];
     if (vno == Gdiag_no) DiagBreak();
 
     if (v->ripflag) continue;
@@ -4188,10 +4186,10 @@ int mrisComputeThicknessNormalTerm(MRI_SURFACE *mris, double l_thick_normal, INT
       sample the coordinate functions along the tangent plane axes and
       compute the derivates using them.
     */
-    e1p = mrisSampleNormalEnergy(mris, v, parms, v->x + d_dist * e1x, v->y + d_dist * e1y, v->z + d_dist * e1z);
-    e1m = mrisSampleNormalEnergy(mris, v, parms, v->x - d_dist * e1x, v->y - d_dist * e1y, v->z - d_dist * e1z);
-    e2p = mrisSampleNormalEnergy(mris, v, parms, v->x + d_dist * e2x, v->y + d_dist * e2y, v->z + d_dist * e2z);
-    e2m = mrisSampleNormalEnergy(mris, v, parms, v->x - d_dist * e2x, v->y - d_dist * e2y, v->z - d_dist * e2z);
+    e1p = mrisSampleNormalEnergy(mris, vno, parms, v->x + d_dist * e1x, v->y + d_dist * e1y, v->z + d_dist * e1z);
+    e1m = mrisSampleNormalEnergy(mris, vno, parms, v->x - d_dist * e1x, v->y - d_dist * e1y, v->z - d_dist * e1z);
+    e2p = mrisSampleNormalEnergy(mris, vno, parms, v->x + d_dist * e2x, v->y + d_dist * e2y, v->z + d_dist * e2z);
+    e2m = mrisSampleNormalEnergy(mris, vno, parms, v->x - d_dist * e2x, v->y - d_dist * e2y, v->z - d_dist * e2z);
     dE_de1 = (e1p - e1m) / (2 * d_dist);
     dE_de2 = (e2p - e2m) / (2 * d_dist);
     norm = sqrt(dE_de1 * dE_de1 + dE_de2 * dE_de2);
@@ -4206,15 +4204,15 @@ int mrisComputeThicknessNormalTerm(MRI_SURFACE *mris, double l_thick_normal, INT
     cx = v->x + parms->dt * dx;
     cy = v->y + parms->dt * dy;
     cz = v->z + parms->dt * dz;
-    E0 = mrisSampleNormalEnergy(mris, v, parms, v->x, v->y, v->z);
-    E1 = mrisSampleNormalEnergy(mris, v, parms, cx, cy, cz);
+    E0 = mrisSampleNormalEnergy(mris, vno, parms, v->x, v->y, v->z);
+    E1 = mrisSampleNormalEnergy(mris, vno, parms, cx, cy, cz);
     if (E1 > E0) {
       double E2;
       if (vno == Gdiag_no) {
         DiagBreak();
       }
       DiagBreak();
-      E2 = mrisSampleNormalEnergy(mris, v, parms, v->x - parms->dt * dx, v->y - parms->dt * dy, v->z - parms->dt * dz);
+      E2 = mrisSampleNormalEnergy(mris, vno, parms, v->x - parms->dt * dx, v->y - parms->dt * dy, v->z - parms->dt * dz);
       if (E2 < E0) {
         dx *= -1;
         dy *= -1;
@@ -7313,7 +7311,8 @@ double mrisComputeError(MRI_SURFACE *mris,
       ErrorExit(ERROR_BADPARM, "sse (%f, %f) is not finite at face %d!\n", sse_area, sse_angle, fno);
   }
 
-  sse_corr = mrisComputeCorrelationError(mris, parms, 1, false);
+  sse_corr = mrisComputeCorrelationError(mris, NULL, parms, 1, false);
+  
   if (!DZERO(parms->l_dist)) {
     sse_dist = mrisComputeDistanceError(mris, parms);
   }
@@ -12292,7 +12291,7 @@ int MRISrigidBodyAlignGlobal(
                 vertex0->x,vertex0->y,vertex0->z); 
             }
             
-            double sse = mrisComputeCorrelationError(mris, parms, 1, trace);
+            double sse = mrisComputeCorrelationError(mris, NULL, parms, 1, trace);
             if (trace) fprintf(stdout, "%s:%d sse:%g\n", __FILE__, __LINE__, sse);
             
             MRISrestoreVertexPositions(mris, TMP_VERTICES);
@@ -12842,7 +12841,7 @@ double MRIScomputeCorrelationError(MRIS *mris, MRI_SP *mrisp_template, int fno)
   parms.mrisp_template = mrisp_template;
   parms.l_corr = 1.0f;
   parms.frame_no = fno;
-  error = mrisComputeCorrelationError(mris, &parms, 1, false);
+  error = mrisComputeCorrelationError(mris, NULL, &parms, 1, false);
   return (sqrt(error / (double)MRISvalidVertices(mris)));
 }
 

@@ -632,7 +632,7 @@ int MRISintegrate(MRI_SURFACE *mris, INTEGRATION_PARMS *parms, int n_averages)
         if (v->ripflag) {
           continue;
         }
-        sq = mrisSampleMinimizationEnergy(mris, v, parms, v->x, v->y, v->z);
+        sq = mrisSampleMinimizationEnergy(mris, vno, parms, v->x, v->y, v->z);
         mn += sqrt(sq);
       }
       mn /= (double)MRISvalidVertices(mris);

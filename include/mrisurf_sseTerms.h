@@ -24,10 +24,10 @@
 #include "mrisurf_metricProperties.h"
 
 #define LIST_OF_PER_VERTEX_SSETERMS \
-    ELT(CorrelationError              , (MRIS *mris,                            INTEGRATION_PARMS *parms, int use_stds, bool trace  )) SEP \
+    ELT(CorrelationError              , (MRIS *mris, float const * v_thick_sq,  INTEGRATION_PARMS *parms, int use_stds, bool trace  )) SEP \
     ELT(RepulsiveRatioEnergy          , (MRIS *mris, double l_repulse                                                               )) SEP \
     ELT(SpringEnergy                  , (MRIS *mris                                                                                 )) SEP \
-    ELT(ThicknessMinimizationEnergy   , (MRIS *mris, double l_thick_min,        INTEGRATION_PARMS *parms                            )) SEP \
+    ELT(ThicknessMinimizationEnergy   , (MRIS *mris, double l_thick_min, float * v_thick_sq, INTEGRATION_PARMS *parms               )) SEP \
     ELT(ThicknessNormalEnergy         , (MRIS *mris, double l_thick_normal,     INTEGRATION_PARMS *parms                            )) SEP \
     ELT(ThicknessSpringEnergy         , (MRIS *mris, double l_thick_spring,     INTEGRATION_PARMS *parms                            )) SEP \
     ELT(ThicknessParallelEnergy       , (MRIS *mris, double l_thick_parallel,   INTEGRATION_PARMS *parms                            )) SEP \

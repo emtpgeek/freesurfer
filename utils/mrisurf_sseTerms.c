@@ -36,7 +36,7 @@
 //====================================================================================
 // VERTEX SSE TERMS
 //
-static double mrisComputeCorrelationErrorTerm(MRIS *mris, int vno, INTEGRATION_PARMS *parms, int use_stds, bool vertexTrace) {
+static double mrisComputeCorrelationErrorTerm(MRIS *mris, int vno, float const * v_thick_sq_or_NULL, INTEGRATION_PARMS *parms, int use_stds, bool vertexTrace) {
   VERTEX const * const v  = &mris->vertices[vno];
   
   float const x = v->x;
@@ -44,19 +44,19 @@ static double mrisComputeCorrelationErrorTerm(MRIS *mris, int vno, INTEGRATION_P
   float const z = v->z;
 
 #if 0
-  double const src = MRISPfunctionVal(parms->mrisp, mris, x, y, z, 0, vertexTrace) ;                                      // YUCK
+  double const src = MRISPfunctionVal(parms->mrisp, mris->radius, x, y, z, 0, vertexTrace) ;
 #else
-  double const src = v->curv;                                                                                             // YUCK - this is written by mrisComputeThicknessMinimizationEnergyTerm
+  double const src = v_thick_sq_or_NULL ? v_thick_sq_or_NULL[vno] : v->curv;    // v_thick_sq written by mrisComputeThicknessMinimizationEnergyTerm
 #endif
 
-  double const target = MRISPfunctionValTraceable(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no, vertexTrace);    // YUCK
+  double const target = MRISPfunctionValTraceable(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no, vertexTrace);
 
 #define DEFAULT_STD 4.0f
 #define DISABLE_STDS 0
 #if DISABLE_STDS
   double const std = 1.0f;
 #else
-  double std = MRISPfunctionValTraceable(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no + 1, vertexTrace);         // YUCK
+  double std = MRISPfunctionValTraceable(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no + 1, vertexTrace);
   std = sqrt(std);
   if (FZERO(std)) {
     std = DEFAULT_STD /*FSMALL*/;
@@ -140,11 +140,11 @@ static double mrisComputeSpringEnergyTerm(MRIS *mris, int vno, double area_scale
 }
 
 
-static double mrisComputeThicknessMinimizationEnergyTerm(MRIS *mris, int vno, INTEGRATION_PARMS *parms) {
+static double mrisComputeThicknessMinimizationEnergyTerm(MRIS *mris, int vno, float * v_thick_sq, INTEGRATION_PARMS *parms) {
   VERTEX /* const */ * const v = &mris->vertices[vno];                                      // YUCK
 
-  float thick_sq = mrisSampleMinimizationEnergy(mris, v, parms, v->x, v->y, v->z);
-  v->curv = sqrt(thick_sq);                                                                 // YUCK
+  float thick_sq = mrisSampleMinimizationEnergy(mris, vno, parms, v->x, v->y, v->z);
+  v_thick_sq[vno] = sqrt(thick_sq);                                                                 // YUCK
 
   return thick_sq;
 }
@@ -152,7 +152,7 @@ static double mrisComputeThicknessMinimizationEnergyTerm(MRIS *mris, int vno, IN
 
 static double mrisComputeThicknessNormalEnergyTerm(MRIS *mris, int vno, INTEGRATION_PARMS *parms) {
   VERTEX const * const v = &mris->vertices[vno];
-  return mrisSampleNormalEnergy(mris, v, parms, v->x, v->y, v->z);
+  return mrisSampleNormalEnergy(mris, vno, parms, v->x, v->y, v->z);
 }
 
 
@@ -232,7 +232,7 @@ static double mrisComputeNonlinearAreaSSETerm(MRIS *mris, int fno, double area_s
 
 // WALK ALL THE VERTICES
 //
-double mrisComputeCorrelationError(MRIS *mris, INTEGRATION_PARMS *parms, int use_stds, bool trace)
+double mrisComputeCorrelationError(MRIS *mris, float const * v_thick_sq_or_NULL, INTEGRATION_PARMS *parms, int use_stds, bool trace)
 {
   float const l_corr = parms->l_corr + parms->l_pcorr; /* only one will be nonzero */
 
@@ -264,7 +264,7 @@ double mrisComputeCorrelationError(MRIS *mris, INTEGRATION_PARMS *parms, int use
       ROMP_PF_continue;
     }
 
-    sse += mrisComputeCorrelationErrorTerm(mris, vno, parms, use_stds, vertexTrace);
+    sse += mrisComputeCorrelationErrorTerm(mris, vno, v_thick_sq_or_NULL, parms, use_stds, vertexTrace);
 
     #undef sse
   #include "romp_for_end.h"
@@ -323,7 +323,7 @@ double mrisComputeSpringEnergy(MRIS *mris)
 }
 
 
-double mrisComputeThicknessMinimizationEnergy(MRIS *mris, double l_thick_min, INTEGRATION_PARMS *parms)
+double mrisComputeThicknessMinimizationEnergy(MRIS *mris, double l_thick_min, float * v_thick_sq, INTEGRATION_PARMS *parms)
 {
   if (FZERO(l_thick_min)) {
     return (0.0);
@@ -335,7 +335,7 @@ double mrisComputeThicknessMinimizationEnergy(MRIS *mris, double l_thick_min, IN
     VERTEX* v = &mris->vertices[vno];
     if (v->ripflag) continue;
     
-    sse_tmin += mrisComputeThicknessMinimizationEnergyTerm(mris, vno, parms);
+    sse_tmin += mrisComputeThicknessMinimizationEnergyTerm(mris, vno, v_thick_sq, parms);
   }
 
   sse_tmin /= 2;

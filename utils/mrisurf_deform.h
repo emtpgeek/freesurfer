@@ -40,7 +40,7 @@ int mrisTearStressedRegions(MRI_SURFACE *mris, INTEGRATION_PARMS *parms);
 int mrisSmoothBoundaryNormals(MRI_SURFACE *mris, int niter);
 
 
-double mrisComputeCorrelationError              (MRI_SURFACE *mris, INTEGRATION_PARMS *parms, int use_stds, bool trace);
+double mrisComputeCorrelationError              (MRI_SURFACE *mris, float const * v_thick_sq, INTEGRATION_PARMS *parms, int use_stds, bool trace);
 double mrisComputeDistanceError                 (MRI_SURFACE *mris, INTEGRATION_PARMS *parms);
 double mrisComputeDuraError                     (MRI_SURFACE *mris, INTEGRATION_PARMS *parms);
 double mrisComputeExpandwrapError               (MRI_SURFACE *mris, MRI *mri_brain, double l_expandwrap, double target_radius);
@@ -66,7 +66,7 @@ double mrisComputeRepulsiveRatioEnergy          (MRI_SURFACE *mris, double l_rep
 double mrisComputeSpringEnergy                  (MRI_SURFACE *mris);
 double mrisComputeSurfaceRepulsionEnergy        (MRI_SURFACE *mris, double l_repulse, MHT *mht);
 double mrisComputeTangentialSpringEnergy        (MRI_SURFACE *mris);
-double mrisComputeThicknessMinimizationEnergy   (MRI_SURFACE *mris, double l_thick_min,          INTEGRATION_PARMS *parms);
+double mrisComputeThicknessMinimizationEnergy   (MRI_SURFACE *mris, double l_thick_min,          float * v_thick_sq, INTEGRATION_PARMS *parms);
 double mrisComputeThicknessNormalEnergy         (MRI_SURFACE *mris, double l_thick_normal,       INTEGRATION_PARMS *parms);
 double mrisComputeThicknessParallelEnergy       (MRI_SURFACE *mris, double l_thick_parallel,     INTEGRATION_PARMS *parms);
 double mrisComputeThicknessSmoothnessEnergy     (MRI_SURFACE *mris, double l_repulse,            INTEGRATION_PARMS *parms);

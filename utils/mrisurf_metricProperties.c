@@ -4185,7 +4185,7 @@ int MRIScomputeCanonicalCoordinates(MRIS *mris)
   return (NO_ERROR);
 }
 
-int MRISvertexCoord2XYZ_float(VERTEX *v, int which, float *x, float *y, float *z)
+int MRISvertexCoord2XYZ_float(VERTEX const * const v, int const which, float * const x, float * const y, float * const z)
 {
   switch (which) {
     case ORIGINAL_VERTICES:
@@ -4255,7 +4255,7 @@ int MRISvertexCoord2XYZ_float(VERTEX *v, int which, float *x, float *y, float *z
   }
   return (NO_ERROR);
 }
-int MRISvertexCoord2XYZ_double(VERTEX *v, int which, double *x, double *y, double *z)
+int MRISvertexCoord2XYZ_double(VERTEX const * const v, int const which, double *x, double *y, double *z)
 {
   switch (which) {
     default:
