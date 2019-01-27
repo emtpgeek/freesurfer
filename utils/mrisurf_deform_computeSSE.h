@@ -173,11 +173,22 @@ double MRIScomputeSSE(MRIS* mris, INTEGRATION_PARMS *parms)
   }
 
   float* v_thick_sq = NULL;
-#define INIT_V_THICK_SQ NULL    //  keeps the old behaviour     new would be   (v_thick_sq = (float*)calloc(mris->nvertices, sizeof(float)))
+  bool fixing_v_thick_sq = false;
+#define INIT_V_THICK_SQ ((!fixing_v_thick_sq) ? NULL : (v_thick_sq = (float*)calloc(mris->nvertices, sizeof(float))))
+  if (!fixing_v_thick_sq) {
     //
-    // This detects whether the current weird behavior of the code is used:
-    // one of the early terms overwrites Vertex::curv and a later term reads the overwritten values
-    // but if the earlier term is not used, then the initial Vertex::curv values are used
+    // This detects whether weird behavior in the old code is used:
+    //      one of the early terms overwrites Vertex::curv and a later term reads the overwritten values
+    //      but if the earlier term is not used, then the initial Vertex::curv values are used
+    // This makes no sense, since those curv values are used later as though they were the values that were overwritten
+    //
+    switch (copeWithLogicProblem("FREESURFER_fix_MRIScomputeSSE_thick_sq","l_thick_min overwrites VERTEX::curv changing l_corr and l_pcorr")) {
+    case LogicProblemResponse_old: 
+      break;
+    case LogicProblemResponse_fix:
+      fixing_v_thick_sq = true;
+    }
+  }
       
 #define SEP
 #define ELT(NAME, MULTIPLIER, COND, EXPR) double const NAME = (COND) ? (EXPR) : 0.0;
@@ -186,13 +197,13 @@ double MRIScomputeSSE(MRIS* mris, INTEGRATION_PARMS *parms)
 #undef SEP
 
 #undef INIT_V_THICK_SQ
-  if (v_thick_sq) {
+  if (v_thick_sq && !fixing_v_thick_sq) {
     int vno;
     for (vno = 0; vno < mris->nvertices; vno++) {
       mris->vertices[vno].curv = v_thick_sq[vno];
     }  
-    freeAndNULL(v_thick_sq);
   }
+  freeAndNULL(v_thick_sq);
   
   if (parms->l_thick_spring > 0 || parms->l_thick_min > 0 || parms->l_thick_parallel > 0 /* && DIAG_VERBOSE_ON*/)
     printf("min=%2.3f, parallel=%2.4f, normal=%2.4f, spring=%2.4f, ashburner=%2.3f, tsmooth=%2.3f\n",
