@@ -15,6 +15,8 @@
  *
  */
 #include "mrisurf_metricProperties.h"
+#include "mrisurf_mp.h"
+#include "mrisurf_MRISBase.h"
 
 
 static int count_MRIScomputeMetricProperties_calls = 0;
@@ -4925,7 +4927,7 @@ int IsMRISselfIntersecting(MRIS *mris)
 }
 
 
-int face_barycentric_coords(MRIS const *mris,
+int face_barycentric_coords2(MRISBaseConst mrisBase,
                             int fno,
                             int which_vertices,
                             double cx,
@@ -4935,6 +4937,8 @@ int face_barycentric_coords(MRIS const *mris,
                             double *pl2,
                             double *pl3)
 {
+  MRIS const * const mris = mrisBase.mris;
+
   double l1, l2, l3, x, y, x1, x2, x3, y1, y2, y3, e1[3], e2[3];
   FACE const *face = &mris->faces[fno];
   double V0[3], V1[3], V2[3], point[3], proj[3], detT;

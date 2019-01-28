@@ -735,18 +735,19 @@ static void MRIScomputeMetricPropertiesWkr(MRIS *mris)
 float mrisSampleMinimizationEnergy(
     MRIS *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
 {
+  project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
+
   VERTEX const * const v = &mris->vertices[vno];
   
-  float xw, yw, zw, dx, dy, dz, thick_sq, xp, yp, zp;
+  float const xw = v->whitex, yw = v->whitey, zw = v->whitez;
 
-  project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
-  MRISvertexCoord2XYZ_float(v, WHITE_VERTICES, &xw, &yw, &zw);
+  float xp, yp, zp;
   MRISsampleFaceCoordsCanonical((MHT *)(parms->mht), mris, cx, cy, cz, PIAL_VERTICES, &xp, &yp, &zp);
 
-  dx = xp - xw;
-  dy = yp - yw;
-  dz = zp - zw;
-  thick_sq = dx * dx + dy * dy + dz * dz;
+  float dx = xp - xw;
+  float dy = yp - yw;
+  float dz = zp - zw;
+  float thick_sq = dx * dx + dy * dy + dz * dz;
 
   return (thick_sq);
 }

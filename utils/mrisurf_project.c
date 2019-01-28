@@ -19,6 +19,7 @@
  *
  */
 #include "mrisurf_project.h"
+#include "mrisurf_mp.h"
 
 /* project onto the sphere of radius DEFAULT_RADIUS */
 void mrisSphericalProjectXYZ(float xs, float ys, float zs, float *xd, float *yd, float *zd)

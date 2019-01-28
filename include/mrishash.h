@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file  mrishash.h
  * @brief Implements a hash table mechanism to speed comparing vertices
@@ -25,16 +27,12 @@
  *
  */
 
+#include "mrisurf.h"
 
-#ifndef MRISHASH_ONCE_H
-#define MRISHASH_ONCE_H
 
 // define the following to get a single inclusion of non-renamed functions
 #define MRISHASH_VANILLA_FUNCS
 
-
-//--------------------------
-typedef struct _mht MRIS_HASH_TABLE, MHT ;
 
 // Ad hoc test functions
 int MHT_gw_version(void);  // version of that unit
@@ -141,8 +139,8 @@ int MHTcheckSurface(MRIS const *mris,MRIS_HASH_TABLE *mht);
 //------------------------------------------------
 // utilities for finding closest face
 //------------------------------------------------
-int MHTfindClosestFaceGeneric(MRIS_HASH_TABLE *mht, 
-                              MRIS const *mris,
+int MHTfindClosestFaceGeneric2(MRIS_HASH_TABLE *mht, 
+                              MRISBaseConst mris,
                               //---------- inputs --------------
                               double probex, double probey, double probez,
                               // How far to search: set one or both
@@ -156,6 +154,13 @@ int MHTfindClosestFaceGeneric(MRIS_HASH_TABLE *mht,
                               int *pfno, 
                               double *pface_distance);
                               
+                              
+static int MHTfindClosestFaceGeneric(
+  MRIS_HASH_TABLE *p1, MRIS const *p2, double p3, double p4, double p5, double p6, int p7, int p8, FACE **p9, int *p10, double *p11)
+{
+  return MHTfindClosestFaceGeneric2(p1,MRISBaseConstCtr(NULL,p2),p3,p4,p5,p6,p7,p8,p9,p10,p11);
+}
+
 int mhtBruteForceClosestFace(MRIS const *mris, 
                              float x, float y, float z, 
                              int which,                  // which surface within mris to search
@@ -167,5 +172,3 @@ int mhtBruteForceClosestFace(MRIS const *mris,
 
 void MHT_maybeParallel_begin();     // Note: Can be nested!
 void MHT_maybeParallel_end();
-
-#endif // END #ifndef MRISHASH_ONCE_H

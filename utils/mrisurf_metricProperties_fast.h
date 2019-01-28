@@ -735,4 +735,58 @@ void MRISMP_computeMetricProperties(MRIS_MP* mris) {
   }
 }
 
+
+float mrismp_SampleMinimizationEnergy(
+    MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
+{
+  project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
+  float const xw = mris->v_whitex[vno], yw = mris->v_whitey[vno], zw = mris->v_whitez[vno];
+
+  float xp, yp, zp;
+  MRISMP_sampleFaceCoordsCanonical((MHT *)(parms->mht), mris, cx, cy, cz, PIAL_VERTICES, &xp, &yp, &zp);
+
+  float dx = xp - xw;
+  float dy = yp - yw;
+  float dz = zp - zw;
+  float thick_sq = dx * dx + dy * dy + dz * dz;
+
+  return (thick_sq);
+}
+
+
+int MRISMP_sampleFaceCoordsCanonical(
+    MHT *mht, MRIS_MP *mris, float x, float y, float z, int which, float *px, float *py, float *pz)
+{
+  double norm = sqrt(x * x + y * y + z * z);
+  if (!FEQUAL(norm, mris->radius))  // project point onto sphere
+  {
+    DiagBreak();
+    project_point_onto_sphere(x, y, z, mris->radius, &x, &y, &z);
+  }
+
+  double lambda[3], fdist;
+  int   fno;
+  FACE* face;
+  MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), x, y, z, 8, 8, 1, &face, &fno, &fdist);
+  if (fno < 0) {
+    DiagBreak();
+    MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), x, y, z, 1000, -1, -1, &face, &fno, &fdist);
+    lambda[0] = lambda[1] = lambda[2] = 1.0 / 3.0;
+  }
+  else {
+    face_barycentric_coords2(MRISBaseConstCtr(mris,NULL), fno, CANONICAL_VERTICES, x, y, z, &lambda[0], &lambda[1], &lambda[2]);
+  }
+
+  *px = *py = *pz = 0;
+  int n;
+  for (n = 0; n < VERTICES_PER_FACE; n++) {
+    float xv, yv, zv;
+    MRISBase_getWhichXYZ(MRISBaseConstCtr(mris,NULL), face->v[n], which, &xv, &yv, &zv);
+    *px += lambda[n] * xv;
+    *py += lambda[n] * yv;
+    *pz += lambda[n] * zv;
+  }
+
+  return NO_ERROR;
+}
 #undef COMPILING_MRIS_MP

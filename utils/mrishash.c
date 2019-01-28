@@ -32,18 +32,22 @@
 // Includes that differ for linux vs GW BC compile
 //----------------------------------------------------
 #ifdef __BORLANDC__
+
 #include <mem.h>
 #include "../mrishash_include/mrisurf.h"
 #include "mrishash_include/error.h"
 //... above includes vanilla mrihash.h
 #include "mrishash_include/mrishash_gwmisc.h"
+
 #else
+
 #include <string.h>
 
 #include "diag.h"
 #include "error.h"
 
-#include "mrisurf.h"
+#include "mrisurf_metricProperties.h"
+#include "mrisurf_mp.h"
 #include "tritri.h"
 
 #endif
@@ -215,13 +219,13 @@ static int checkFace(MRIS_HASH_TABLE *mht, MRIS const *mris, int fno1);
 
 // Primitives that have to be correct...
 //
-static MRIS_HASH_TABLE* newMHT(MRIS const   *mris)
+static MRIS_HASH_TABLE* newMHT(MRISBaseConst mrisBase)
 {
   MRIS_HASH_TABLE* mht = (MRIS_HASH_TABLE *)calloc(1, sizeof(MRIS_HASH_TABLE));
   if (!mht) {
     ErrorExit(ERROR_NO_MEMORY, "%s: could not allocate hash table.\n", __MYFUNCTION__);
   }
-  mht->mris = mris;
+  mht->mrisBase = mrisBase;
 #ifdef HAVE_OPENMP
   omp_init_lock(&mht->buckets_lock);
 #endif
@@ -443,7 +447,7 @@ MRIS_HASH_TABLE *MHTcreateFaceTable_Resolution(
   static int ncalls = 0;
   ncalls++;
 
-  MRIS_HASH_TABLE* mht = newMHT(mris);
+  MRIS_HASH_TABLE* mht = newMHT(MRISBaseConstCtr(NULL,mris));
   
   mhtStoreFaceCentroids(mht, mris, which);
 
@@ -818,7 +822,7 @@ MRIS_HASH_TABLE *MHTcreateVertexTable_Resolution(MRIS const *mris, int which, fl
   // Allocation and initialization
   //-----------------------------
 
-  MRIS_HASH_TABLE* mht = newMHT(mris);
+  MRIS_HASH_TABLE* mht = newMHT(MRISBaseConstCtr(NULL,mris));
 
   mhtStoreFaceCentroids(mht, mris, which);
 
@@ -1023,7 +1027,7 @@ int MHTisVectorFilled(
   //----------------------------------------------------
   if (!mht)  ErrorExit(ERROR_BADPARM, "%s: mht  is NULL\n", __MYFUNCTION__);
   if (!mris) ErrorExit(ERROR_BADPARM, "%s: mris is NULL\n", __MYFUNCTION__);
-  if (mht->mris != mris) ErrorExit(ERROR_BADPARM, "%s: mris is wrong\n", __MYFUNCTION__);
+  if (mht->mrisBase.mris != mris) ErrorExit(ERROR_BADPARM, "%s: mris is wrong\n", __MYFUNCTION__);
   if (mht->fno_usage != MHTFNO_FACE) {
              ErrorExit(ERROR_BADPARM, "%s: mht not initialized for vertices\n", __MYFUNCTION__);
   }
@@ -1234,7 +1238,7 @@ static int MHTexpandToTouchingFaces(
     // Puts fno in the list, and all the faces that (by intersection rules) are touching fno
     // Returns the length of the list
 {
-  MRIS const * const mris = mht->mris;    
+  MRIS const * const mris = mht->mrisBase.mris;    
   FACE const * const face = &mris->faces[fno];
 
   int size = 0;
@@ -1519,7 +1523,7 @@ static int mhtDoesTriangleVoxelListIntersect(
     int                     const trace)
 //------------------------------------------------------------------
 {
-  MRIS const * const mris = mht->mris;
+  MRIS const * const mris = mht->mrisBase.mris;
   
   //------------------------------------------------------------------------
   // Iterate through all the voxels pertaining to the triangle, 
@@ -2157,8 +2161,8 @@ done:
  -----------------------------------------------------------------
 */
 
-int MHTfindClosestFaceGeneric(MRIS_HASH_TABLE *mht,
-                              MRIS const *mris,
+int MHTfindClosestFaceGeneric2(MRIS_HASH_TABLE *mht,
+                              MRISBaseConst mrisBase,
                               //---------- inputs --------------
                               double probex,
                               double probey,
@@ -2283,7 +2287,7 @@ int MHTfindClosestFaceGeneric(MRIS_HASH_TABLE *mht,
         zv = zvi + near8offsetz;
 
         mhtfindClosestFaceCentroidGenericInBucket(mht,
-                                                  mris,
+                                                  mrisBase.mris,
                                                   probex_vox + xv,
                                                   probey_vox + yv,
                                                   probez_vox + zv,
@@ -2326,7 +2330,7 @@ int MHTfindClosestFaceGeneric(MRIS_HASH_TABLE *mht,
         if (!central27[xv + 1][yv + 1][zv + 1])  // skip ones already done
         {
           mhtfindClosestFaceCentroidGenericInBucket(mht,
-                                                    mris,
+                                                    mrisBase.mris,
                                                     probex_vox + xv,
                                                     probey_vox + yv,
                                                     probez_vox + zv,
@@ -2377,7 +2381,7 @@ int MHTfindClosestFaceGeneric(MRIS_HASH_TABLE *mht,
         isWall = ((xv == -RVox) || (xv == RVox)) || ((yv == -RVox) || (yv == RVox));
         for (zv = -RVox; zv <= RVox; zv = isWall ? zv + 1 : zv + WallJump) {
           mhtfindClosestFaceCentroidGenericInBucket(mht,
-                                                    mris,
+                                                    mrisBase.mris,
                                                     probex_vox + xv,
                                                     probey_vox + yv,
                                                     probez_vox + zv,
@@ -3363,7 +3367,7 @@ static void mhtComputeFaceCentroid(
 
 static void mhtStoreFaceCentroids(MHT* mht, MRIS const *mris, int which)
 {
-  if (mris != mht->mris || mht->nfaces || mht->f) {
+  if (mris != mht->mrisBase.mris || mht->nfaces || mht->f) {
     fprintf(stderr, "%s:%d wrong initial state\n", __FILE__, __LINE__);
     exit(1);
   }

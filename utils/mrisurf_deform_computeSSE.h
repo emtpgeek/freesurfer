@@ -26,7 +26,7 @@
       ELT(sse_repulse               , 1.0,                     (parms->l_repulse > 0),    mrisComputeRepulsiveEnergy(mris, parms->l_repulse, mht_v_current, mht_f_current)) SEP \
       ELT(sse_repulsive_ratio       , 1.0,                                       true,    mrisComputeRepulsiveRatioEnergy(mris, parms->l_repulse_ratio)                   ) SEP \
       ELT(sse_tsmooth               , 1.0,                                       true,    mrisComputeThicknessSmoothnessEnergy(mris, parms->l_tsmooth, parms)             ) SEP \
-      ELT(sse_thick_min             , parms->l_thick_min,                        true,    mrisComputeThicknessMinimizationEnergy(mris, parms->l_thick_min, INIT_V_THICK_SQ, parms) ) SEP \
+      ELT(sse_thick_min             , parms->l_thick_min,                        true,    mrisComputeThicknessMinimizationEnergy(mris, parms->l_thick_min, parms)         ) SEP \
       ELT(sse_ashburner_triangle    , parms->l_ashburner_triangle,               false,   mrisComputeAshburnerTriangleEnergy(mris, parms->l_ashburner_triangle, parms)    ) SEP \
       ELT(sse_thick_parallel        , parms->l_thick_parallel,                   true,    mrisComputeThicknessParallelEnergy(mris, parms->l_thick_parallel, parms)        ) SEP \
       ELT(sse_thick_normal          , parms->l_thick_normal,                     true,    mrisComputeThicknessNormalEnergy(mris, parms->l_thick_normal, parms)            ) SEP \
@@ -39,7 +39,7 @@
       ELT(sse_tspring               , parms->l_tspring,       !DZERO(parms->l_tspring),   mrisComputeTangentialSpringEnergy(mris)                                         ) SEP \
       ELT(sse_nlspring              , parms->l_nlspring,      !DZERO(parms->l_nlspring),  mrisComputeNonlinearSpringEnergy(mris, parms)                                   ) SEP \
       ELT(sse_curv                  , l_curv_scaled,          !DZERO(parms->l_curv),      mrisComputeQuadraticCurvatureSSE(mris, parms->l_curv)                           ) SEP \
-      ELT(sse_corr                  , l_corr,                 !DZERO(l_corr),             mrisComputeCorrelationError(mris, v_thick_sq, parms, 1, false)                  ) SEP \
+      ELT(sse_corr                  , l_corr,                 !DZERO(l_corr),             mrisComputeCorrelationError(mris, parms, 1, false)                              ) SEP \
       ELT(sse_val                   , parms->l_intensity,     !DZERO(parms->l_intensity), mrisComputeIntensityError(mris, parms)                                          ) SEP \
       ELT(sse_loc                   , parms->l_location,      !DZERO(parms->l_location),  mrisComputeTargetLocationError(mris, parms)                                     ) SEP \
       ELT(sse_dura                  , parms->l_dura,          !DZERO(parms->l_dura),      mrisComputeDuraError(mris, parms)                                               ) SEP \
@@ -172,39 +172,12 @@ double MRIScomputeSSE(MRIS* mris, INTEGRATION_PARMS *parms)
 #endif
   }
 
-  float* v_thick_sq = NULL;
-  bool fixing_v_thick_sq = false;
-#define INIT_V_THICK_SQ ((!fixing_v_thick_sq) ? NULL : (v_thick_sq = (float*)calloc(mris->nvertices, sizeof(float))))
-  if (!fixing_v_thick_sq) {
-    //
-    // This detects whether weird behavior in the old code is used:
-    //      one of the early terms overwrites Vertex::curv and a later term reads the overwritten values
-    //      but if the earlier term is not used, then the initial Vertex::curv values are used
-    // This makes no sense, since those curv values are used later as though they were the values that were overwritten
-    //
-    switch (copeWithLogicProblem("FREESURFER_fix_MRIScomputeSSE_thick_sq","l_thick_min overwrites VERTEX::curv changing l_corr and l_pcorr")) {
-    case LogicProblemResponse_old: 
-      break;
-    case LogicProblemResponse_fix:
-      fixing_v_thick_sq = true;
-    }
-  }
-      
 #define SEP
 #define ELT(NAME, MULTIPLIER, COND, EXPR) double const NAME = (COND) ? (EXPR) : 0.0;
     SSE_TERMS
 #undef ELT
 #undef SEP
 
-#undef INIT_V_THICK_SQ
-  if (v_thick_sq && !fixing_v_thick_sq) {
-    int vno;
-    for (vno = 0; vno < mris->nvertices; vno++) {
-      mris->vertices[vno].curv = v_thick_sq[vno];
-    }  
-  }
-  freeAndNULL(v_thick_sq);
-  
   if (parms->l_thick_spring > 0 || parms->l_thick_min > 0 || parms->l_thick_parallel > 0 /* && DIAG_VERBOSE_ON*/)
     printf("min=%2.3f, parallel=%2.4f, normal=%2.4f, spring=%2.4f, ashburner=%2.3f, tsmooth=%2.3f\n",
            sse_thick_min            / (float)mris->nvertices,

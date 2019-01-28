@@ -32,6 +32,61 @@
 #include "matrix.h"
 #include "dmatrix.h"
 
+
+typedef struct _mht             MRIS_HASH_TABLE, MHT ;
+typedef struct LABEL_VERTEX     LABEL_VERTEX,    LV  ;
+typedef struct LABEL            LABEL;
+
+
+typedef struct MRIS_XYZ {
+  float x,y,z;
+} MRIS_XYZ;
+
+
+typedef struct {
+    unsigned long hash;
+} MRIS_HASH;
+
+
+// MRIS supplies a rich world, but in a format that causes lots of memory traffic
+//
+typedef struct MRIS MRIS,MRI_SURFACE;       // Prefer using MRIS
+
+
+// MRIS_MP is a much more efficient supplier of MetricProperties data than MRIS.
+// It is implemented in mrisurf_mp.h
+//
+// It is optimized to cope with the XYZ changing as the shape is mutated to optimize some SSE.  
+// Its representation keeps the data in a format that fills cache lines with immediately
+// needed information.
+//
+typedef struct MRIS_MP MRIS_MP;
+
+
+// The SSE calculation uses some large subsystems, such as MHT, that are coded
+// using the MRIS.  Ideally we would use C++, a class derivation hierachy, and 
+// virtual functions or C++ templates to implement these functions on top of both 
+// MRIS and MRIS_MP
+//
+// The following is basically a base class with virtual functions.
+// It is implemented in mrisurf_MRISBase.h
+//
+typedef struct MRISBase {
+    MRIS_MP*    mris_mp;            // takes preference over mris
+    MRIS*       mris;
+} MRISBase;
+
+typedef struct MRISBaseConst {
+    MRIS_MP const*    mris_mp;      // takes preference over mris
+    MRIS const*       mris;
+} MRISBaseConst;
+
+
+static MRISBase      MRISBaseCtr     (      MRIS_MP* mris_mp, MRIS       * mris) { MRISBase      base; base.mris_mp = mris_mp; base.mris = mris; return base; }
+static MRISBaseConst MRISBaseConstCtr(const MRIS_MP* mris_mp, MRIS const * mris) { MRISBaseConst base; base.mris_mp = mris_mp; base.mris = mris; return base; }
+
+
+
 #define MAX_SURFACES 20
 #define TALAIRACH_COORDS     0
 #define SPHERICAL_COORDS     1
@@ -85,8 +140,6 @@ typedef struct _area_label
   int      label ;            /* an identifier (used as an index) */
 }
 MRIS_AREA_LABEL ;
-
-struct MRIS;
 
 typedef struct FaceNormCacheEntry {
     // inputs
@@ -253,11 +306,6 @@ typedef struct VERTEX_TOPOLOGY {
 #define LIST_OF_VERTEX_TOPOLOGY_ELTS_IN_VERTEX
 
 #endif
-
-
-typedef struct MRIS_XYZ {
-  float x,y,z;
-} MRIS_XYZ;
 
 
 typedef struct vertex_type_
@@ -541,7 +589,7 @@ typedef char   *MRIS_cmdlines_t[MAX_CMDS] ;
 typedef char    MRIS_subject_name_t[STRLEN] ;
 typedef char    MRIS_fname_t[STRLEN] ;
 
-typedef struct MRIS
+struct MRIS
 {
 // The LIST_OF_MRIS_ELTS macro used here enables the the mris_hash
 // and other algorithms to process all the elements without having to explicitly name them there and here
@@ -686,8 +734,7 @@ LIST_OF_MRIS_ELTS ;
 #undef ELTP
 #undef SEP
 
-}
-MRI_SURFACE, MRIS ;
+};
 
 typedef const MRIS MRIS_const;
     // Ideally the MRIS and all the things it points to would be unchangeable via this object but C can't express this concept easily.
@@ -782,10 +829,6 @@ void setFaceNorm(MRIS const * const mris, int fno, float nx, float ny, float nz)
 
 // Support for writing traces that can be compared across test runs to help find where differences got introduced  
 //
-typedef struct {
-    unsigned long hash;
-} MRIS_HASH;
-
 void mrisVertexHash(MRIS_HASH* hash, MRIS const * mris, int vno);
 
 void mris_hash_init (MRIS_HASH* hash, MRIS const * mris);
@@ -1762,7 +1805,6 @@ int   MRISmeasureCorticalThickness(MRI_SURFACE *mris, int nbhd_size,
                                    float max_thickness) ;
 #endif
 
-#include "mrishash.h"
 int  MRISmeasureThicknessFromCorrespondence(MRI_SURFACE *mris, MHT *mht, float max_thick) ;
 int MRISfindClosestOrigVertices(MRI_SURFACE *mris, int nbhd_size) ;
 int MRISfindClosestPialVerticesCanonicalCoords(MRI_SURFACE *mris, int nbhd_size) ;
@@ -2373,7 +2415,6 @@ int MRISvertexNormalInVoxelCoords(MRI_SURFACE *mris,
    default: break; \
  }
 
-#include "label.h" // LABEL
 int MRISlogOdds(MRI_SURFACE *mris, LABEL *area, double slope)  ;
 MRI_SP  *MRISPorLabel(MRI_SP *mrisp, MRI_SURFACE *mris, LABEL *area) ;
 MRI_SP  *MRISPandLabel(MRI_SP *mrisp, MRI_SURFACE *mris, LABEL *area) ;
@@ -2672,9 +2713,7 @@ int MRISrepositionSurfaceToCoordinate(MRI_SURFACE *mris, MRI *mri, int target_vn
                                       float ty, 
                                       float tz, 
                                       int nsize, double sigma, int flags)  ;
-int face_barycentric_coords(MRI_SURFACE const *mris, int fno, int which_vertices,
-                            double cx, double cy, double cz, double *pl1, double *pl2, double *pl3) ;
-
+                                      
 MRI *MRIScomputeFlattenedVolume(MRI_SURFACE *mris,
                                 MRI *mri,
                                 double res,
@@ -2961,3 +3000,12 @@ void mrisComputeOriginalVertexDistancesIfNecessaryWkr(MRIS *mris, bool* laterTim
   }
 
 void MRIScheckForNans(MRIS *mris);
+
+
+// Historically these have been included in mrisurf.h
+// even though this leads to circular inclusions
+// which have been broken by moving some typedef struct's into here and shifting this inclusion to the end
+//
+#include "label.h"
+#include "mrishash.h"
+#include "mrisurf_MRISBase.h"

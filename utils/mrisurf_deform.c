@@ -18,6 +18,7 @@
  * Reporting: freesurfer@nmr.mgh.harvard.edu
  *
  */
+#include "mrisurf_mp.h"
 #include "mrisurf_deform.h"
 #include "mrisurf_project.h"
 #include "mrisurf_sseTerms.h"
@@ -7311,7 +7312,7 @@ double mrisComputeError(MRI_SURFACE *mris,
       ErrorExit(ERROR_BADPARM, "sse (%f, %f) is not finite at face %d!\n", sse_area, sse_angle, fno);
   }
 
-  sse_corr = mrisComputeCorrelationError(mris, NULL, parms, 1, false);
+  sse_corr = mrisComputeCorrelationError(mris, parms, 1, false);
   
   if (!DZERO(parms->l_dist)) {
     sse_dist = mrisComputeDistanceError(mris, parms);
@@ -12291,7 +12292,7 @@ int MRISrigidBodyAlignGlobal(
                 vertex0->x,vertex0->y,vertex0->z); 
             }
             
-            double sse = mrisComputeCorrelationError(mris, NULL, parms, 1, trace);
+            double sse = mrisComputeCorrelationError(mris, parms, 1, trace);
             if (trace) fprintf(stdout, "%s:%d sse:%g\n", __FILE__, __LINE__, sse);
             
             MRISrestoreVertexPositions(mris, TMP_VERTICES);
@@ -12841,7 +12842,7 @@ double MRIScomputeCorrelationError(MRIS *mris, MRI_SP *mrisp_template, int fno)
   parms.mrisp_template = mrisp_template;
   parms.l_corr = 1.0f;
   parms.frame_no = fno;
-  error = mrisComputeCorrelationError(mris, NULL, &parms, 1, false);
+  error = mrisComputeCorrelationError(mris, &parms, 1, false);
   return (sqrt(error / (double)MRISvalidVertices(mris)));
 }
 

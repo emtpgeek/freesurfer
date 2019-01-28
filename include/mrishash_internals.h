@@ -96,7 +96,7 @@ typedef struct mht_face_t {
 
 struct _mht 
 {
-  MRI_SURFACE const *mris ;                                             //
+  MRISBaseConst      mrisBase ;                                         //
   float              vres ;                                             // Resolution of discretization
   MHTFNO_t           fno_usage;                                         // To enforce consistent use of fno:  face number or vertex number
   int                nbuckets ;                                         // Total # of buckets
