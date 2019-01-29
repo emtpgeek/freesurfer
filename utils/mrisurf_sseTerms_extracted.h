@@ -181,9 +181,9 @@ static double FUNCTION_NAME(mrisComputeThicknessMinimizationEnergyTerm,mrismp_Co
   MRIS_INFO *mris, int vno, INTEGRATION_PARMS *parms) 
 {
   GET_V_XYZ
-  GET_PCURV                                                                                 // YUCK
+  GET_PCURV                                                                                // YUCK
 
-  float thick_sq = mrisSampleMinimizationEnergy(mris, vno, parms, x, y, z);
+  float thick_sq = FUNCTION_NAME(mrisSampleMinimizationEnergy,mrismp_SampleMinimizationEnergy)(mris, vno, parms, x, y, z);
   *pcurv = sqrt(thick_sq);                                                                 // YUCK
 
   return thick_sq;
@@ -193,24 +193,24 @@ static double FUNCTION_NAME(mrisComputeThicknessMinimizationEnergyTerm,mrismp_Co
 static double FUNCTION_NAME(mrisComputeThicknessNormalEnergyTerm,mrismp_ComputeThicknessNormalEnergyTerm) (
   MRIS_INFO *mris, int vno, INTEGRATION_PARMS *parms) 
 {
-  VERTEX const * const v = &mris->vertices[vno];
-  return mrisSampleNormalEnergy(mris, vno, parms, v->x, v->y, v->z);
+  GET_V_XYZ
+  return FUNCTION_NAME(mrisSampleNormalEnergy,mrismp_SampleNormalEnergy)(mris, vno, parms, x, y, z);
 }
 
 
 static double FUNCTION_NAME(mrisComputeThicknessSpringEnergyTerm, mrismp_ComputeThicknessSpringEnergyTerm) (
   MRIS_INFO *mris, int vno, INTEGRATION_PARMS *parms)
 {
-  VERTEX const * const v = &mris->vertices[vno];
-  return mrisSampleSpringEnergy(mris, vno, v->x, v->y, v->z, parms);
+  GET_V_XYZ
+  return FUNCTION_NAME(mrisSampleSpringEnergy,mrismp_SampleSpringEnergy)(mris, vno, x, y, z, parms);
 }
 
 
 static double FUNCTION_NAME(mrisComputeThicknessParallelEnergyTerm, mrismp_ComputeThicknessParallelEnergyTerm) (
   MRIS_INFO *mris, int vno, INTEGRATION_PARMS *parms)
 {
-  VERTEX * const v = &mris->vertices[vno];
-  return mrisSampleParallelEnergy(mris, vno, parms, v->x, v->y, v->z);
+  GET_V_XYZ
+  return FUNCTION_NAME(mrisSampleParallelEnergy,mrismp_SampleParallelEnergy)(mris, vno, parms, x, y, z);
 }
 
 

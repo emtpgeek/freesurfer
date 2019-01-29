@@ -753,6 +753,110 @@ float mrismp_SampleMinimizationEnergy(
   return (thick_sq);
 }
 
+float mrismp_SampleNormalEnergy(
+    MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
+{
+  if (vno == Gdiag_no) DiagBreak();
+
+  project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
+  float 
+    xw = mris->v_whitex[vno], 
+    yw = mris->v_whitey[vno], 
+    zw = mris->v_whitez[vno];
+  // MRISvertexCoord2XYZ_float(v, WHITE_VERTICES, &xw, &yw, &zw);
+  
+  float xp, yp, zp;
+  MRISMP_sampleFaceCoordsCanonical((MHT *)(parms->mht), mris, cx, cy, cz, PIAL_VERTICES, &xp, &yp, &zp);
+
+  float dx = xp - xw;
+  float dy = yp - yw;
+  float dz = zp - zw;
+  float len = sqrt(dx * dx + dy * dy + dz * dz);    // This should have been double precision * and +.  Changing will affect results
+  if (len < 0.01)  // can't reliably estimate normal. Probably not in cortex
+  {
+    return (0.0);
+  }
+  float
+    wnx = mris->v_wnx[vno],
+    wny = mris->v_wny[vno],
+    wnz = mris->v_wnz[vno];
+  dx /= len;
+  dy /= len;
+  dz /= len;
+  len = dx * wnx + dy * wny + dz * wnz;  // dot product
+  len = 1 - len;
+  double sse = sqrt(len * len);
+  //  sse = SQR(dx-v->wnx) + SQR(dy-v->wny) + SQR(dz-v->wnz) ;
+
+  float pnx, pny, pnz;
+  MRISMP_sampleFaceCoordsCanonical((MHT *)(parms->mht), mris, cx, cy, cz, PIAL_NORMALS, &pnx, &pny, &pnz);
+  len = sqrt(pnx * pnx + pny * pny + pnz * pnz);
+  if (len < 0.01)  // can't reliably estimate normal. Probably not in cortex
+    return (0.0);
+  pnx /= len;
+  pny /= len;
+  pnz /= len;
+  len = dx * pnx + dy * pny + dz * pnz;  // dot product
+  len = 1 - len;
+  sse += sqrt(len * len);
+  //  sse += SQR(dx-pnx) + SQR(dy-pny) + SQR(dz-pnz) ;
+
+  if (!devFinite(sse)) DiagBreak();
+
+  return (sse);
+}
+
+float mrismp_SampleSpringEnergy(
+    MRIS_MP *mris, int const vno, float cx, float cy, float cz, INTEGRATION_PARMS *parms)
+{
+  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+  project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
+
+  MHT * const mht = (MHT *)(parms->mht);
+
+  double fdist;
+  int fno;
+  MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), cx, cy, cz, 4, 4, 1, &fno, &fdist);
+  if (fno < 0) MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), cx, cy, cz, 1000, -1, -1, &fno, &fdist);
+
+  float xp, yp, zp;
+  mrismp_sampleFaceCoords_PIAL_VERTICES_CANONICAL_VERTICES(mris, fno, cx, cy, cz, &xp, &yp, &zp);
+
+  float xc = 0.0f, yc = 0.0f, zc = 0.0f;
+  int num = 0;
+  int n;
+  for (n = 0; n < vt->vnum; n++) {
+    int const vno2 = vt->v[n];
+    if (mris->v_ripflag[vno2]) continue;
+    float
+      vnx = mris->v_x[vno2],
+      vny = mris->v_y[vno2],
+      vnz = mris->v_z[vno2];
+    float xn, yn, zn;
+    mrismp_sampleFaceCoords_PIAL_VERTICES_CANONICAL_VERTICES(mris, mris->v_assigned_fno[vno2], vnx, vny, vnz, &xn, &yn, &zn);
+
+    xc += xn;
+    yc += yn;
+    zc += zn;
+    num++;
+  }
+
+  if (num > 0) {
+    xc /= num;
+    yc /= num;
+    zc /= num;
+  }
+
+  double vdist = mris->avg_vertex_dist;
+  if (!vdist) vdist = 1.0;
+
+  double sse = (SQR(xc - xp) + SQR(yc - yp) + SQR(zc - zp)) / vdist;
+
+  if (!devFinite(sse)) DiagBreak();
+
+  return (sse);
+}
+
 
 int MRISMP_sampleFaceCoordsCanonical(
     MHT *mht, MRIS_MP *mris, float x, float y, float z, int which, float *px, float *py, float *pz)

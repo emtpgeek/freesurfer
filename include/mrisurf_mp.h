@@ -90,7 +90,11 @@ struct MRIS_MP {
     ELT(const,  float,  whitez      ) SEP   \
     ELT(const,  float,  pialx       ) SEP   \
     ELT(const,  float,  pialy       ) SEP   \
-    ELT(const,  float,  pialz       ) 
+    ELT(const,  float,  pialz       ) SEP   \
+    ELT(const,  float,  wnx         ) SEP   \
+    ELT(const,  float,  wny         ) SEP   \
+    ELT(const,  float,  wnz         ) SEP   \
+    ELT(const,  int,    assigned_fno) 
     
     MRIS_MP__LIST_V_IN
 

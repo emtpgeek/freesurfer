@@ -753,42 +753,55 @@ float mrisSampleMinimizationEnergy(
 }
 
 float mrisSampleNormalEnergy(
-    MRIS *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
+  MRIS *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
 {
   VERTEX const * const v = &mris->vertices[vno];
 
-  float dx, dy, dz, len, xw, yw, zw, xp, yp, zp, pnx, pny, pnz;
-  double sse;
-
-  if (v - mris->vertices == Gdiag_no) DiagBreak();
-
   project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
-  MRISvertexCoord2XYZ_float(v, WHITE_VERTICES, &xw, &yw, &zw);
+
+  float 
+    xw = v->whitex, 
+    yw = v->whitey, 
+    zw = v->whitez;
+  //MRISvertexCoord2XYZ_float(v, WHITE_VERTICES, &xw, &yw, &zw);
+
+  float xp, yp, zp;
   MRISsampleFaceCoordsCanonical((MHT *)(parms->mht), mris, cx, cy, cz, PIAL_VERTICES, &xp, &yp, &zp);
 
-  dx = xp - xw;
-  dy = yp - yw;
-  dz = zp - zw;
-  len = sqrt(dx * dx + dy * dy + dz * dz);
+  float dx = xp - xw;
+  float dy = yp - yw;
+  float dz = zp - zw;
+  float len = sqrt(dx * dx + dy * dy + dz * dz);    // This should have been double precision * and +.  Changing will affect results
   if (len < 0.01)  // can't reliably estimate normal. Probably not in cortex
   {
     return (0.0);
   }
+  
+  float
+    wnx = v->wnx,
+    wny = v->wny,
+    wnz = v->wnz;
+    
   dx /= len;
   dy /= len;
   dz /= len;
-  len = dx * v->wnx + dy * v->wny + dz * v->wnz;  // dot product
+  len = dx * wnx + dy * wny + dz * wnz;  // dot product
   len = 1 - len;
-  sse = sqrt(len * len);
-  //  sse = SQR(dx-v->wnx) + SQR(dy-v->wny) + SQR(dz-v->wnz) ;
 
+  double sse = sqrt(len * len);
+  //  sse = SQR(dx - v->wnx) + SQR(dy - v->wny) + SQR(dz - v->wnz) ;
+
+  float pnx, pny, pnz;
   MRISsampleFaceCoordsCanonical((MHT *)(parms->mht), mris, cx, cy, cz, PIAL_NORMALS, &pnx, &pny, &pnz);
+
   len = sqrt(pnx * pnx + pny * pny + pnz * pnz);
   if (len < 0.01)  // can't reliably estimate normal. Probably not in cortex
     return (0.0);
+
   pnx /= len;
   pny /= len;
   pnz /= len;
+
   len = dx * pnx + dy * pny + dz * pnz;  // dot product
   len = 1 - len;
   sse += sqrt(len * len);
@@ -804,41 +817,50 @@ float mrisSampleSpringEnergy(
     MRIS *mris, int const vno, float cx, float cy, float cz, INTEGRATION_PARMS *parms)
 {
   VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
-  VERTEX          const * const v  = &mris->vertices         [vno];
-
-  float xn, yn, zn, xp, yp, zp, xc, yc, zc;
-  double sse, fdist, vdist = mris->avg_vertex_dist;
-  int n, num, fno;
-
-  FACE *face;
-  MHT *mht = (MHT *)(parms->mht);
-
-  if (vdist) vdist = 1;
 
   project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
-  if (v - mris->vertices == Gdiag_no) DiagBreak();
 
+  MHT * const mht = (MHT *)(parms->mht);
+
+  double fdist;
+  int fno;
+  FACE *face;
   MHTfindClosestFaceGeneric(mht, mris, cx, cy, cz, 4, 4, 1, &face, &fno, &fdist);
   if (fno < 0) MHTfindClosestFaceGeneric(mht, mris, cx, cy, cz, 1000, -1, -1, &face, &fno, &fdist);
+
+  float xp, yp, zp;
   MRISsampleFaceCoords(mris, fno, cx, cy, cz, PIAL_VERTICES, CANONICAL_VERTICES, &xp, &yp, &zp);
 
-  xc = yc = zc = 0;
-  for (num = n = 0; n < vt->vnum; n++) {
-    VERTEX const * const vn = &mris->vertices[vt->v[n]];
+  float xc = 0.0f, yc = 0.0f, zc = 0.0f;
+  int num = 0;
+  int n;
+  for (n = 0; n < vt->vnum; n++) {
+    int const vno2 = vt->v[n];
+    VERTEX const * const vn = &mris->vertices[vno2];
     if (vn->ripflag) continue;
-    MRISsampleFaceCoords(mris, vn->fno, vn->x, vn->y, vn->z, PIAL_VERTICES, CANONICAL_VERTICES, &xn, &yn, &zn);
+    float
+      vnx = vn->x,
+      vny = vn->y,
+      vnz = vn->z;
+    float xn, yn, zn;
+    MRISsampleFaceCoords(mris, vn->assigned_fno, vnx, vny, vnz, PIAL_VERTICES, CANONICAL_VERTICES, &xn, &yn, &zn);
+
     xc += xn;
     yc += yn;
     zc += zn;
     num++;
   }
+
   if (num > 0) {
     xc /= num;
     yc /= num;
     zc /= num;
   }
 
-  sse = (SQR(xc - xp) + SQR(yc - yp) + SQR(zc - zp)) / vdist;
+  double vdist = mris->avg_vertex_dist;
+  if (!vdist) vdist = 1.0;
+
+  double sse = (SQR(xc - xp) + SQR(yc - yp) + SQR(zc - zp)) / vdist;
 
   if (!devFinite(sse)) DiagBreak();
 
@@ -856,7 +878,7 @@ float mrisSampleParallelEnergyAtVertex(MRIS *mris, int const vno, INTEGRATION_PA
   double sse;
 
   MRISvertexCoord2XYZ_float(v, WHITE_VERTICES, &xw, &yw, &zw);
-  MRISsampleFaceCoords(mris, v->fno, v->x, v->y, v->z, PIAL_VERTICES, CANONICAL_VERTICES, &xp, &yp, &zp);
+  MRISsampleFaceCoords(mris, v->assigned_fno, v->x, v->y, v->z, PIAL_VERTICES, CANONICAL_VERTICES, &xp, &yp, &zp);
 
   dx = xp - xw;
   dy = yp - yw;
@@ -875,8 +897,8 @@ float mrisSampleParallelEnergyAtVertex(MRIS *mris, int const vno, INTEGRATION_PA
     if (vn->ripflag) continue;
 
     MRISvertexCoord2XYZ_float(vn, WHITE_VERTICES, &xw, &yw, &zw);
-    if (vn->fno >= 0) {
-      MRISsampleFaceCoords(mris, vn->fno, vn->x, vn->y, vn->z, PIAL_VERTICES, CANONICAL_VERTICES, &xp, &yp, &zp);
+    if (vn->assigned_fno >= 0) {
+      MRISsampleFaceCoords(mris, vn->assigned_fno, vn->x, vn->y, vn->z, PIAL_VERTICES, CANONICAL_VERTICES, &xp, &yp, &zp);
     }
     else {
       MRISsampleFaceCoordsCanonical((MHT *)(parms->mht), mris, vn->x, vn->y, vn->z, PIAL_VERTICES, &xp, &yp, &zp);
@@ -938,13 +960,13 @@ float mrisSampleParallelEnergy(
   project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
   x = v->x;
   y = v->y;
-  z = v->z;          // store old coordinates
-  old_fno = v->fno;  // store old face
+  z = v->z;                     // store old coordinates
+  old_fno = v->assigned_fno;    // store old face
   MHTfindClosestFaceGeneric(mht, mris, cx, cy, cz, 4, 4, 1, &face, &fno, &fdist);
   if (fno < 0) {
     MHTfindClosestFaceGeneric(mht, mris, cx, cy, cz, 1000, -1, -1, &face, &fno, &fdist);
   }
-  v->fno = fno;
+  v->assigned_fno = fno;
 
   v->x = cx;
   v->y = cy;
@@ -965,8 +987,8 @@ float mrisSampleParallelEnergy(
 #endif
   v->x = x;
   v->y = y;
-  v->z = z;          // restore old coordinates
-  v->fno = old_fno;  // restore old face
+  v->z = z;                     // restore old coordinates
+  v->assigned_fno = old_fno;    // restore old face
   sse /= (num);
   return (sse);
 }

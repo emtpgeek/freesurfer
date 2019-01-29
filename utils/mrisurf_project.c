@@ -166,7 +166,7 @@ void mrisAssignFaces(MRIS *mris, MHT *mht, int which_vertices)
     MHTfindClosestFaceGeneric(mht, mris, v->x, v->y, v->z, 8, 8, 1, &face, &fno, &fdist);
     if (fno < 0) MHTfindClosestFaceGeneric(mht, mris, v->x, v->y, v->z, 1000, -1, -1, &face, &fno, &fdist);
 
-    v->fno = fno;
+    v->assigned_fno = fno;
     
     ROMP_PFLB_end
   }

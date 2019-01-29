@@ -5059,24 +5059,52 @@ int MRISsampleFaceCoords(MRIS *mris,
                          float *py,
                          float *pz)
 {
-  float xv, yv, zv;
   double lambda[3];
-  int n, ret;
-  FACE *face;
-  VERTEX *v;
-
-  face = &mris->faces[fno];
-
-  xv = yv = zv = 0.0;  // to get rid of mac warnings
-  ret = face_barycentric_coords(mris, fno, which_barycentric, x, y, z, &lambda[0], &lambda[1], &lambda[2]);
+  int ret = face_barycentric_coords(mris, fno, which_barycentric, x, y, z, &lambda[0], &lambda[1], &lambda[2]);
   if (ret < 0) {
     lambda[0] = lambda[1] = lambda[2] = 1.0 / 3.0;
   }
 
   *px = *py = *pz = 0;
+  FACE *face = &mris->faces[fno];
+  int n;
   for (n = 0; n < VERTICES_PER_FACE; n++) {
-    v = &mris->vertices[face->v[n]];
+    int vno = face->v[n];
+    VERTEX *v = &mris->vertices[vno];
+
+    float xv, yv, zv;
     MRISvertexCoord2XYZ_float(v, which_coords, &xv, &yv, &zv);
+    *px += lambda[n] * xv;
+    *py += lambda[n] * yv;
+    *pz += lambda[n] * zv;
+  }
+
+  return (ret);
+}
+
+int mrismp_sampleFaceCoords_PIAL_VERTICES_CANONICAL_VERTICES(MRIS_MP *mris,
+                         int fno,
+                         double x,
+                         double y,
+                         double z,
+                         float *px,
+                         float *py,
+                         float *pz)
+{
+  double lambda[3];
+  int ret = face_barycentric_coords2(MRISBaseConstCtr(mris,NULL), fno, CANONICAL_VERTICES, x, y, z, &lambda[0], &lambda[1], &lambda[2]);
+  if (ret < 0) {
+    lambda[0] = lambda[1] = lambda[2] = 1.0 / 3.0;
+  }
+
+  *px = *py = *pz = 0;
+  FACE_TOPOLOGY const * const face = &mris->faces_topology[fno];
+  int n;
+  for (n = 0; n < VERTICES_PER_FACE; n++) {
+    int vno = face->v[n];
+
+    float const xv = mris->v_pialx[vno], yv = mris->v_pialy[vno], zv = mris->v_pialz[vno];
+
     *px += lambda[n] * xv;
     *py += lambda[n] * yv;
     *pz += lambda[n] * zv;

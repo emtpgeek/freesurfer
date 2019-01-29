@@ -513,7 +513,7 @@ typedef struct vertex_type_
   ELTT(float,mean_imag) SEP         /* imaginary part of complex statistic */    \
   ELTT(float,std_error) SEP    \
   ELTT(unsigned int,flags) SEP    \
-  ELTT(int,fno) SEP                 /* face that this vertex is in */    \
+  ELTT(int,assigned_fno) SEP        /* face that this vertex is assigned to */    \
   ELTT(int,cropped) SEP \
   ELTT(short,marked) SEP            /* for a variety of uses */    \
   ELTT(short,marked2) SEP    \

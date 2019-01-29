@@ -14,7 +14,7 @@
  */
 #include "mrisurf_sseTerms.h"
 #include "mrisurf_project.h"
-
+#include "mrisurf_mp.h"
 
 // The SSE terms are either computed by iterating over the vertices or the faces
 // Ideally there would be one pass over each, to 

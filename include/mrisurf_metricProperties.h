@@ -178,13 +178,19 @@ void computeDefectFaceNormal_calculate(
 
 
 void MRISMP_translate_along_vertex_dxdydz(MRIS_MP* mris_src, MRIS_MP* mris_dst, 
-  double dt,
-  float const* dx, float const* dy, float const* dz);               // the dx,dy,dz for ripped should be zero
+    double dt,
+    float const* dx, float const* dy, float const* dz);               // the dx,dy,dz[vno] for ripped[vno] should be zero
 
 int MRISMP_sampleFaceCoordsCanonical(
     MHT *mht, MRIS_MP *mris, float x, float y, float z, int which, float *px, float *py, float *pz);
+ 
+int mrismp_sampleFaceCoords_PIAL_VERTICES_CANONICAL_VERTICES(
+    MRIS_MP *mris, int fno, double x, double y, double z, float *px, float *py, float *pz);   
     
 float mrismp_SampleMinimizationEnergy(MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz);
-
+float mrismp_SampleNormalEnergy      (MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz);
+float mrismp_SampleSpringEnergy      (MRIS_MP *mris, int const vno, float cx, float cy, float cz, INTEGRATION_PARMS *parms);
+    
+    
 void MRISMP_computeMetricProperties(MRIS_MP* mris);
 void MRISMP_updateEllipsoidSurface(MRIS_MP* mris);
