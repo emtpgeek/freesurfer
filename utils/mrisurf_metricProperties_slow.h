@@ -867,60 +867,77 @@ float mrisSampleSpringEnergy(
   return (sse);
 }
 
+static bool mrisSampleParallelEnergyAtVertex_oneVertex_alternateXYZ(
+  MRIS *mris, INTEGRATION_PARMS *parms, 
+  int const vno, 
+  int const moved_vno, float const moved_x, float const moved_y, float const moved_z, int moved_assigned_fno,
+  float* pdx, float* pdy, float* pdz)
+{
+  VERTEX* const v = &mris->vertices[vno];
 
-float mrisSampleParallelEnergyAtVertex(MRIS *mris, int const vno, INTEGRATION_PARMS *parms)
+  float const
+    x = (vno == moved_vno) ? moved_x : v->x, 
+    y = (vno == moved_vno) ? moved_y : v->y, 
+    z = (vno == moved_vno) ? moved_z : v->z;
+
+  float const
+    xw = v->whitex, yw = v->whitey, zw = v->whitez;
+
+  int const 
+    assigned_fno = (vno == moved_vno) ? moved_assigned_fno : v->assigned_fno;
+    
+  float xp, yp, zp;
+  if (assigned_fno >= 0) {
+    MRISsampleFaceCoords(mris, assigned_fno, x, y, z, PIAL_VERTICES, CANONICAL_VERTICES, &xp, &yp, &zp);
+  } else {
+    MRISsampleFaceCoordsCanonical((MHT *)(parms->mht), mris, x, y, z, PIAL_VERTICES, &xp, &yp, &zp);
+  }
+
+  float dx = xp - xw;
+  float dy = yp - yw;
+  float dz = zp - zw;
+  float len = sqrt(dx * dx + dy * dy + dz * dz);
+  if (FZERO(len)) return false;
+
+  *pdx = dx/len;
+  *pdy = dy/len;
+  *pdz = dz/len;
+  
+  return true;
+}
+
+float mrisSampleParallelEnergyAtVertex_alternateXYZ(
+  MRIS *mris, int const vno, 
+  int const moved_vno, float const moved_x, float const moved_y, float const moved_z, int moved_assigned_fno,
+  INTEGRATION_PARMS *parms)
 {
   VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
-  VERTEX                * const v  = &mris->vertices         [vno];
 
-  float xw, yw, zw, xp, yp, zp, dx, dy, dz, dxn, dyn, dzn, len, dxn_total, dyn_total, dzn_total;
-  int n, num;
-  double sse;
-
-  MRISvertexCoord2XYZ_float(v, WHITE_VERTICES, &xw, &yw, &zw);
-  MRISsampleFaceCoords(mris, v->assigned_fno, v->x, v->y, v->z, PIAL_VERTICES, CANONICAL_VERTICES, &xp, &yp, &zp);
-
-  dx = xp - xw;
-  dy = yp - yw;
-  dz = zp - zw;
-  len = sqrt(dx * dx + dy * dy + dz * dz);
-  if (FZERO(len)) return (0.0);
-
-  dx /= len;
-  dy /= len;
-  dz /= len;
+  float dx, dy, dz;
+  if (!mrisSampleParallelEnergyAtVertex_oneVertex_alternateXYZ(mris, parms, vno, moved_vno,moved_x,moved_y,moved_z,moved_assigned_fno, &dx, &dy, &dz)) return 0.0f;
 
   // compute average of neighboring vectors connecting white and pial surface, store it in d[xyz]n_total
-  dxn_total = dyn_total = dzn_total = 0.0;
-  for (num = 0, sse = 0.0, n = 0; n < vt->vnum; n++) {
-    VERTEX * const vn = &mris->vertices[vt->v[n]];
+  //
+  float dxn_total = 0.0f, dyn_total = 0.0f, dzn_total = 0.0f;
+  double sse = 0.0;
+  int num = 0;
+  int n;
+  for (n = 0; n < vt->vnum; n++) {
+    int const vno2 = vt->v[n];
+    VERTEX * const vn = &mris->vertices[vno2];
     if (vn->ripflag) continue;
 
-    MRISvertexCoord2XYZ_float(vn, WHITE_VERTICES, &xw, &yw, &zw);
-    if (vn->assigned_fno >= 0) {
-      MRISsampleFaceCoords(mris, vn->assigned_fno, vn->x, vn->y, vn->z, PIAL_VERTICES, CANONICAL_VERTICES, &xp, &yp, &zp);
-    }
-    else {
-      MRISsampleFaceCoordsCanonical((MHT *)(parms->mht), mris, vn->x, vn->y, vn->z, PIAL_VERTICES, &xp, &yp, &zp);
-    }
-
-    dxn = xp - xw;
-    dyn = yp - yw;
-    dzn = zp - zw;
-    len = sqrt(dxn * dxn + dyn * dyn + dzn * dzn);
-    if (FZERO(len)) continue;
-
-    dxn /= len;
-    dyn /= len;
-    dzn /= len;
-
+    float dxn, dyn, dzn;
+    if (!mrisSampleParallelEnergyAtVertex_oneVertex_alternateXYZ(mris, parms, vno2, moved_vno,moved_x,moved_y,moved_z,moved_assigned_fno, &dxn, &dyn, &dzn)) continue;
+    
     dxn_total += dxn;
     dyn_total += dyn;
     dzn_total += dzn;
+    
 #if 0
     sse += SQR(dxn-dx) + SQR(dyn-dy) + SQR(dzn-dz) ;
 #else
-    len = dx * dxn + dy * dyn + dz * dzn;  // dot product
+    float len = dx * dxn + dy * dyn + dz * dzn;  // dot product
     len = 1 - len;
     sse += sqrt(len * len);
 #endif
@@ -929,7 +946,7 @@ float mrisSampleParallelEnergyAtVertex(MRIS *mris, int const vno, INTEGRATION_PA
   }
 
 #if 0
-  len = sqrt(dxn_total*dxn_total + dyn_total*dyn_total + dzn_total*dzn_total) ;
+  float len = sqrt(dxn_total*dxn_total + dyn_total*dyn_total + dzn_total*dzn_total) ;
   if (len > 0)
   {
     dxn_total /= len ; dyn_total /= len ; dzn_total /= len ;
@@ -943,53 +960,43 @@ float mrisSampleParallelEnergyAtVertex(MRIS *mris, int const vno, INTEGRATION_PA
   return (sse);
 }
 
+float mrisSampleParallelEnergyAtVertex(MRIS *mris, int const vno, INTEGRATION_PARMS *parms) {
+  return mrisSampleParallelEnergyAtVertex_alternateXYZ(mris, vno, -1,0.0f,0.0f,0.0f,-1, parms);
+}
 
 float mrisSampleParallelEnergy(
-    MRIS *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
+  MRIS *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
 {
-  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
-  VERTEX                * const v  = &mris->vertices         [vno];
-
-  int fno = 0, old_fno, num;
-  double sse, fdist;
-  FACE *face;
-  float x, y, z;
-  MHT *mht = (MHT *)(parms->mht);
-  int n;
+  MHT* const mht = (MHT *)(parms->mht);
 
   project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
-  x = v->x;
-  y = v->y;
-  z = v->z;                     // store old coordinates
-  old_fno = v->assigned_fno;    // store old face
-  MHTfindClosestFaceGeneric(mht, mris, cx, cy, cz, 4, 4, 1, &face, &fno, &fdist);
-  if (fno < 0) {
-    MHTfindClosestFaceGeneric(mht, mris, cx, cy, cz, 1000, -1, -1, &face, &fno, &fdist);
-  }
-  v->assigned_fno = fno;
 
-  v->x = cx;
-  v->y = cy;
-  v->z = cz;  // change coords to here and compute effects on sse
-  sse = mrisSampleParallelEnergyAtVertex(mris, vno, parms);
+  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+
+  FACE* face;
+  int assigned_fno;
+  double fdist;
+  MHTfindClosestFaceGeneric(mht, mris, cx, cy, cz, 4, 4, 1, &face, &assigned_fno, &fdist);
+  if (assigned_fno < 0) {
+    MHTfindClosestFaceGeneric(mht, mris, cx, cy, cz, 1000, -1, -1, &face, &assigned_fno, &fdist);
+  }
+
+  double sse = mrisSampleParallelEnergyAtVertex_alternateXYZ(mris, vno, vno,cx,cy,cz,assigned_fno, parms);
+
 #if 1
+  int num = 1;
+  int n;
   for (num = 1, n = 0; n < vt->vnum; n++) {
-    int const vnno = vt->v[n];
-    VERTEX *vn;
-    vn = &mris->vertices[vnno];
+    int const vno2 = vt->v[n];
+    VERTEX *vn = &mris->vertices[vno2];
     if (vn->ripflag) continue;
 
-    sse += mrisSampleParallelEnergyAtVertex(mris, vnno, parms);
+    sse += mrisSampleParallelEnergyAtVertex_alternateXYZ(mris, vno2, vno,cx,cy,cz,assigned_fno, parms);
     num++;
   }
-#else
-  num = 1;
-#endif
-  v->x = x;
-  v->y = y;
-  v->z = z;                     // restore old coordinates
-  v->assigned_fno = old_fno;    // restore old face
   sse /= (num);
+#endif
+
   return (sse);
 }
 
