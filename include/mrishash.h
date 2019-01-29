@@ -28,7 +28,7 @@
  */
 
 #include "mrisurf.h"
-
+#include "error.h"
 
 // define the following to get a single inclusion of non-renamed functions
 #define MRISHASH_VANILLA_FUNCS
@@ -150,15 +150,20 @@ int MHTfindClosestFaceGeneric2(MRIS_HASH_TABLE *mht,
                               // only faces that projection is interior to (Use -1 to ignore )
                               int    project_into_face, 
                               //---------- outputs -------------
-                              FACE **pface, 
                               int *pfno, 
                               double *pface_distance);
                               
                               
 static int MHTfindClosestFaceGeneric(
-  MRIS_HASH_TABLE *p1, MRIS const *p2, double p3, double p4, double p5, double p6, int p7, int p8, FACE **p9, int *p10, double *p11)
+  MRIS_HASH_TABLE *p1, MRIS const *mris, double p3, double p4, double p5, double p6, int p7, int p8, FACE **pface, int *pfno, double *p11)
 {
-  return MHTfindClosestFaceGeneric2(p1,MRISBaseConstCtr(NULL,p2),p3,p4,p5,p6,p7,p8,p9,p10,p11);
+  int result = MHTfindClosestFaceGeneric2(p1,MRISBaseConstCtr(NULL,mris),p3,p4,p5,p6,p7,p8,pfno,p11);
+  if (pface) *pface = NULL;
+  if (result == NO_ERROR && *pfno >= 0) {
+    cheapAssert(*pfno < mris->nfaces);
+    *pface = &mris->faces[*pfno];
+  }
+  return result;
 }
 
 int mhtBruteForceClosestFace(MRIS const *mris, 

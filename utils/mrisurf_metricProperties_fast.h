@@ -766,22 +766,23 @@ int MRISMP_sampleFaceCoordsCanonical(
 
   double lambda[3], fdist;
   int   fno;
-  FACE* face;
-  MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), x, y, z, 8, 8, 1, &face, &fno, &fdist);
+  MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), x, y, z, 8, 8, 1, &fno, &fdist);
   if (fno < 0) {
     DiagBreak();
-    MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), x, y, z, 1000, -1, -1, &face, &fno, &fdist);
+    MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), x, y, z, 1000, -1, -1, &fno, &fdist);
     lambda[0] = lambda[1] = lambda[2] = 1.0 / 3.0;
   }
   else {
     face_barycentric_coords2(MRISBaseConstCtr(mris,NULL), fno, CANONICAL_VERTICES, x, y, z, &lambda[0], &lambda[1], &lambda[2]);
   }
 
+  FACE_TOPOLOGY const * const ft = &mris->faces_topology[fno];
+
   *px = *py = *pz = 0;
   int n;
   for (n = 0; n < VERTICES_PER_FACE; n++) {
     float xv, yv, zv;
-    MRISBase_getWhichXYZ(MRISBaseConstCtr(mris,NULL), face->v[n], which, &xv, &yv, &zv);
+    MRISBase_getWhichXYZ(MRISBaseConstCtr(mris,NULL), ft->v[n], which, &xv, &yv, &zv);
     *px += lambda[n] * xv;
     *py += lambda[n] * yv;
     *pz += lambda[n] * zv;
