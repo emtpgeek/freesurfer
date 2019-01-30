@@ -48,6 +48,7 @@
 
 #include "mrisurf_metricProperties.h"
 #include "mrisurf_mp.h"
+#include "mrisurf_MRISBase.h"
 #include "tritri.h"
 
 #endif

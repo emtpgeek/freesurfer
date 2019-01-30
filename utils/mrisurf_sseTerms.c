@@ -34,7 +34,7 @@
 
 #include "mrisurf_sseTerms_extracted.h"
 
-#if 0
+#if 1
 
 #define COMPILING_MRIS_MP
 #include "mrisurf_sseTerms_extracted.h"

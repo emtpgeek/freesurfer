@@ -857,6 +857,134 @@ float mrismp_SampleSpringEnergy(
   return (sse);
 }
 
+static bool mrismp_SampleParallelEnergyAtVertex_oneVertex_alternateXYZ(
+  MRIS_MP *mris, INTEGRATION_PARMS *parms, 
+  int const vno, 
+  int const moved_vno, float const moved_x, float const moved_y, float const moved_z, int moved_assigned_fno,
+  float* pdx, float* pdy, float* pdz)
+{
+  float const
+    x = (vno == moved_vno) ? moved_x : mris->v_x[vno], 
+    y = (vno == moved_vno) ? moved_y : mris->v_y[vno], 
+    z = (vno == moved_vno) ? moved_z : mris->v_z[vno];
+
+  float const
+    xw = mris->v_whitex[vno], yw = mris->v_whitey[vno], zw = mris->v_whitez[vno];
+
+  int const 
+    assigned_fno = (vno == moved_vno) ? moved_assigned_fno : mris->v_assigned_fno[vno];
+    
+  float xp, yp, zp;
+  if (assigned_fno >= 0) {
+    mrismp_sampleFaceCoords_PIAL_VERTICES_CANONICAL_VERTICES(mris, assigned_fno, x, y, z, &xp, &yp, &zp);
+  } else {
+    MRISMP_sampleFaceCoordsCanonical((MHT *)(parms->mht), mris, x, y, z, PIAL_VERTICES, &xp, &yp, &zp);
+  }
+
+  float dx = xp - xw;
+  float dy = yp - yw;
+  float dz = zp - zw;
+  float len = sqrt(dx * dx + dy * dy + dz * dz);
+  if (FZERO(len)) return false;
+
+  *pdx = dx/len;
+  *pdy = dy/len;
+  *pdz = dz/len;
+  
+  return true;
+}
+
+static float mrismp_SampleParallelEnergyAtVertex_alternateXYZ(
+  MRIS_MP *mris, int const vno, 
+  int const moved_vno, float const moved_x, float const moved_y, float const moved_z, int moved_assigned_fno,
+  INTEGRATION_PARMS *parms)
+{
+  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+
+  float dx, dy, dz;
+  if (!mrismp_SampleParallelEnergyAtVertex_oneVertex_alternateXYZ(mris, parms, vno, moved_vno,moved_x,moved_y,moved_z,moved_assigned_fno, &dx, &dy, &dz)) return 0.0f;
+
+  // compute average of neighboring vectors connecting white and pial surface, store it in d[xyz]n_total
+  //
+  float dxn_total = 0.0f, dyn_total = 0.0f, dzn_total = 0.0f;
+  double sse = 0.0;
+  int num = 0;
+  int n;
+  for (n = 0; n < vt->vnum; n++) {
+    int const vno2 = vt->v[n];
+    if (mris->v_ripflag[vno2]) continue;
+
+    float dxn, dyn, dzn;
+    if (!mrismp_SampleParallelEnergyAtVertex_oneVertex_alternateXYZ(mris, parms, vno2, moved_vno,moved_x,moved_y,moved_z,moved_assigned_fno, &dxn, &dyn, &dzn)) continue;
+    
+    dxn_total += dxn;
+    dyn_total += dyn;
+    dzn_total += dzn;
+    
+#if 0
+    sse += SQR(dxn-dx) + SQR(dyn-dy) + SQR(dzn-dz) ;
+#else
+    float len = dx * dxn + dy * dyn + dz * dzn;  // dot product
+    len = 1 - len;
+    sse += sqrt(len * len);
+#endif
+
+    num++;
+  }
+
+#if 0
+  float len = sqrt(dxn_total*dxn_total + dyn_total*dyn_total + dzn_total*dzn_total) ;
+  if (len > 0)
+  {
+    dxn_total /= len ; dyn_total /= len ; dzn_total /= len ;
+    sse = SQR(dxn_total-dx) + SQR(dyn_total-dy) + SQR(dzn_total-dz) ;
+    //    sse /= num ;
+  }
+#else
+  if (num > 0) sse /= num;
+#endif
+
+  return (sse);
+}
+
+float mrismp_SampleParallelEnergyAtVertex(MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms) {
+  return mrismp_SampleParallelEnergyAtVertex_alternateXYZ(mris, vno, -1,0.0f,0.0f,0.0f,-1, parms);
+}
+
+float mrismp_SampleParallelEnergy(
+  MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
+{
+  MHT* const mht = (MHT *)(parms->mht);
+
+  project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
+
+  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+
+  int assigned_fno;
+  double fdist;
+  MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), cx, cy, cz, 4, 4, 1, &assigned_fno, &fdist);
+  if (assigned_fno < 0) {
+    MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), cx, cy, cz, 1000, -1, -1, &assigned_fno, &fdist);
+  }
+
+  double sse = mrismp_SampleParallelEnergyAtVertex_alternateXYZ(mris, vno, vno,cx,cy,cz,assigned_fno, parms);
+
+#if 1
+  int num = 1;
+  int n;
+  for (num = 1, n = 0; n < vt->vnum; n++) {
+    int const vno2 = vt->v[n];
+    if (mris->v_ripflag[vno2]) continue;
+
+    sse += mrismp_SampleParallelEnergyAtVertex_alternateXYZ(mris, vno2, vno,cx,cy,cz,assigned_fno, parms);
+    num++;
+  }
+  sse /= (num);
+#endif
+
+  return (sse);
+}
+
 
 int MRISMP_sampleFaceCoordsCanonical(
     MHT *mht, MRIS_MP *mris, float x, float y, float z, int which, float *px, float *py, float *pz)

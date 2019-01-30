@@ -25,4 +25,4 @@ void mrisSphericalProjection(MRIS *mris);
 
 void MRISMP_projectOntoSphere(MRIS_MP* mris, double r);
 
-void mrisAssignFaces(MRIS *mris, MHT *mht, int which_vertices);
+void mrisAssignFaces(MRISBase mris, MHT *mht, int which_vertices);

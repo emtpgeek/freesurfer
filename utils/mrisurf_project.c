@@ -20,6 +20,7 @@
  */
 #include "mrisurf_project.h"
 #include "mrisurf_mp.h"
+#include "mrisurf_MRISBase.h"
 
 /* project onto the sphere of radius DEFAULT_RADIUS */
 void mrisSphericalProjectXYZ(float xs, float ys, float zs, float *xd, float *yd, float *zd)
@@ -141,32 +142,35 @@ void MRISMP_projectOntoSphere(MRIS_MP* mris, double r)
 }
 
 
-void mrisAssignFaces(MRIS *mris, MHT *mht, int which_vertices)
+void mrisAssignFaces(MRISBase mrisBase, MHT *mht, int which_vertices)
 {
+  MRISBaseConst mris = MRISBaseToConst(mrisBase);
+  
+  int const nvertices = MRISBase_nvertices(mris);
   int vno;
 
   ROMP_PF_begin
 #ifdef HAVE_OPENMP
   #pragma omp parallel for if_ROMP(experimental)
 #endif
-  for (vno = 0; vno < mris->nvertices; vno++) {
+  for (vno = 0; vno < nvertices; vno++) {
     ROMP_PFLB_begin 
     
-    VERTEX *v = &mris->vertices[vno];
-    if (v->ripflag) continue;
-
+    if (MRISBase_v_ripflag(mris, vno)) continue;
+    
     if (vno == Gdiag_no) DiagBreak();
 
-    project_point_onto_sphere(v->x, v->y, v->z, mris->radius, &v->x, &v->y, &v->z);
+    float x,y,z;
+    MRISBase_v_xyz(mris,vno, &x,&y,&z);
+    project_point_onto_sphere(x, y, z, MRISBase_radius(mris), &x, &y, &z);
+    MRISBase_set_v_xyz(mrisBase,vno, x,y,z);
 
     int fno;
-    FACE *face;
     double fdist;
+    MHTfindClosestFaceGeneric2(mht, mris, x, y, z, 8, 8, 1, &fno, &fdist);
+    if (fno < 0) MHTfindClosestFaceGeneric2(mht, mris, x, y, z, 1000, -1, -1, &fno, &fdist);
 
-    MHTfindClosestFaceGeneric(mht, mris, v->x, v->y, v->z, 8, 8, 1, &face, &fno, &fdist);
-    if (fno < 0) MHTfindClosestFaceGeneric(mht, mris, v->x, v->y, v->z, 1000, -1, -1, &face, &fno, &fdist);
-
-    v->assigned_fno = fno;
+    MRISBase_set_v_assigned_fno(mrisBase,vno, fno);
     
     ROMP_PFLB_end
   }

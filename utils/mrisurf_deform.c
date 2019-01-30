@@ -3901,7 +3901,7 @@ double mrisComputeAshburnerTriangleEnergy(MRI_SURFACE *mris,
 
   if (FZERO(l_ashburner_triangle)) return (0.0);
 
-  mrisAssignFaces(mris, (MHT *)(parms->mht), CANONICAL_VERTICES);  // don't look it up every time
+  mrisAssignFaces(MRISBaseCtr(NULL,mris), (MHT *)(parms->mht), CANONICAL_VERTICES);  // don't look it up every time
   sse_ashburner = 0.0;
 
   ROMP_PF_begin
@@ -4053,7 +4053,7 @@ int mrisComputeThicknessParallelTerm(MRI_SURFACE *mris, double l_thick_parallel,
 
   if (FZERO(l_thick_parallel)) return (0.0);
 
-  mrisAssignFaces(mris, (MHT *)(parms->mht), CANONICAL_VERTICES);  // don't look it up every time
+  mrisAssignFaces(MRISBaseCtr(NULL,mris), (MHT *)(parms->mht), CANONICAL_VERTICES);  // don't look it up every time
 
   ROMP_PF_begin
   // ifdef HAVE_OPENMP

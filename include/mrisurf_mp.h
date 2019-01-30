@@ -19,7 +19,7 @@
  */
 // The following format provides a denser representation of just the data needed to compute the SSE
 //
-#include "mrisurf.h"
+#include "mrisurf_aaa.h"
 
 struct MRIS_MP {
 
@@ -93,8 +93,7 @@ struct MRIS_MP {
     ELT(const,  float,  pialz       ) SEP   \
     ELT(const,  float,  wnx         ) SEP   \
     ELT(const,  float,  wny         ) SEP   \
-    ELT(const,  float,  wnz         ) SEP   \
-    ELT(const,  int,    assigned_fno) 
+    ELT(const,  float,  wnz         ) 
     
     MRIS_MP__LIST_V_IN
 
@@ -109,7 +108,8 @@ struct MRIS_MP {
     ELT(,       float,  cy          ) SEP   \
     ELT(,       float,  cz          ) SEP   \
     ELT(,       float,  curv        ) SEP   \
-    ELT(,       float,  origarea    ) 
+    ELT(,       float,  origarea    ) SEP   \
+    ELT(,       int,    assigned_fno) 
   
     MRIS_MP__LIST_V_IN_OUT
     

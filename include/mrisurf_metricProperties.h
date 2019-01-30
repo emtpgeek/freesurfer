@@ -187,10 +187,11 @@ int MRISMP_sampleFaceCoordsCanonical(
 int mrismp_sampleFaceCoords_PIAL_VERTICES_CANONICAL_VERTICES(
     MRIS_MP *mris, int fno, double x, double y, double z, float *px, float *py, float *pz);   
     
-float mrismp_SampleMinimizationEnergy(MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz);
-float mrismp_SampleNormalEnergy      (MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz);
-float mrismp_SampleSpringEnergy      (MRIS_MP *mris, int const vno, float cx, float cy, float cz, INTEGRATION_PARMS *parms);
-    
+float mrismp_SampleMinimizationEnergy    (MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz);
+float mrismp_SampleNormalEnergy          (MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz);
+float mrismp_SampleSpringEnergy          (MRIS_MP *mris, int const vno, float cx, float cy, float cz, INTEGRATION_PARMS *parms);
+float mrismp_SampleParallelEnergyAtVertex(MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms);
+float mrismp_SampleParallelEnergy        (MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz);
     
 void MRISMP_computeMetricProperties(MRIS_MP* mris);
 void MRISMP_updateEllipsoidSurface(MRIS_MP* mris);

@@ -2,6 +2,8 @@
     #define MRIS_INFO MRIS_MP
     #define FUNCTION_NAME(MRIS_NAME,MRISMP_NAME) MRISMP_NAME
     #define GET_V
+    #define GET_V_RIPFLAG                               \
+        bool const ripflag = mris->v_ripflag[vno];
     #define GET_V_XYZ                                   \
         float const x = mris->v_x[vno];                 \
         float const y = mris->v_y[vno];                 \
@@ -31,11 +33,32 @@
         float const curv = mris->v_curv[vno];
     #define GET_PCURV                                   \
         float* const pcurv = &mris->v_curv[vno];
+    #define GET_WHITEXYZ                                \
+        float const whitex = mris->v_whitex[vno];       \
+        float const whitey = mris->v_whitey[vno];       \
+        float const whitez = mris->v_whitez[vno];       \
+        // end of macro
+    #define GET_WHITEXYZ2                               \
+        float const whitex2 = mris->v_whitex[vno2];     \
+        float const whitey2 = mris->v_whitey[vno2];     \
+        float const whitez2 = mris->v_whitez[vno2];     \
+        // end of macro
+    #define GET_F                                       \
+        // end of macro
+    #define GET_F_RIPFLAG                               \
+        bool const ripflag = mris->f_ripflag[fno];      \
+        // end of macro
+    #define GET_F_AREA                                  \
+        float const area = mris->f_area[fno];           \
+        // end of macro
 #else
     #define MRIS_INFO MRIS
     #define FUNCTION_NAME(MRIS_NAME,MRISMP_NAME) MRIS_NAME
     #define GET_V                                       \
         VERTEX const * const v  = &mris->vertices[vno];
+    #define GET_V_RIPFLAG                               \
+        GET_V                                           \
+        bool const ripflag = v->ripflag;
     #define GET_V_XYZ                                   \
         GET_V                                           \
         float const x = v->x;                           \
@@ -68,6 +91,23 @@
         float const curv = v->curv;
     #define GET_PCURV                                   \
         float* const pcurv = &mris->vertices[vno].curv;
+    #define GET_WHITEXYZ                                \
+        float const whitex = v->whitex;                 \
+        float const whitey = v->whitey;                 \
+        float const whitez = v->whitez;                 \
+        // end of macro
+    #define GET_WHITEXYZ2                               \
+        float const whitex2 = v2->whitex;               \
+        float const whitey2 = v2->whitey;               \
+        float const whitez2 = v2->whitez;               \
+        // end of macro
+    #define GET_F_RIPFLAG                               \
+        bool const ripflag = mris->faces[fno].ripflag;  \
+        // end of macro
+    #define GET_F_AREA                                  \
+        FACE const * const face = &mris->faces[fno];    \
+        float const area = face->area;                  \
+        // end of macro
         
 #endif
 
@@ -217,26 +257,29 @@ static double FUNCTION_NAME(mrisComputeThicknessParallelEnergyTerm, mrismp_Compu
 static double FUNCTION_NAME(mrisComputeThicknessSmoothnessEnergyTerm,mrismp_ComputeThicknessSmoothnessEnergyTerm) (
   MRIS_INFO *mris, int vno, INTEGRATION_PARMS *parms) 
 {
-  VERTEX * const v = &mris->vertices[vno];
   VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+  GET_V_XYZ
+  GET_WHITEXYZ
 
   float xp,yp,zp;
-  MRISsampleFaceCoordsCanonical((MHT *)(parms->mht), mris, v->x, v->y, v->z, PIAL_VERTICES, &xp, &yp, &zp);
+  FUNCTION_NAME(MRISsampleFaceCoordsCanonical,MRISMP_sampleFaceCoordsCanonical)((MHT *)(parms->mht), mris, x, y, z, PIAL_VERTICES, &xp, &yp, &zp);
 
-  double d0 = SQR(xp - v->whitex) + SQR(yp - v->whitey) + SQR(zp - v->whitez);
+  double d0 = SQR(xp - whitex) + SQR(yp - whitey) + SQR(zp - whitez);
   double v_sse = 0.0;
   
   int n;
   for (n = 0; n < vt->vnum; n++) {
-    VERTEX const * const vn = &mris->vertices[vt->v[n]];
-    if (vn->ripflag) continue;
-
+    GET_V2_XYZ_Ripflag2(vt->v[n]);
+    if (ripflag2) continue;
+    
     float xp, yp, zp;
-    MRISsampleFaceCoordsCanonical((MHT *)(parms->mht), mris, vn->x, vn->y, vn->z, PIAL_VERTICES, &xp, &yp, &zp);
+    FUNCTION_NAME(MRISsampleFaceCoordsCanonical,MRISMP_sampleFaceCoordsCanonical)((MHT *)(parms->mht), mris, x2, y2, z2, PIAL_VERTICES, &xp, &yp, &zp);
 
-    double dx = xp - vn->whitex;
-    double dy = yp - vn->whitey;
-    double dz = zp - vn->whitez;
+    GET_WHITEXYZ2
+
+    double dx = xp - whitex2;
+    double dy = yp - whitey2;
+    double dz = zp - whitez2;
     double dn = (dx * dx + dy * dy + dz * dz);
     v_sse += (dn - d0) * (dn - d0);
   }
@@ -248,18 +291,18 @@ static double FUNCTION_NAME(mrisComputeThicknessSmoothnessEnergyTerm,mrismp_Comp
 static double FUNCTION_NAME(mrisComputeNonlinearAreaSSETerm,mrismp_ComputeNonlinearAreaSSETerm) (
   MRIS_INFO *mris, int fno, double area_scale) 
 {
-  FACE *face = &mris->faces[fno];
+  GET_F_AREA
   
   double ratio;
 #define SCALE_NONLINEAR_AREA 0
 #if SCALE_NONLINEAR_AREA
   if (!FZERO(face->orig_area)) {
-    ratio = area_scale * face->area / face->orig_area;
+    ratio = area_scale * area / face->orig_area;
   } else {
     ratio = 0.0f;
   }
 #else
-  ratio = area_scale * face->area;
+  ratio = area_scale * area;
 #endif
 
   if (ratio > MAX_NEG_RATIO) {
@@ -309,13 +352,13 @@ double FUNCTION_NAME(mrisComputeCorrelationError, mrismp_ComputeCorrelationError
     
     bool const vertexTrace = trace && (vno == 0);
     
-    VERTEX *v = &mris->vertices[vno];
+    GET_V_RIPFLAG
 
-    if (v->ripflag) {
+    if (ripflag) {
       ROMP_PF_continue;
     }
 
-    sse += mrisComputeCorrelationErrorTerm(mris, vno, parms, use_stds, vertexTrace);
+    sse += FUNCTION_NAME(mrisComputeCorrelationErrorTerm,mrismp_ComputeCorrelationErrorTerm)(mris, vno, parms, use_stds, vertexTrace);
 
     #undef sse
   #include "romp_for_end.h"
@@ -334,12 +377,12 @@ double FUNCTION_NAME(mrisComputeRepulsiveRatioEnergy,mrismp_ComputeRepulsiveRati
     return (0.0);
 
   for (sse_repulse = 0.0, vno = 0; vno < mris->nvertices; vno++) {
-    VERTEX const * const v  = &mris->vertices[vno];
+    GET_V_RIPFLAG
 
-    if (v->ripflag) 
+    if (ripflag) 
       continue;
 
-    sse_repulse += mrisComputeRepulsiveRatioEnergyTerm(mris, vno);
+    sse_repulse += FUNCTION_NAME(mrisComputeRepulsiveRatioEnergyTerm,mrismp_ComputeRepulsiveRatioEnergyTerm)(mris, vno);
   }
   
   return (l_repulse * sse_repulse);
@@ -366,10 +409,11 @@ double FUNCTION_NAME(mrisComputeSpringEnergy,mrismp_ComputeSpringEnergy) (
 
   int vno;
   for (vno = 0; vno < mris->nvertices; vno++) {
-    VERTEX const * const v = &mris->vertices[vno];
-    if (v->ripflag) continue;
+    GET_V_RIPFLAG
+    
+    if (ripflag) continue;
 
-    sse_spring += mrisComputeSpringEnergyTerm(mris, vno, area_scale);
+    sse_spring += FUNCTION_NAME(mrisComputeSpringEnergyTerm,mrismp_ComputeSpringEnergyTerm)(mris, vno, area_scale);
   }
   
   return sse_spring;
@@ -386,10 +430,11 @@ double FUNCTION_NAME(mrisComputeThicknessMinimizationEnergy,mrismp_ComputeThickn
   double sse_tmin = 0.0;
   int vno;
   for (vno = 0; vno < mris->nvertices; vno++) {
-    VERTEX* v = &mris->vertices[vno];
-    if (v->ripflag) continue;
+    GET_V_RIPFLAG
     
-    sse_tmin += mrisComputeThicknessMinimizationEnergyTerm(mris, vno, parms);
+    if (ripflag) continue;
+    
+    sse_tmin += FUNCTION_NAME(mrisComputeThicknessMinimizationEnergyTerm,mrismp_ComputeThicknessMinimizationEnergyTerm)(mris, vno, parms);
   }
 
   sse_tmin /= 2;
@@ -407,10 +452,11 @@ double FUNCTION_NAME(mrisComputeThicknessNormalEnergy,mrismp_ComputeThicknessNor
 
   int vno;
   for (vno = 0; vno < mris->nvertices; vno++) {
-    VERTEX *v = &mris->vertices[vno];
-    if (v->ripflag) continue;
+    GET_V_RIPFLAG
+    
+    if (ripflag) continue;
 
-    sse_tnormal += mrisComputeThicknessNormalEnergyTerm(mris, l_thick_normal, parms);
+    sse_tnormal += FUNCTION_NAME(mrisComputeThicknessNormalEnergyTerm,mrismp_ComputeThicknessNormalEnergyTerm)(mris, l_thick_normal, parms);
   }
 
   sse_tnormal /= 2;
@@ -430,12 +476,11 @@ double FUNCTION_NAME(mrisComputeThicknessSpringEnergy,mrismp_ComputeThicknessSpr
 
   int vno;
   for (vno = 0; vno < mris->nvertices; vno++) {
-    VERTEX *v = &mris->vertices[vno];
-    if (vno == Gdiag_no) DiagBreak();
+    GET_V_RIPFLAG
+    
+    if (ripflag) continue;
 
-    if (v->ripflag) continue;
-
-    sse_spring += mrisComputeThicknessSpringEnergyTerm(mris,vno,parms);
+    sse_spring += FUNCTION_NAME(mrisComputeThicknessSpringEnergyTerm,mrismp_ComputeThicknessSpringEnergyTerm)(mris,vno,parms);
   }
 
   sse_spring /= 2;
@@ -450,16 +495,17 @@ double FUNCTION_NAME(mrisComputeThicknessParallelEnergy,mrismp_ComputeThicknessP
     return (0.0);
   }
 
-  mrisAssignFaces(mris, (MHT *)(parms->mht), CANONICAL_VERTICES);  // don't look it up every time
+  mrisAssignFaces(MRISBaseCtr(mris,NULL), (MHT *)(parms->mht), CANONICAL_VERTICES);  // don't look it up every time
 
   double sse_tparallel = 0.0;
 
   int vno;
   for (vno = 0; vno < mris->nvertices; vno++) {
-    VERTEX * const v = &mris->vertices[vno];
-    if (v->ripflag) continue;
+    GET_V_RIPFLAG
+    
+    if (ripflag) continue;
 
-    sse_tparallel += mrisComputeThicknessParallelEnergyTerm(mris, vno, parms);
+    sse_tparallel += FUNCTION_NAME(mrisComputeThicknessParallelEnergyTerm,mrismp_ComputeThicknessParallelEnergyTerm)(mris, vno, parms);
   }
   
   sse_tparallel /= 2;
@@ -478,10 +524,11 @@ double FUNCTION_NAME(mrisComputeThicknessSmoothnessEnergy,mrismp_ComputeThicknes
 
   int vno;
   for (vno = 0; vno < mris->nvertices; vno++) {
-    VERTEX          const * const v  = &mris->vertices         [vno];
-    if (v->ripflag) continue;
+    GET_V_RIPFLAG
+    
+    if (ripflag) continue;
 
-    sse_tsmooth += mrisComputeThicknessSmoothnessEnergyTerm(mris,vno,parms);
+    sse_tsmooth += FUNCTION_NAME(mrisComputeThicknessSmoothnessEnergyTerm,mrismp_ComputeThicknessSmoothnessEnergyTerm)(mris,vno,parms);
   }
   
   return (sse_tsmooth);
@@ -523,10 +570,10 @@ double FUNCTION_NAME(mrisComputeNonlinearAreaSSE,mrismp_ComputeNonlinearAreaSSE)
   ROMP_for_begin
     #define sse  ROMP_PARTIALSUM(0)
 
-    FACE *face = &mris->faces[fno];
-    if (face->ripflag) ROMP_PF_continue;
+    GET_F_RIPFLAG
+    if (ripflag) ROMP_PF_continue;
 
-    sse += mrisComputeNonlinearAreaSSETerm(mris, fno, area_scale);
+    sse += FUNCTION_NAME(mrisComputeNonlinearAreaSSETerm,mrismp_ComputeNonlinearAreaSSETerm)(mris, fno, area_scale);
     
     #undef sse
   #include "romp_for_end.h"
@@ -534,6 +581,10 @@ double FUNCTION_NAME(mrisComputeNonlinearAreaSSE,mrismp_ComputeNonlinearAreaSSE)
   return (sse);
 }
 
+#undef GET_F_AREA
+#undef GET_F_RIPFLAG
+#undef GET_WHITEXYZ2
+#undef GET_WHITEXYZ
 #undef GET_PCURV
 #undef GET_CURV
 #undef GET_V_DIST
@@ -541,6 +592,7 @@ double FUNCTION_NAME(mrisComputeNonlinearAreaSSE,mrismp_ComputeNonlinearAreaSSE)
 #undef GET_CXYZ
 #undef GET_V2_XYZ_Ripflag2
 #undef GET_V_XYZ
+#undef GET_V_RIPFLAG
 #undef GET_V
 #undef MRIS_INFO
 #undef FUNCTION_NAME
