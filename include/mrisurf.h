@@ -2565,12 +2565,17 @@ int MRISmeasureDistanceBetweenSurfaces(MRI_SURFACE *mris,
 int MRISwriteCoordsToIco(MRI_SURFACE *mris,
                          MRI_SURFACE *mris_ico,
                          int which_vertices);
+                         
 int MRISvertexCoord2XYZ_float (VERTEX const * v,
                                int which,
                                float  *x, float  *y, float  *z);
 int MRISvertexCoord2XYZ_double (VERTEX const * v,
                                int which,
                                double  *x, double  *y, double  *z);
+int face_barycentric_coords(MRIS const * mris, int fno, int which_vertices,
+                            double cx, double cy, double cz, double *pl1, double *pl2, double *pl3) ;
+
+                               
 int MRISsampleFaceNormal(MRI_SURFACE *mris, int fno, double x, double y, double z, 
                          float *px, float *py, float *pz) ;
 int

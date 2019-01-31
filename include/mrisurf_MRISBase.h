@@ -44,13 +44,6 @@ static void MRISBase_getWhichXYZ(MRISBaseConst mrisBase, int vno, int which, flo
     MRISvertexCoord2XYZ_float(&mrisBase.mris->vertices[vno], which, x, y, z);
 }
 
-
-static int face_barycentric_coords(MRIS const *mris, int p1, int p2,
-                            double p3, double p4, double p5, double *p6, double *p7, double *p8) 
-{
-  return face_barycentric_coords2(MRISBaseConstCtr(NULL,mris),p1,p2,p3,p4,p5,p6,p7,p8);
-}
-
 static double MRISBase_radius   (MRISBaseConst mrisBase) {
   return mrisBase.mris_mp ? mrisBase.mris_mp->radius : mrisBase.mris->radius;
 }
