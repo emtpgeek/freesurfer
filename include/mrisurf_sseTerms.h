@@ -77,9 +77,3 @@ typedef enum {
 typedef struct MRIS_sseTerms {
     double term[MRIS_sseTermFlag_bitPosition_LAST];
 } MRIS_sseTerms;
-
-
-// Input to several of these terms
-//
-
-  double relevant_angle = 0, computed_neg_area = 0, computed_area = 0;
