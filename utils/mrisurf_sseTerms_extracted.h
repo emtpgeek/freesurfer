@@ -1,5 +1,7 @@
 #ifdef COMPILING_MRIS_MP
     #define MRIS_INFO MRIS_MP
+    #define GET_MRISBase                                \
+        MRISBase mrisBase = MRISBaseCtr(mris,NULL);
     #define FUNCTION_NAME(MRIS_NAME,MRISMP_NAME) MRISMP_NAME
     #define GET_V
     #define GET_V_RIPFLAG                               \
@@ -51,8 +53,16 @@
     #define GET_F_AREA                                  \
         float const area = mris->f_area[fno];           \
         // end of macro
+    #define GET_F_AREA_ANGLE_ORIGAREA_ORIGANGLE         \
+        float const area      = mris->f_area     [fno]; \
+        float const orig_area = mris->f_norm_orig_area[fno]; \
+        float const* const angle      = mris->f_angle     [fno];  \
+        float const* const orig_angle = mris->f_orig_angle[fno];  \
+        // end of macro
 #else
     #define MRIS_INFO MRIS
+    #define GET_MRISBase                                \
+        MRISBase mrisBase = MRISBaseCtr(NULL,mris);
     #define FUNCTION_NAME(MRIS_NAME,MRISMP_NAME) MRIS_NAME
     #define GET_V                                       \
         VERTEX const * const v  = &mris->vertices[vno];
@@ -106,12 +116,90 @@
         // end of macro
     #define GET_F_AREA                                  \
         FACE const * const face = &mris->faces[fno];    \
-        float const area = face->area;                  \
+        float const area      = face->area;             \
+        // end of macro
+    #define GET_F_AREA_ANGLE_ORIGAREA_ORIGANGLE         \
+        FACE const * const face = &mris->faces[fno];    \
+        FaceNormCacheEntry const * const fNorm = getFaceNorm(mris, fno); \
+        float const area      = face->area;             \
+        float const orig_area = fNorm->orig_area;       \
+        float const* const angle      = face->angle;        \
+        float const* const orig_angle = face->orig_angle;   \
         // end of macro
         
 #endif
 
 
+void FUNCTION_NAME(mrisComputeFaceRelevantAngleAndArea,mrismp_ComputeFaceRelevantAngleAndArea) (
+  MRIS_INFO *mris, INTEGRATION_PARMS *parms, double* p_relevant_angle, double* p_computed_neg_area, double* p_computed_area)
+{
+  double const area_scale =
+#if METRIC_SCALE
+    (mris->patch || mris->noscale) ? 1.0 : mris->orig_area / mris->total_area;
+#else
+    1.0;
+#endif
+
+  double relevant_angle = 0.0, computed_neg_area = 0.0, computed_area = 0.0;
+
+  #define ROMP_VARIABLE       fno
+  #define ROMP_LO             0
+  #define ROMP_HI             mris->nfaces
+    
+  #define ROMP_SUMREDUCTION0  relevant_angle
+  #define ROMP_SUMREDUCTION1  computed_neg_area
+  #define ROMP_SUMREDUCTION2  computed_area
+    
+  #define ROMP_FOR_LEVEL      ROMP_level_assume_reproducible
+    
+#ifdef ROMP_SUPPORT_ENABLED
+  const int romp_for_line = __LINE__;
+#endif
+  #include "romp_for_begin.h"
+  ROMP_for_begin
+    
+    #define relevant_angle    ROMP_PARTIALSUM(0)
+    #define computed_neg_area ROMP_PARTIALSUM(1)
+    #define computed_area     ROMP_PARTIALSUM(2)
+
+      GET_F_RIPFLAG
+      if (ripflag) ROMP_PF_continue;
+      
+      GET_F_AREA_ANGLE_ORIGAREA_ORIGANGLE
+      
+      {
+        double const delta = (double)(area_scale * area - orig_area);
+#if ONLY_NEG_AREA_TERM
+        if (area < 0.0f) computed_neg_area += delta * delta;
+#endif
+        computed_area += delta * delta;
+      }
+      
+      int ano;
+      for (ano = 0; ano < ANGLES_PER_TRIANGLE; ano++) {
+        double delta = deltaAngle(angle[ano], orig_angle[ano]);
+#if ONLY_NEG_AREA_TERM
+        if (angle[ano] >= 0.0f) delta = 0.0f;
+
+#endif
+        relevant_angle += delta * delta;
+      }
+      
+      if (!isfinite(computed_area) || !isfinite(relevant_angle)) {
+        ErrorExit(ERROR_BADPARM, "sse not finite at face %d!\n", fno);
+      }
+
+    #undef relevant_angle
+    #undef computed_neg_area
+    #undef computed_area
+
+  #include "romp_for_end.h"
+
+   
+  *p_relevant_angle    = relevant_angle;
+  *p_computed_neg_area = computed_neg_area;
+  *p_computed_area     = computed_area;
+}
 
 
 //====================================================================================
@@ -491,11 +579,13 @@ double FUNCTION_NAME(mrisComputeThicknessSpringEnergy,mrismp_ComputeThicknessSpr
 double FUNCTION_NAME(mrisComputeThicknessParallelEnergy,mrismp_ComputeThicknessParallelEnergy) (
   MRIS_INFO *mris, double l_thick_parallel, INTEGRATION_PARMS *parms)
 {
+  GET_MRISBase
+  
   if (FZERO(l_thick_parallel)) {
     return (0.0);
   }
 
-  mrisAssignFaces(MRISBaseCtr(mris,NULL), (MHT *)(parms->mht), CANONICAL_VERTICES);  // don't look it up every time
+  mrisAssignFaces(mrisBase, (MHT *)(parms->mht), CANONICAL_VERTICES);  // don't look it up every time
 
   double sse_tparallel = 0.0;
 
@@ -581,6 +671,7 @@ double FUNCTION_NAME(mrisComputeNonlinearAreaSSE,mrismp_ComputeNonlinearAreaSSE)
   return (sse);
 }
 
+#undef GET_F_AREA_ANGLE_ORIGAREA_ORIGANGLE
 #undef GET_F_AREA
 #undef GET_F_RIPFLAG
 #undef GET_WHITEXYZ2
@@ -595,4 +686,5 @@ double FUNCTION_NAME(mrisComputeNonlinearAreaSSE,mrismp_ComputeNonlinearAreaSSE)
 #undef GET_V_RIPFLAG
 #undef GET_V
 #undef MRIS_INFO
+#undef GET_MRISBase
 #undef FUNCTION_NAME
