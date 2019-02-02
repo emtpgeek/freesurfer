@@ -156,7 +156,18 @@ void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src,
   }
 }
 
+
+static void MRISMP_makeDist(MRIS_MP* mp, int vno) {
+  int capacity = mp->v_dist_capacity[vno];
+  int vSize    = mp->v_VSize[vno];
+  if (capacity < vSize) capacity = vSize;
+  mp->v_dist         [vno] = mrisStealDistStore(mp->underlyingMRIS, vno, capacity);
+  mp->v_dist_capacity[vno] = capacity;
+}
+
+
 void MRISMP_load(MRIS_MP* mp, MRIS* mris,
+  bool loadOutputs,
   float * dx_or_NULL, float * dy_or_NULL, float * dz_or_NULL) {
 
   cheapAssert(!dx_or_NULL == !dy_or_NULL);
@@ -184,6 +195,10 @@ void MRISMP_load(MRIS_MP* mp, MRIS* mris,
 
 #define ELT(C,T,N) *(T*)&(mp->N) = mris->N;                   // support initializing the const members
   MRIS_MP__LIST_MRIS_IN SEP MRIS_MP__LIST_MRIS_IN_OUT
+  if (loadOutputs) {
+    ELT(,double,avg_vertex_dist)
+    MRIS_MP__LIST_MRIS_OUT
+  }
 #undef ELT
 #undef ELTX
 #undef SEP
@@ -207,10 +222,15 @@ void MRISMP_load(MRIS_MP* mp, MRIS* mris,
 #define ELTX(C,T,N) // these are the special cases dealt with here
     v_dist_capacity[vno] = v->dist_capacity;
     v_VSize[vno] = mrisVertexVSize(mris, vno);
-    if (v_neg) v_neg[vno] = v->neg;
-    v_dist[vno] = NULL;
+    v_dist [vno] = NULL;
 #define ELT(C,T,N) v_##N[vno] = v->N;
     MRIS_MP__LIST_V_IN SEP MRIS_MP__LIST_V_IN_OUT
+    if (loadOutputs) {
+      if (v_neg) v_neg[vno] = v->neg;
+      MRIS_MP__LIST_V_OUT
+      MRISMP_makeDist(mp, vno);
+      memcpy(v_dist [vno], v->dist,  v_VSize[vno]*sizeof(*v_dist[vno]));
+    }
 #undef ELT
 #undef ELTX
 #undef SEP
@@ -246,6 +266,23 @@ void MRISMP_load(MRIS_MP* mp, MRIS* mris,
     copyAnglesPerTriangle(f_orig_angle[fno],f->orig_angle);
 #define ELT(C,T,N) f_##N[fno] = f->N;
     MRIS_MP__LIST_F_IN
+    f_normSet[fno] = false;
+    if (loadOutputs) {
+      MRIS_MP__LIST_F_OUT
+      DMATRIX* d = f->norm;
+      if (!d) {
+        f_norm[fno].x = 0.0;
+        f_norm[fno].y = 0.0;
+        f_norm[fno].z = 0.0;
+      } else {
+        cheapAssert(d->rows == 3);
+        cheapAssert(d->cols == 1);
+        f_norm[fno].x = d->rptr[0][0];
+        f_norm[fno].y = d->rptr[1][0];
+        f_norm[fno].z = d->rptr[2][0];
+      }
+      copyAnglesPerTriangle(f_angle[fno],f->angle);
+    }
 #undef ELT
 #undef ELTX
 #undef SEP
@@ -376,16 +413,6 @@ static void MRISMP_unload(MRIS* mris, MRIS_MP* mp, bool check) {
 }
 
 #undef comparison
-
-
-static void MRISMP_makeDist(MRIS_MP* mp, int vno) {
-  int capacity = mp->v_dist_capacity[vno];
-  int vSize    = mp->v_VSize[vno];
-  if (capacity < vSize) capacity = vSize;
-  mp->v_dist         [vno] = mrisStealDistStore(mp->underlyingMRIS, vno, capacity);
-  mp->v_dist_capacity[vno] = capacity;
-}
-
 
 
 //==================================================================================================================
@@ -2232,7 +2259,7 @@ int MRIScomputeMetricProperties(MRIS *mris)
   if (useNewBehaviour) {
     MRISfreeDistsButNotOrig(mris);                                      // So they can be stolen to avoid unnecessary mallocs and frees
   
-    MRISMP_load(&mp, mris, NULL, NULL, NULL);                           // Copy the input data before MRIScomputeMetricPropertiesWkr changes it
+    MRISMP_load(&mp, mris, false, NULL, NULL, NULL);                    // Copy the input data before MRIScomputeMetricPropertiesWkr changes it
     MRISMP_computeMetricProperties(&mp);                                // It should not matter the order old and new are done in
   }
   

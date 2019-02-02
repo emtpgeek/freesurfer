@@ -8134,12 +8134,12 @@ double MRIScomputeSSE_asThoughGradientApplied(
 
       float *dx, *dy, *dz;
       MRISmemalignNFloats(mris->nvertices, &dx, &dy, &dz);
-      MRISMP_load(&ctx->orig, mris, dx,dy,dz);
+      MRISMP_load(&ctx->orig, mris, true, dx,dy,dz);        // needs to load the outputs because those are inputs to ProjectSurface
       ctx->dx = dx; ctx->dy = dy; ctx->dz = dz; 
     }
     
     MRISMP_copy(&ctx->curr, &ctx->orig, 
-      true,   // copy the in and in_out fields only
+      false,  // needs to copy the outputs because those are inputs to ProjectSurface
       true);  // no need to copy v_x[*] etc. because they are obtained by the translate_along_vertex_dxdydxz below
 
     MRISMP_translate_along_vertex_dxdydz(&ctx->orig, &ctx->curr, delta_t, ctx->dx, ctx->dy, ctx->dz);

@@ -17,8 +17,8 @@
 //      so I suspect it is being used as a convenient temporary... 
 //
 #define SSE_TERMS \
-      ELT(sse_area                  , parms->l_parea,                            true,    computed_area                                                                   ) SEP \
-      ELT(sse_neg_area              , parms->l_area,                             true,    computed_neg_area                                                               ) SEP \
+      ELTM(sse_area                 , parms->l_parea,                            true,    computed_area,computed_area                                                     ) SEP \
+      ELTM(sse_neg_area             , parms->l_area,                             true,    computed_neg_area,computed_neg_area                                             ) SEP \
       ELT(sse_repulse               , 1.0,                     (parms->l_repulse > 0),    mrisComputeRepulsiveEnergy(mris, parms->l_repulse, mht_v_current, mht_f_current)) SEP \
       \
       ELTM(sse_repulsive_ratio      , 1.0,                                       true,    mrisComputeRepulsiveRatioEnergy   (mris, parms->l_repulse_ratio),                     \

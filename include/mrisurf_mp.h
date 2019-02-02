@@ -158,6 +158,7 @@ void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src,
     bool ignore_xyz);           // if true, don't copy the v_x[*] v_y[*] v_z[*]     NYI
     
 void MRISMP_load(MRIS_MP* mp, MRIS* mris,
+  bool loadOutputs,
   float * dx_or_NULL, float * dy_or_NULL, float * dz_or_NULL);      // loaded if not NULL, the dx,dy,dz for ripped set to zero
 
 
