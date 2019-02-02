@@ -146,7 +146,8 @@ void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src,
   for (fno = 0; fno < dst->nfaces; fno++) {
 #define SEP
 #define ELTX(C,T,N) // these are the special cases dealt with here
-    f_norm_orig_area[fno] = src->f_norm_orig_area[fno]; // not so special
+    f_norm_orig_area [fno] = src->f_norm_orig_area [fno]; // not so special
+    copyAnglesPerTriangle(f_orig_angle[fno],src->f_orig_angle[fno]); // not so special
 #define ELT(C,T,N) f_##N[fno] = src->f_##N[fno];
     MRIS_MP__LIST_F_IN
 #undef ELT
@@ -241,7 +242,8 @@ void MRISMP_load(MRIS_MP* mp, MRIS* mris,
     FaceNormCacheEntry const * const fNorm = getFaceNorm(mris, fno);
 #define SEP
 #define ELTX(C,T,N) // these are the special cases dealt with here
-    f_norm_orig_area[fno] = fNorm->orig_area;
+    f_norm_orig_area [fno] = fNorm->orig_area;
+    copyAnglesPerTriangle(f_orig_angle[fno],f->orig_angle);
 #define ELT(C,T,N) f_##N[fno] = f->N;
     MRIS_MP__LIST_F_IN
 #undef ELT
@@ -350,7 +352,8 @@ static void MRISMP_unload(MRIS* mris, MRIS_MP* mp, bool check) {
     FaceNormCacheEntry const * const fNorm = getFaceNorm(mris, fno);
 #define SEP
 #define ELTX(C,T,N) // these are the special cases dealt with here
-    if (check) comparison(fno,fNorm->orig_area,mp->f_norm_orig_area[fno]) else setFaceOrigArea(mris, fno, mp->f_norm_orig_area[fno]);
+    if (check) comparison(fno,fNorm->orig_area, mp->f_norm_orig_area [fno]) else setFaceOrigArea (mris, fno, mp->f_norm_orig_area[fno]);
+    if (check) comparison(fno,cmpAnglesPerTriangle(f->orig_angle,mp->f_orig_angle[fno]),0) else copyAnglesPerTriangle(f->orig_angle,mp->f_orig_angle[fno]);
     if (mp->f_normSet[fno]) { 
       FloatXYZ* fn = &mp->f_norm[fno]; 
       if (!check) {
@@ -3520,7 +3523,7 @@ int MRISstoreMeanCurvature(MRIS *mris)
   ------------------------------------------------------*/
 int MRISstoreMetricProperties(MRIS *mris)
 {
-  int vno, nvertices, fno, ano, n;
+  int vno, nvertices, fno, n;
   FACE *f;
 
 #if 0
@@ -3550,9 +3553,7 @@ int MRISstoreMetricProperties(MRIS *mris)
       continue;
     }
     setFaceOrigArea(mris, fno, f->area);
-    for (ano = 0; ano < ANGLES_PER_TRIANGLE; ano++) {
-      f->orig_angle[ano] = f->angle[ano];
-    }
+    copyAnglesPerTriangle(f->orig_angle,f->angle);
   }
   mris->orig_area = mris->total_area;
   return (NO_ERROR);
@@ -3567,7 +3568,7 @@ int MRISstoreMetricProperties(MRIS *mris)
   ------------------------------------------------------*/
 int MRISrestoreMetricProperties(MRIS *mris)
 {
-  int vno, nvertices, fno, ano, n;
+  int vno, nvertices, fno, n;
   FACE *f;
 
   nvertices = mris->nvertices;
@@ -3588,9 +3589,7 @@ int MRISrestoreMetricProperties(MRIS *mris)
       continue;
     }
     f->area = getFaceOrigArea(mris, fno);
-    for (ano = 0; ano < ANGLES_PER_TRIANGLE; ano++) {
-      f->angle[ano] = f->orig_angle[ano];
-    }
+    copyAnglesPerTriangle(f->angle,f->orig_angle);
   }
   mris->total_area = mris->orig_area;
   return (NO_ERROR);

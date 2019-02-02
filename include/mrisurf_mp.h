@@ -131,7 +131,8 @@ struct MRIS_MP {
 #define ELT(C,T,N) C T * f_##N;
   #define MRIS_MP__LIST_F_IN                                    \
     ELT(const,  char,                   ripflag         ) SEP   \
-    ELTX(const, float,                  norm_orig_area  )
+    ELTX(const, float,                  norm_orig_area  ) SEP   \
+    ELTX(const, angles_per_triangle_t,  orig_angle      )
     
     MRIS_MP__LIST_F_IN
 
@@ -139,7 +140,7 @@ struct MRIS_MP {
     ELT(,       float,                  area            ) SEP   \
     ELTX(,      char,                   normSet         ) SEP   \
     ELTX(,      FloatXYZ,               norm            ) SEP   \
-    ELTX(,      angles_per_triangle_t,  angle)
+    ELTX(,      angles_per_triangle_t,  angle           )
 
     MRIS_MP__LIST_F_OUT
     

@@ -12,10 +12,6 @@
 // ELT  are only doable using MRIS
 // ELTM are also doable using MRIS_MP
 //
-#ifndef COMPILING_MRIS_MP
-#define ELTM(NAME,MULTIPLIER,COND,EXPR,EXPRM) ELT(NAME, MULTIPLIER, COND, EXPR)
-#endif
-
 // Note: mrisComputeCorrelationError reads v->curv, which is written by mrisComputeThicknessMinimizationEnergy!
 //      but the definition of curv here seems totally unrelated to that used elsewhere in the code
 //      so I suspect it is being used as a convenient temporary... 
@@ -24,22 +20,40 @@
       ELT(sse_area                  , parms->l_parea,                            true,    computed_area                                                                   ) SEP \
       ELT(sse_neg_area              , parms->l_area,                             true,    computed_neg_area                                                               ) SEP \
       ELT(sse_repulse               , 1.0,                     (parms->l_repulse > 0),    mrisComputeRepulsiveEnergy(mris, parms->l_repulse, mht_v_current, mht_f_current)) SEP \
-      ELT(sse_repulsive_ratio       , 1.0,                                       true,    mrisComputeRepulsiveRatioEnergy(mris, parms->l_repulse_ratio)                   ) SEP \
-      ELT(sse_tsmooth               , 1.0,                                       true,    mrisComputeThicknessSmoothnessEnergy(mris, parms->l_tsmooth, parms)             ) SEP \
-      ELT(sse_thick_min             , parms->l_thick_min,                        true,    mrisComputeThicknessMinimizationEnergy(mris, parms->l_thick_min, parms)         ) SEP \
+      \
+      ELTM(sse_repulsive_ratio      , 1.0,                                       true,    mrisComputeRepulsiveRatioEnergy   (mris, parms->l_repulse_ratio),                     \
+                                                                                          mrismp_ComputeRepulsiveRatioEnergy(mris, parms->l_repulse_ratio)                ) SEP \
+      ELTM(sse_tsmooth              , 1.0,                                       true,    mrisComputeThicknessSmoothnessEnergy(mris, parms->l_tsmooth, parms),                  \
+                                                                                          mrismp_ComputeThicknessSmoothnessEnergy(mris, parms->l_tsmooth, parms)          ) SEP \
+      ELTM(sse_thick_min            , parms->l_thick_min,                        true,    mrisComputeThicknessMinimizationEnergy(mris, parms->l_thick_min, parms),              \
+                                                                                          mrismp_ComputeThicknessMinimizationEnergy(mris, parms->l_thick_min, parms)      ) SEP \
+      \
       ELT(sse_ashburner_triangle    , parms->l_ashburner_triangle,               false,   mrisComputeAshburnerTriangleEnergy(mris, parms->l_ashburner_triangle, parms)    ) SEP \
-      ELT(sse_thick_parallel        , parms->l_thick_parallel,                   true,    mrisComputeThicknessParallelEnergy(mris, parms->l_thick_parallel, parms)        ) SEP \
-      ELT(sse_thick_normal          , parms->l_thick_normal,                     true,    mrisComputeThicknessNormalEnergy(mris, parms->l_thick_normal, parms)            ) SEP \
-      ELT(sse_thick_spring          , parms->l_thick_spring,                     true,    mrisComputeThicknessSpringEnergy(mris, parms->l_thick_spring, parms)            ) SEP \
-      ELT(sse_nl_area               , parms->l_nlarea,        !FZERO(parms->l_nlarea),    mrisComputeNonlinearAreaSSE(mris)                                               ) SEP \
+      \
+      ELTM(sse_thick_parallel       , parms->l_thick_parallel,                   true,    mrisComputeThicknessParallelEnergy(mris, parms->l_thick_parallel, parms),             \
+                                                                                          mrismp_ComputeThicknessParallelEnergy(mris, parms->l_thick_parallel, parms)     ) SEP \
+      ELTM(sse_thick_normal         , parms->l_thick_normal,                     true,    mrisComputeThicknessNormalEnergy(mris, parms->l_thick_normal, parms),                 \
+                                                                                          mrismp_ComputeThicknessNormalEnergy(mris, parms->l_thick_normal, parms)         ) SEP \
+      ELTM(sse_thick_spring         , parms->l_thick_spring,                     true,    mrisComputeThicknessSpringEnergy(mris, parms->l_thick_spring, parms),                 \
+                                                                                          mrismp_ComputeThicknessSpringEnergy(mris, parms->l_thick_spring, parms)         ) SEP \
+      \
+      ELTM(sse_nl_area              , parms->l_nlarea,        !FZERO(parms->l_nlarea),    mrisComputeNonlinearAreaSSE(mris),                                                    \
+                                                                                          mrismp_ComputeNonlinearAreaSSE(mris)                                            ) SEP \
+      \
       ELT(sse_nl_dist               , parms->l_nldist,        !DZERO(parms->l_nldist),    mrisComputeNonlinearDistanceSSE(mris)                                           ) SEP \
       ELT(sse_dist                  , parms->l_dist,          !DZERO(parms->l_dist),      COMPUTE_DISTANCE_ERROR                                                          ) SEP \
-      ELT(sse_spring                , parms->l_spring,        !DZERO(parms->l_spring),    mrisComputeSpringEnergy(mris)                                                   ) SEP \
+      \
+      ELTM(sse_spring               , parms->l_spring,        !DZERO(parms->l_spring),    mrisComputeSpringEnergy(mris),                                                        \
+                                                                                          mrismp_ComputeSpringEnergy(mris))                                                 SEP \
+      \
       ELT(sse_lap                   , parms->l_lap,           !DZERO(parms->l_lap),       mrisComputeLaplacianEnergy(mris)                                                ) SEP \
       ELT(sse_tspring               , parms->l_tspring,       !DZERO(parms->l_tspring),   mrisComputeTangentialSpringEnergy(mris)                                         ) SEP \
       ELT(sse_nlspring              , parms->l_nlspring,      !DZERO(parms->l_nlspring),  mrisComputeNonlinearSpringEnergy(mris, parms)                                   ) SEP \
       ELT(sse_curv                  , l_curv_scaled,          !DZERO(parms->l_curv),      mrisComputeQuadraticCurvatureSSE(mris, parms->l_curv)                           ) SEP \
-      ELT(sse_corr                  , l_corr,                 !DZERO(l_corr),             mrisComputeCorrelationError(mris, parms, 1, false)                              ) SEP \
+      \
+      ELTM(sse_corr                 , l_corr,                 !DZERO(l_corr),             mrisComputeCorrelationError(mris, parms, 1, false),                                   \
+                                                                                          mrismp_ComputeCorrelationError(mris, parms, 1, false))                            SEP \
+      \
       ELT(sse_val                   , parms->l_intensity,     !DZERO(parms->l_intensity), mrisComputeIntensityError(mris, parms)                                          ) SEP \
       ELT(sse_loc                   , parms->l_location,      !DZERO(parms->l_location),  mrisComputeTargetLocationError(mris, parms)                                     ) SEP \
       ELT(sse_dura                  , parms->l_dura,          !DZERO(parms->l_dura),      mrisComputeDuraError(mris, parms)                                               ) SEP \
@@ -60,17 +74,20 @@ static double MRIScomputeSSE_CUDA(MRIS *mris, MRI_CUDA_SURFACE *mrisc, INTEGRATI
 bool MRISMP_computeSSE_canDo(INTEGRATION_PARMS *parms)
 {
   bool   const use_multiframes  = !!(parms->flags & IP_USE_MULTIFRAMES);
-  double const l_corr           = (double)(parms->l_corr + parms->l_pcorr);
+  // double const l_corr           = (double)(parms->l_corr + parms->l_pcorr);
 
   bool result = true;
 #define SEP
+#define ELTM(NAME,MULTIPLIER,COND,EXPR,EXPRM)
 #define ELT(NAME, MULTIPLIER, COND, EXPR) \
   if (COND) { static bool reported = false; \
     if (!reported) { reported = true; fprintf(stdout, "%s:%d can't do %s %s\n", __FILE__,__LINE__,#NAME,#EXPR); } \
     result = false; \
   }
   SSE_TERMS
+  ELT(sse_init,1.0,gMRISexternalSSE,)
 #undef ELT
+#undef ELTM
 #undef SEP
   return result;
 }
@@ -81,82 +98,22 @@ double MRISMP_computeSSE(MRIS_MP* mris, INTEGRATION_PARMS *parms)
 #else
 double MRIScomputeSSE(MRIS* mris, INTEGRATION_PARMS *parms)
 #endif
-
-#if defined(COMPILING_MRIS_MP)
-{
-  cheapAssert(false);
-  return 0.0;
-}
-#else
 {
   bool   const use_multiframes  = !!(parms->flags & IP_USE_MULTIFRAMES);
   double const l_corr           = (double)(parms->l_corr + parms->l_pcorr);
+#ifndef COMPILING_MRIS_MP
+  // not used so causes a warning message
   double const l_curv_scaled    = (double)parms->l_curv * CURV_SCALE;
-  double const area_scale =
-#if METRIC_SCALE
-    (mris->patch || mris->noscale) ? 1.0 : mris->orig_area / mris->total_area;
-#else
-    1.0;
 #endif
-
+  
   double relevant_angle = 0, computed_neg_area = 0, computed_area = 0;
 
   if (!FZERO(parms->l_angle) || !FZERO(parms->l_area) || (!FZERO(parms->l_parea))) {
-
-    relevant_angle = 0; computed_neg_area = 0; computed_area = 0;
-
-  #define ROMP_VARIABLE       fno
-  #define ROMP_LO             0
-  #define ROMP_HI             mris->nfaces
-    
-  #define ROMP_SUMREDUCTION0  relevant_angle
-  #define ROMP_SUMREDUCTION1  computed_neg_area
-  #define ROMP_SUMREDUCTION2  computed_area
-    
-  #define ROMP_FOR_LEVEL      ROMP_level_assume_reproducible
-    
-#ifdef ROMP_SUPPORT_ENABLED
-  const int romp_for_line = __LINE__;
+#if defined(COMPILING_MRIS_MP)
+    mrismp_ComputeFaceRelevantAngleAndArea(mris, parms, &relevant_angle, &computed_neg_area, &computed_area);
+#else
+    mrisComputeFaceRelevantAngleAndArea(mris, parms, &relevant_angle, &computed_neg_area, &computed_area);
 #endif
-  #include "romp_for_begin.h"
-  ROMP_for_begin
-    
-    #define relevant_angle    ROMP_PARTIALSUM(0)
-    #define computed_neg_area ROMP_PARTIALSUM(1)
-    #define computed_area     ROMP_PARTIALSUM(2)
-
-      FACE const * const face = &mris->faces[fno];
-      if (face->ripflag) ROMP_PF_continue;
-      FaceNormCacheEntry const * const fNorm = getFaceNorm(mris, fno);
-
-      {
-        double const delta = (double)(area_scale * face->area - fNorm->orig_area);
-#if ONLY_NEG_AREA_TERM
-        if (face->area < 0.0f) computed_neg_area += delta * delta;
-#endif
-        computed_area += delta * delta;
-      }
-      
-      int ano;
-      for (ano = 0; ano < ANGLES_PER_TRIANGLE; ano++) {
-        double delta = deltaAngle(face->angle[ano], face->orig_angle[ano]);
-#if ONLY_NEG_AREA_TERM
-        if (face->angle[ano] >= 0.0f) delta = 0.0f;
-
-#endif
-        relevant_angle += delta * delta;
-      }
-      
-      if (!isfinite(computed_area) || !isfinite(relevant_angle)) {
-        ErrorExit(ERROR_BADPARM, "sse not finite at face %d!\n", fno);
-      }
-
-    #undef relevant_angle
-    #undef computed_neg_area
-    #undef computed_area
-
-  #include "romp_for_end.h"
-
   }
 
   MHT* mht_v_current = NULL;
@@ -173,9 +130,19 @@ double MRIScomputeSSE(MRIS* mris, INTEGRATION_PARMS *parms)
   }
 
 #define SEP
-#define ELT(NAME, MULTIPLIER, COND, EXPR) double const NAME = (COND) ? (EXPR) : 0.0;
+
+#ifdef COMPILING_MRIS_MP
+#define ELT(NAME, MULTIPLIER, COND, EXPR)     cheapAssert(!(COND))
+#define ELTM(NAME,MULTIPLIER,COND,EXPR,EXPRM) double const NAME = (COND) ? (EXPRM) : 0.0;
+#else
+#define ELT(NAME, MULTIPLIER, COND, EXPR)     double const NAME = (COND) ? (EXPR) : 0.0;
+#define ELTM(NAME,MULTIPLIER,COND,EXPR,EXPRM) ELT(NAME, MULTIPLIER, COND, EXPR)
+#endif
+
     SSE_TERMS
+
 #undef ELT
+#undef ELTM
 #undef SEP
 
   if (parms->l_thick_spring > 0 || parms->l_thick_min > 0 || parms->l_thick_parallel > 0 /* && DIAG_VERBOSE_ON*/)
@@ -184,31 +151,58 @@ double MRIScomputeSSE(MRIS* mris, INTEGRATION_PARMS *parms)
            sse_thick_parallel       / (float)mris->nvertices,
            sse_thick_normal         / (float)mris->nvertices,
            sse_thick_spring         / (float)mris->nvertices,
+#ifdef COMPILING_MRIS_MP
+           -666.666,
+#else
            sse_ashburner_triangle   / (float)mris->nvertices,
+#endif
            sse_tsmooth              / (float)mris->nvertices);
            
   double sse_init = 0;
 
   if (gMRISexternalSSE) {
+#ifdef COMPILING_MRIS_MP
+    cheapAssert(false);
+#else
     sse_init = (*gMRISexternalSSE)(mris, parms);
+#endif
   }
   
   double sse = sse_init +
-#define SEP +
-#define ELT(NAME, MULTIPLIER, COND, EXPR) (MULTIPLIER) * (NAME)
-    SSE_TERMS ;
+#define SEP
+#define ELTM(NAME,MULTIPLIER,COND,EXPR,EXPRM) (MULTIPLIER) * (NAME) +
+
+#ifdef COMPILING_MRIS_MP
+#define ELT(NAME, MULTIPLIER,COND,EXPR)
+#else
+#define ELT(NAME, MULTIPLIER,COND,EXPR)       ELTM(NAME, MULTIPLIER,COND,NotUsed,NotUsed)
+#endif
+
+    SSE_TERMS 0.0 ;
+
 #undef ELT
+#undef ELTM
 #undef SEP
 
   static bool laterTime, logSSE;
   if (!laterTime) { laterTime = true; logSSE = !!getenv("FREESURFER_logSSE"); }
   if (false || logSSE) {
-    #define SEP
     double sum = 0;
-    #define ELT(NAME, MULTIPLIER, COND, EXPR) fprintf(stdout, "new %s : %f \n", #NAME, (MULTIPLIER) * (NAME));  sum += (MULTIPLIER) * (NAME);
+
+#define SEP
+#define ELTM(NAME, MULTIPLIER, COND, EXPR, EXPRM) fprintf(stdout, "new %s : %f \n", #NAME, (MULTIPLIER) * (NAME));  sum += (MULTIPLIER) * (NAME);
+
+#ifdef COMPILING_MRIS_MP
+#define ELT(NAME, MULTIPLIER, COND, EXPR)
+#else
+#define ELT(NAME, MULTIPLIER, COND, EXPR) ELTM(NAME, MULTIPLIER, NotUsed, NotUsed, NotUsed)
+#endif
+
     ELT(sse_init, 1, true, sse_init)
     SSE_TERMS
     fprintf(stdout, "new sum = %f \n", sum);
+
+    #undef ELTM
     #undef ELT
     #undef SEP
   }
@@ -225,5 +219,3 @@ double MRIScomputeSSE(MRIS* mris, INTEGRATION_PARMS *parms)
 
   return sse;
 }
-#endif
-

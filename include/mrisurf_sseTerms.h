@@ -23,6 +23,9 @@
 
 #include "mrisurf_metricProperties.h"
 
+void mrisComputeFaceRelevantAngleAndArea   (MRIS    *mris, INTEGRATION_PARMS *parms, double* relevant_angle, double* computed_neg_area, double* computed_area);
+void mrismp_ComputeFaceRelevantAngleAndArea(MRIS_MP *mris, INTEGRATION_PARMS *parms, double* relevant_angle, double* computed_neg_area, double* computed_area);
+
 #define LIST_OF_PER_VERTEX_SSETERMS \
     ELT(CorrelationError              , (MRIS *mris,                            INTEGRATION_PARMS *parms, int use_stds, bool trace  )) SEP \
     ELT(RepulsiveRatioEnergy          , (MRIS *mris, double l_repulse                                                               )) SEP \
@@ -47,6 +50,15 @@ LIST_OF_SSETERMS
 #undef ELT
 #undef SEP
 
+#define SEP 
+#define MRIS MRIS_MP
+#define ELT(NAME, SIGNATURE)    double mrismp_Compute##NAME SIGNATURE;
+LIST_OF_SSETERMS
+#undef ELT
+#undef MRIS
+#undef SEP
+
+
 #define SEP
 #define ELT(NAME, SIGNATURE)    MRIS_sseTermFlag_##NAME##_bitPosition,
 enum {
@@ -65,3 +77,9 @@ typedef enum {
 typedef struct MRIS_sseTerms {
     double term[MRIS_sseTermFlag_bitPosition_LAST];
 } MRIS_sseTerms;
+
+
+// Input to several of these terms
+//
+
+  double relevant_angle = 0, computed_neg_area = 0, computed_area = 0;

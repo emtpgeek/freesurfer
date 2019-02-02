@@ -70,6 +70,12 @@ typedef struct VERTEX_TOPOLOGY      VERTEX_TOPOLOGY;
 typedef int   vertices_per_face_t[VERTICES_PER_FACE];
 typedef float angles_per_triangle_t[ANGLES_PER_TRIANGLE];
 
+static void copyAnglesPerTriangle(angles_per_triangle_t dst, angles_per_triangle_t const src) {
+  memcpy(dst,src,sizeof(angles_per_triangle_t));
+}
+static int cmpAnglesPerTriangle(angles_per_triangle_t dst, angles_per_triangle_t const src) {
+  return memcmp(dst,src,sizeof(angles_per_triangle_t));
+}
 
 typedef struct MRIS_XYZ {
   float x,y,z;
