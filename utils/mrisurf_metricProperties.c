@@ -306,16 +306,16 @@ void MRISMP_load(MRIS_MP* mp, MRIS* mris,
 }
 
 
-#define comparison(NO,LHS,RHS) { comparisonWkr((NO), (LHS), (RHS), #LHS, __LINE__, &errorCount); }
-static void comparisonWkr(int vnoOrFno, double lhs, double rhs, const char* expr, int line, int* errorCount) {
+#define comparison(NO,LHS,RHS) { comparisonWkr((NO), (LHS), (RHS), #LHS, #RHS, __LINE__, &errorCount); }
+static void comparisonWkr(int vnoOrFno, double lhs, double rhs, const char* exprLHS, const char* exprRHS, int line, int* errorCount) {
   if (lhs == rhs) {
     // if (vnoOrFno < 1) fprintf(stdout, "%d %s matches\n", vnoOrFno,expr);
     return;
   }
   if ((*errorCount)++ > 10) return;
   
-  fprintf(stdout, "no:%d  %s  %f != %f  during count_MRIScomputeMetricProperties_calls:%d\n", 
-    vnoOrFno,expr,lhs,rhs,count_MRIScomputeMetricProperties_calls);
+  fprintf(stdout, "no:%d  %s(%f) != %s(%f)  at %s:%d during count_MRIScomputeMetricProperties_calls:%d\n", 
+    vnoOrFno,exprLHS,lhs,exprRHS,rhs,__FILE__,line,count_MRIScomputeMetricProperties_calls);
     
   static int count;
   count++;
@@ -468,9 +468,9 @@ void MRISsetXYZwkr(MRIS *mris, int vno, float x, float y, float z, const char * 
 
 void MRISmemalignNFloats(size_t n, float** ppx, float** ppy, float** ppz) {
   // cache aligned to improve the performance of loops that use the vectors
-  if (ppx) posix_memalign((void**)ppx, 64, n*sizeof(float));
-  if (ppy) posix_memalign((void**)ppy, 64, n*sizeof(float));
-  if (ppz) posix_memalign((void**)ppz, 64, n*sizeof(float));
+  if (ppx) cheapAssert(0 == posix_memalign((void**)ppx, 64, n*sizeof(float)));
+  if (ppy) cheapAssert(0 == posix_memalign((void**)ppy, 64, n*sizeof(float)));
+  if (ppz) cheapAssert(0 == posix_memalign((void**)ppz, 64, n*sizeof(float)));
 }
 
 void MRISexportXYZ(MRIS *mris, float** ppx, float** ppy, float** ppz) {

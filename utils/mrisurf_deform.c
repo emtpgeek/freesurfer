@@ -326,8 +326,14 @@ bool mrismp_ProjectSurface_canDo(int mris_status)
       break;
     case MRIS_SPHERE:
       break;
-    default:
+    default: {
+      static int shown = 0;
+      int shownMask = (1 << mris_status);
+      if (!(shown&shownMask)) { shown |= shownMask;
+        fprintf(stdout, "%s:%d need to process MRIS::status %d\n", __FILE__, __LINE__, mris_status);
+      }
       return false;
+    }
   }
   return true;
 }
@@ -7908,12 +7914,6 @@ double MRIScomputeSSE_asThoughGradientApplied(
   if (!canUseNewBehaviour) {
     useNewBehaviour = false;
     useOldBehaviour = true;
-
-    static int shown = 0;
-    int shownMask = (1 << mris->status);
-    if (!(shown&shownMask)) { shown |= shownMask;
-      fprintf(stdout, "%s:%d need to process MRIS::status %d\n", __FILE__, __LINE__, mris->status);
-    }
   }
   
   double new_result = 0.0;

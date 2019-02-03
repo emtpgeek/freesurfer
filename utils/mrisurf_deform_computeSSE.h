@@ -3,10 +3,12 @@
 // These are in the order the original code computed them, so that side effects are not reordered
 // In older code the ashburner_triangle is computed but not used , here it is not computed at all
 //
-#ifndef MRIS_COMPUTESSE_CUDA
-    #define COMPUTE_DISTANCE_ERROR mrisComputeDistanceError(mris, parms)
-#else
+#ifdef MRIS_COMPUTESSE_CUDA
     #define COMPUTE_DISTANCE_ERROR mrisComputeDistanceErrorCUDA(mris, mrisc, parms)
+#elif defined(COMPILING_MRIS_MP)
+    #define COMPUTE_DISTANCE_ERROR mrismp_ComputeDistanceError(mris, parms)
+#else
+    #define COMPUTE_DISTANCE_ERROR mrisComputeDistanceError(mris, parms)
 #endif
 
 // ELT  are only doable using MRIS
@@ -41,7 +43,7 @@
                                                                                           mrismp_ComputeNonlinearAreaSSE(mris)                                            ) SEP \
       \
       ELT(sse_nl_dist               , parms->l_nldist,        !DZERO(parms->l_nldist),    mrisComputeNonlinearDistanceSSE(mris)                                           ) SEP \
-      ELT(sse_dist                  , parms->l_dist,          !DZERO(parms->l_dist),      COMPUTE_DISTANCE_ERROR                                                          ) SEP \
+      ELTM(sse_dist                 , parms->l_dist,          !DZERO(parms->l_dist),      COMPUTE_DISTANCE_ERROR,COMPUTE_DISTANCE_ERROR                                   ) SEP \
       \
       ELTM(sse_spring               , parms->l_spring,        !DZERO(parms->l_spring),    mrisComputeSpringEnergy(mris),                                                        \
                                                                                           mrismp_ComputeSpringEnergy(mris))                                                 SEP \
