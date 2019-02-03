@@ -11,9 +11,15 @@
         float const y = mris->v_y[vno];                 \
         float const z = mris->v_z[vno];                 \
         // end of macro
-    #define GET_V2_XYZ_Ripflag2(VNO2)                   \
+    #define GET_DIST_ORIG(NAME,VNO)                     \
+        float const * NAME = mris->v_dist_orig[VNO];    \
+        // end of macro
+    #define GET_V2_Ripflag2(VNO2)                       \
         int const vno2 = VNO2;                          \
         bool  const ripflag2 = mris->v_ripflag[vno2];   \
+        // end of macro
+    #define GET_V2_XYZ_Ripflag2(VNO2)                   \
+        GET_V2_Ripflag2(VNO2)                           \
         float const x2 = mris->v_x[vno2];               \
         float const y2 = mris->v_y[vno2];               \
         float const z2 = mris->v_z[vno2];               \
@@ -29,6 +35,8 @@
         float const cz2 = mris->v_cz[vno2];             \
         // end of macro
     #define GET_V_DIST                                  \
+        GET_DIST
+    #define GET_DIST                                    \
         float const * v_dist = mris->v_dist[vno];       \
         // end of macro
     #define GET_CURV                                    \
@@ -75,10 +83,16 @@
         float const y = v->y;                           \
         float const z = v->z;                           \
         // end of macro
-    #define GET_V2_XYZ_Ripflag2(VNO2)                   \
+    #define GET_DIST_ORIG(NAME,VNO)                     \
+        float const * NAME = mris->vertices[VNO].dist_orig; \
+        // end of macro
+    #define GET_V2_Ripflag2(VNO2)                       \
         int const vno2 = VNO2;                          \
         VERTEX const * const v2 = &mris->vertices[vno2];\
         bool  const ripflag2 = v2->ripflag;             \
+        // end of macro
+    #define GET_V2_XYZ_Ripflag2(VNO2)                   \
+        GET_V2_Ripflag2(VNO2)                           \
         float const x2 = v2->x;                         \
         float const y2 = v2->y;                         \
         float const z2 = v2->z;                         \
@@ -95,12 +109,14 @@
         // end of macro
     #define GET_V_DIST                                  \
         GET_V                                           \
-        float const * v_dist = v->dist;                 \
+        GET_DIST                                        \
         // end of macro
     #define GET_CURV                                    \
         float const curv = v->curv;
     #define GET_PCURV                                   \
         float* const pcurv = &mris->vertices[vno].curv;
+    #define GET_DIST                                    \
+        float const * v_dist = v->dist;
     #define GET_WHITEXYZ                                \
         float const whitex = v->whitex;                 \
         float const whitey = v->whitey;                 \
@@ -671,17 +687,242 @@ double FUNCTION_NAME(mrisComputeNonlinearAreaSSE,mrismp_ComputeNonlinearAreaSSE)
   return (sse);
 }
 
+
+double FUNCTION_NAME(mrisComputeDistanceError,mrismp_ComputeDistanceError) (
+  MRIS_INFO *mris, INTEGRATION_PARMS *parms)
+{
+  MRIS* const underlyingMRIS =
+#ifdef COMPILING_MRIS_MP
+    mris->underlyingMRIS;
+#else
+    mris;    
+#endif
+
+  if (
+#ifdef COMPILING_MRIS_MP
+    !mris->v_dist[0]
+#else
+    !(mris->dist_alloced_flags & 1)
+#endif
+  ) {
+    switch (copeWithLogicProblem("FREESURFER_fix_mrisComputeDistanceError","should have computed dist already - FIX NYI")) {
+    case LogicProblemResponse_old: 
+      break;
+    case LogicProblemResponse_fix:
+      // mrisComputeVertexDistances(mris);
+      break;
+    }
+  }
+  if (
+    !(underlyingMRIS->dist_alloced_flags & 2)
+  ) {
+    switch (copeWithLogicProblem("FREESURFER_fix_mrisComputeDistanceTerm","should have computed dist_orig already - FIX NYI")) {
+    case LogicProblemResponse_old: 
+      break;
+    case LogicProblemResponse_fix:
+      // mrisComputeOriginalVertexDistances(mris);
+      break;
+    }
+  }
+
+  if (false) {
+    fprintf(stdout, "%s:%d calling mrisCheckDistOrig\n", __FILE__, __LINE__);
+    if (!mrisCheckDistOrig(underlyingMRIS)) 
+      fprintf(stdout, "  failed mrisCheckDistOrig\n");
+  }
+  
+  int max_v, max_n, err_cnt, max_errs;
+  volatile int count_dist_orig_zeros = 0;
+  double dist_scale, sse_dist, max_del;
+
+#if METRIC_SCALE
+  if (mris->patch) {
+    dist_scale = 1.0;
+  }
+  else if (mris->status == MRIS_PARAMETERIZED_SPHERE) {
+    dist_scale = sqrt(mris->orig_area / mris->total_area);
+  }
+  else
+    dist_scale = mris->neg_area < mris->total_area ? sqrt(mris->orig_area / (mris->total_area - mris->neg_area))
+                                                   : sqrt(mris->orig_area / mris->total_area);
+#else
+  dist_scale = 1.0;
+#endif
+  max_del = -1.0;
+  max_v = max_n = -1;
+
+  err_cnt = 0;
+  max_errs = 100;
+
+  sse_dist = 0.0;
+  
+  int const acceptableNumberOfZeros = 
+    ( mris->status == MRIS_PARAMETERIZED_SPHERE
+    ||mris->status == MRIS_SPHERE)
+    ? mris->nvertices * mris->avg_nbrs * 0.01       // only the direction from 000 has to match
+    : mris->nvertices * mris->avg_nbrs * 0.001;     // xyz has to match
+
+#ifdef COMPILING_MRIS_MP
+  const char* vertexRipflags = mris->v_ripflag;  
+#else
+  const char* vertexRipflags = MRISexportVertexRipflags(mris);  
+    // since we have to read them a lot, get them into 100KB in the L2 cache
+    // rather than reading them in 6.4MB of cache lines
+#endif
+  
+#ifdef BEVIN_MRISCOMPUTEDISTANCEERROR_REPRODUCIBLE
+
+  #define ROMP_VARIABLE       vno 
+  #define ROMP_LO             0
+  #define ROMP_HI             mris->nvertices
+    
+  #define ROMP_SUMREDUCTION0  sse_dist
+    
+  #define ROMP_FOR_LEVEL      ROMP_level_assume_reproducible
+    
+#ifdef ROMP_SUPPORT_ENABLED
+  const int romp_for_line = __LINE__;
+#endif
+  #include "romp_for_begin.h"
+  ROMP_for_begin
+    
+    #define sse_dist ROMP_PARTIALSUM(0)
+    
+#else
+  int vno;
+  
+  ROMP_PF_begin         // mris_register
+
+#ifdef HAVE_OPENMP
+  #pragma omp parallel for if_ROMP(fast) reduction(+ : sse_dist)
+#endif
+  for (vno = 0; vno < mris->nvertices; vno++) {
+    ROMP_PFLB_begin
+
+#endif    
+
+    VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+
+    GET_V_RIPFLAG
+    GET_DIST
+    GET_DIST_ORIG(v_dist_orig, vno)
+
+    if (ripflag) ROMP_PF_continue;
+
+    if (vno == Gdiag_no) DiagBreak();
+
+#if NO_NEG_DISTANCE_TERM
+    if (v->neg) ROMP_PF_continue;
+#endif
+
+    double v_sse = 0.0;
+
+
+    int n;
+    for (n = 0; n < vt->vtotal; n++) {
+      int const vn_vno = vt->v[n];
+      if (vertexRipflags[vn_vno]) continue;
+      
+#if NO_NEG_DISTANCE_TERM
+      if (mris->vertices[vn_vno].neg) continue;
+
+#endif
+      float const dist_orig_n = !v_dist_orig ? 0.0 : v_dist_orig[n];
+      
+      if (dist_orig_n >= UNFOUND_DIST) continue;
+
+      if (DZERO(dist_orig_n) && (count_dist_orig_zeros++ > acceptableNumberOfZeros)) {
+        fprintf(stderr, "v[%d]->dist_orig[%d] = %f!!!!, count_dist_orig_zeros:%d\n", vno, n, dist_orig_n, count_dist_orig_zeros);
+        fflush(stderr);
+        DiagBreak();
+        if (++err_cnt > max_errs) {
+          fprintf(stderr, ">>> dump of head zeroes \n");
+          int dump_vno,dump_count_dist_orig_zeros = 0;
+          for (dump_vno = 0; dump_vno < mris->nvertices; dump_vno++) {
+            VERTEX_TOPOLOGY const * const dump_vt = &mris->vertices_topology[dump_vno];
+            
+            GET_V2_Ripflag2(dump_vno)
+            if (ripflag2) continue;
+
+            GET_DIST_ORIG(dump_v_dist_orig, dump_vno)
+            
+            int dump_n;
+            for (dump_n = 0; dump_n < dump_vt->vtotal; dump_n++) {
+              int const dump_vn_vno = dump_vt->v[n];
+              if (vertexRipflags[dump_vn_vno]) continue;
+              float const dump_dist_orig_n = !dump_v_dist_orig ? 0.0 : dump_v_dist_orig[n];
+              if (!DZERO(dump_dist_orig_n)) continue;
+              dump_count_dist_orig_zeros++;
+              fprintf(stderr, "v[%d]->dist_orig[%d] = %f!!!!, count_dist_orig_zeros:%d\n", dump_vno, dump_n, dump_dist_orig_n, dump_count_dist_orig_zeros);
+              if (dump_count_dist_orig_zeros > 30) goto dump_done;
+            }
+          }
+          dump_done:;
+          ErrorExit(ERROR_BADLOOP, "mrisComputeDistanceError: Too many errors!\n");
+        }
+      }
+
+      double delta = dist_scale * v_dist[n] - dist_orig_n;
+      if (parms->vsmoothness)
+        v_sse += (1.0 - parms->vsmoothness[vno]) * (delta * delta);
+      else
+        v_sse += delta * delta;
+
+      if (!isfinite(delta) || !isfinite(v_sse)) DiagBreak();
+    }
+    if (v_sse > 10000) DiagBreak();
+
+    if (parms->dist_error) parms->dist_error[vno] = v_sse;
+
+    sse_dist += v_sse;
+    if (!isfinite(sse_dist) || !isfinite(v_sse)) DiagBreak();
+    
+#ifdef BEVIN_MRISCOMPUTEDISTANCEERROR_REPRODUCIBLE
+    #undef sse_dist 
+  #include "romp_for_end.h"
+#else
+    ROMP_PFLB_end
+  }
+  ROMP_PF_end
+#endif
+
+#ifdef FS_CUDA
+  /* investigate some of the flags. Neither being true would help
+     tremendously with the GPU implementation as it removes the need
+     to have or produce the information involved with these flags
+  */
+  fprintf(stdout,
+          "mrisComputeDistanceError: parms->dist_error=%d, "
+          "parms->vsmoothness=%d, sse_dist=%lg\n",
+          (parms->dist_error != NULL),
+          (parms->vsmoothness != NULL),
+          sse_dist);
+#endif /* FS_CUDA */
+
+#ifdef COMPILING_MRIS_MP
+#else
+  freeAndNULL(vertexRipflags);  
+#endif
+
+  /*fprintf(stdout, "max_del = %f at v %d, n %d\n", max_del, max_v, max_n) ;*/
+  return (sse_dist);
+}
+
+
 #undef GET_F_AREA_ANGLE_ORIGAREA_ORIGANGLE
 #undef GET_F_AREA
 #undef GET_F_RIPFLAG
 #undef GET_WHITEXYZ2
 #undef GET_WHITEXYZ
+#undef GET_DIST
 #undef GET_PCURV
 #undef GET_CURV
 #undef GET_V_DIST
 #undef GET_CXYZ2
 #undef GET_CXYZ
 #undef GET_V2_XYZ_Ripflag2
+#undef GET_V2_Ripflag2
+#undef GET_DIST_ORIG
 #undef GET_V_XYZ
 #undef GET_V_RIPFLAG
 #undef GET_V

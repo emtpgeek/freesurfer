@@ -33,7 +33,6 @@ extern int fix_vertex_area;
 #ifdef BEVIN_REPRODUCIBLES_CHECK
 
     #define BEVIN_MRISCOMPUTENORMALS_CHECK
-    #define BEVIN_MRISCOMPUTEDISTANCEERROR_CHECK
 #endif
 
 

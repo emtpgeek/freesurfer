@@ -37,6 +37,7 @@ struct MRIS_MP {
   #define MRIS_MP__LIST_MRIS_IN \
     ELT(const,  int,    nvertices   ) SEP \
     ELT(const,  int,    nfaces      ) SEP \
+    ELT(const,  int,    avg_nbrs    ) SEP \
     ELT(const,  int,    nsize       ) SEP \
     ELT(const,  int,    patch       ) SEP \
     ELT(const,  int,    noscale     ) SEP \
@@ -93,7 +94,8 @@ struct MRIS_MP {
     ELT(const,  float,  pialz       ) SEP   \
     ELT(const,  float,  wnx         ) SEP   \
     ELT(const,  float,  wny         ) SEP   \
-    ELT(const,  float,  wnz         ) 
+    ELT(const,  float,  wnz         ) SEP   \
+    ELTX(const,  float const *, dist_orig)      /* note: these keep pointing to the original ones in the MRIS - change it code wants to change these values */
     
     MRIS_MP__LIST_V_IN
 
