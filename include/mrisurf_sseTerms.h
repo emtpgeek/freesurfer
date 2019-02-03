@@ -35,7 +35,7 @@ void mrismp_ComputeFaceRelevantAngleAndArea(MRIS_MP *mris, INTEGRATION_PARMS *pa
     ELT(ThicknessSpringEnergy         , (MRIS *mris, double l_thick_spring,     INTEGRATION_PARMS *parms                            )) SEP \
     ELT(ThicknessParallelEnergy       , (MRIS *mris, double l_thick_parallel,   INTEGRATION_PARMS *parms                            )) SEP \
     ELT(ThicknessSmoothnessEnergy     , (MRIS *mris, double l_tsmooth,          INTEGRATION_PARMS *parms                            )) SEP \
-    ELT(ComputeDistanceError          , (MRIS *mris,                            INTEGRATION_PARMS *parms                            ))     \
+    ELT(DistanceError                 , (MRIS *mris,                            INTEGRATION_PARMS *parms                            ))     \
     // end of macro
     
 #define LIST_OF_PER_FACE_SSETERMS \
