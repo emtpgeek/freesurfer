@@ -37,7 +37,7 @@ struct MRIS_MP {
   #define MRIS_MP__LIST_MRIS_IN \
     ELT(const,  int,    nvertices   ) SEP \
     ELT(const,  int,    nfaces      ) SEP \
-    ELT(const,  int,    avg_nbrs    ) SEP \
+    ELT(const,  float,  avg_nbrs    ) SEP \
     ELT(const,  int,    nsize       ) SEP \
     ELT(const,  int,    patch       ) SEP \
     ELT(const,  int,    noscale     ) SEP \
