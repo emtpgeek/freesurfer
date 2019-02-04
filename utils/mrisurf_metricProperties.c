@@ -79,10 +79,9 @@ void MRISMP_dtr(MRIS_MP* mp) {
   bzero(mp, sizeof(*mp));
 }
 
-static void MRISMP_makeDist(MRIS_MP* mp, int vno) {
-  int vSize    = mp->v_VSize[vno];
+static void MRISMP_makeDist2(MRIS_MP* mp, int vno, int neededCapacity) {
+  int const vSize = mp->v_VSize[vno];
 
-  int neededCapacity = mp->v_dist_capacity[vno];
   if (neededCapacity < vSize) neededCapacity = vSize;
 
   if (neededCapacity <= mp->v_dist_capacity[vno]) {
@@ -103,6 +102,9 @@ static void MRISMP_makeDist(MRIS_MP* mp, int vno) {
   mp->v_dist_capacity[vno] = neededCapacity;
 }
 
+static void MRISMP_makeDist(MRIS_MP* mp, int vno) {
+  MRISMP_makeDist2(mp, vno, mp->v_dist_capacity[vno]);
+}
 
 
 void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src, 
@@ -156,8 +158,8 @@ void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src,
     if (!only_inputs) { 
       if (v_neg) v_neg[vno] = src->v_neg[vno];
       if (src->v_dist[vno]) {
-        MRISMP_makeDist(dst, vno);
-        memcpy(v_dist [vno], src->v_dist[vno], v_VSize[vno]*sizeof(*v_dist[vno]));
+        MRISMP_makeDist2(dst, vno, src->v_dist_capacity[vno]);
+        memcpy(v_dist[vno], src->v_dist[vno], src->v_dist_capacity[vno]*sizeof(*v_dist[vno]));
       }
       MRIS_MP__LIST_V_OUT 
     }
@@ -254,12 +256,13 @@ void MRISMP_load(MRIS_MP* mp, MRIS* mris,
     v_dist_orig[vno]     = v->dist_orig;
     v_VSize[vno] = mrisVertexVSize(mris, vno);
     v_dist [vno] = NULL;
+    v_dist_capacity[vno] = 0;
 #define ELT(C,T,N) v_##N[vno] = v->N;
     MRIS_MP__LIST_V_IN SEP MRIS_MP__LIST_V_IN_OUT
     if (loadOutputs) {
       if (v_neg) v_neg[vno] = v->neg;
       MRIS_MP__LIST_V_OUT
-      MRISMP_makeDist(mp, vno);
+      MRISMP_makeDist2(mp, vno, v->dist_capacity);
       memcpy(v_dist [vno], v->dist,  v_VSize[vno]*sizeof(*v_dist[vno]));
     }
 #undef ELT
@@ -385,9 +388,6 @@ static void MRISMP_unload(MRIS* mris, MRIS_MP* mp, bool check) {
         mp->v_dist_capacity[vno] = 0;
       } else {
       
-        if (!check && !v->dist) 
-            MRISmakeDist(mris,vno);
-        
         float* const mp_dist = mp->v_dist[vno];
         float* const mris_dist = v->dist;
         
