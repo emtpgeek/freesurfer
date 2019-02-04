@@ -126,6 +126,8 @@ struct MRIS_MP {
 
     MRIS_MP__LIST_V_OUT
 
+    float**     v_dist_buffer;
+
 #undef ELT
 
   // Faces

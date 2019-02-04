@@ -50,11 +50,12 @@ void MRISMP_dtr(MRIS_MP* mp) {
 
   // Vertices
   //
-  if (mp->v_dist) {
+  if (mp->v_dist_buffer) {
     int vno;
     for (vno = 0; vno < mp->nvertices; vno++) {
-      freeAndNULL(mp->v_dist[vno]);
+      freeAndNULL(mp->v_dist_buffer[vno]);
     }
+    freeAndNULL(mp->v_dist_buffer);
   }
     
 #define SEP
@@ -82,7 +83,15 @@ static void MRISMP_makeDist(MRIS_MP* mp, int vno) {
   int capacity = mp->v_dist_capacity[vno];
   int vSize    = mp->v_VSize[vno];
   if (capacity < vSize) capacity = vSize;
-  mp->v_dist         [vno] = mrisStealDistStore(mp->underlyingMRIS, vno, capacity);
+  if (capacity < mp->v_dist_capacity[vno]) return;
+  if (!mp->v_dist_buffer) {
+    mp->v_dist_buffer = (float**)calloc(mp->nvertices,sizeof(float*));
+  }
+  if (mp->v_dist_buffer[vno]) {
+    mp->v_dist[vno] = mp->v_dist_buffer[vno] = (float*)realloc(mp->v_dist_buffer[vno], capacity*sizeof(float));
+  } else {
+    mp->v_dist[vno] = mp->v_dist_buffer[vno] = mrisStealDistStore(mp->underlyingMRIS, vno, capacity);
+  }
   mp->v_dist_capacity[vno] = capacity;
 }
 
@@ -131,10 +140,10 @@ void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src,
   for (vno = 0; vno < src->nvertices; vno++) {
 #define SEP
 #define ELTX(C,T,N) // these are the special cases dealt with here
-    v_dist_orig    [vno] = src->v_dist_orig[vno];
-    v_dist_capacity[vno] = src->v_dist_capacity[vno];    // not so special
-    v_VSize        [vno] = src->v_VSize        [vno];    // not so special
-    v_dist         [vno] = NULL;
+    v_dist_orig    [vno] = src->v_dist_orig[vno];       // NOTE - POINTS TO THE ORIGINAL MRIS TREE VECTOR!
+    v_VSize        [vno] = src->v_VSize[vno];           // not so special
+    v_dist_capacity[vno] = 0;                           // not so special
+    v_dist         [vno] = NULL;                        // will make when needed
 #define ELT(C,T,N) v_##N[vno] = src->v_##N[vno];
     MRIS_MP__LIST_V_IN SEP MRIS_MP__LIST_V_IN_OUT
     if (!only_inputs) { 
@@ -366,7 +375,7 @@ static void MRISMP_unload(MRIS* mris, MRIS_MP* mp, bool check) {
     if (mp->v_dist[vno]) {
       if (!check) {                                                         // this requires that the dist capacity match, not just the vtotal
         mrisSetDist(mris,vno,mp->v_dist[vno],mp->v_dist_capacity[vno]);     // why assign and free when you can just move?
-        mp->v_dist[vno] = NULL;
+        mp->v_dist[vno] = mp->v_dist_buffer[vno] = NULL;
       } else {
       
         if (!check && !v->dist) 
