@@ -83,7 +83,10 @@ static void MRISMP_makeDist(MRIS_MP* mp, int vno) {
   int capacity = mp->v_dist_capacity[vno];
   int vSize    = mp->v_VSize[vno];
   if (capacity < vSize) capacity = vSize;
-  if (capacity < mp->v_dist_capacity[vno]) return;
+  if (capacity <= mp->v_dist_capacity[vno]) {
+    mp->v_dist[vno] = mp->v_dist_buffer[vno];
+    return;
+  }
   if (!mp->v_dist_buffer) {
     mp->v_dist_buffer = (float**)calloc(mp->nvertices,sizeof(float*));
   }
