@@ -26,7 +26,10 @@ struct MRIS_MP {
 #define SEP
 #define ELTX(C,T,N) ELT(C,T,N)
 
-    MRIS* underlyingMRIS;  // allows access in a few rare cases where there is a real benefit 
+    MRIS* underlyingMRIS;   // allows access in a few rare cases where there is a real benefit 
+
+    MRIS_MP* in_src;        // since the in are not written, they can be shared by copies
+    int      in_ref_count;  // check the src doesn't go away
     
   // MRIS
   //
@@ -46,7 +49,7 @@ struct MRIS_MP {
     ELTX(const, FACE_TOPOLOGY   const *, faces_topology)
 
     MRIS_MP__LIST_MRIS_IN
-    
+      
   // In out
   #define MRIS_MP__LIST_MRIS_IN_OUT \
     ELT(,       int,    status      ) SEP \
@@ -100,18 +103,23 @@ struct MRIS_MP {
     MRIS_MP__LIST_V_IN
 
   // In out
-  #define MRIS_MP__LIST_V_IN_OUT            \
-    ELTX(,      int,    dist_capacity) SEP  \
-    ELT(,       char,   border      ) SEP   \
+  #define MRIS_MP__LIST_V_IN_OUT_XYZ        \
     ELT(,       float,  x           ) SEP   \
     ELT(,       float,  y           ) SEP   \
-    ELT(,       float,  z           ) SEP   \
+    ELT(,       float,  z           )
+
+  #define MRIS_MP__LIST_V_IN_OUT_NOXYZ      \
+    ELTX(,      int,    dist_capacity) SEP  \
+    ELT(,       char,   border      ) SEP   \
     ELT(,       float,  cx          ) SEP   \
     ELT(,       float,  cy          ) SEP   \
     ELT(,       float,  cz          ) SEP   \
     ELT(,       float,  curv        ) SEP   \
     ELT(,       float,  origarea    ) SEP   \
     ELT(,       int,    assigned_fno) 
+
+  #define MRIS_MP__LIST_V_IN_OUT            \
+    MRIS_MP__LIST_V_IN_OUT_XYZ SEP MRIS_MP__LIST_V_IN_OUT_NOXYZ
   
     MRIS_MP__LIST_V_IN_OUT
     

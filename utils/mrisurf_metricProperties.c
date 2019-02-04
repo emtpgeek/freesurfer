@@ -43,7 +43,8 @@ void MRISMP_dtr(MRIS_MP* mp) {
 #define SEP
 #define ELTX(C,T,N) ELT(C,T,N)
 #define ELT(C,T,N) freeAndNULL(mp->f_##N);
-  MRIS_MP__LIST_F_IN SEP MRIS_MP__LIST_F_OUT
+  if (!mp->in_src) { MRIS_MP__LIST_F_IN }
+  MRIS_MP__LIST_F_OUT
 #undef ELT
 #undef ELTX
 #undef SEP
@@ -61,14 +62,15 @@ void MRISMP_dtr(MRIS_MP* mp) {
 #define SEP
 #define ELTX(C,T,N) ELT(C,T,N)
 #define ELT(C,T,N) freeAndNULL(mp->v_##N);
-  MRIS_MP__LIST_V_IN SEP MRIS_MP__LIST_V_IN_OUT SEP MRIS_MP__LIST_V_OUT
+  if (!mp->in_src) { MRIS_MP__LIST_V_IN }
+  MRIS_MP__LIST_V_IN_OUT SEP MRIS_MP__LIST_V_OUT
 #undef ELT
 #undef ELTX
 #undef SEP
 
   // MRIS
   //
-  {
+  if (!mp->in_src) {
     // hack because mrisurf doesn't have a FACE_TOPOLOGY yet
     // When fixing, fix the dtr also!
     //
@@ -76,6 +78,22 @@ void MRISMP_dtr(MRIS_MP* mp) {
     *(FACE_TOPOLOGY**)(&mp->faces_topology) = NULL;
   }
 
+  if (mp->in_src) {
+    mp->in_src->in_ref_count--;
+#define SEP
+#define ELTX(C,T,N) ELT(C,T,N)
+#define ELT(C,T,N) bzero((void*)&mp->f_##N, sizeof(mp->f_##N));
+    MRIS_MP__LIST_F_IN
+#undef ELT
+#define ELT(C,T,N) bzero((void*)&mp->v_##N, sizeof(mp->v_##N));
+    MRIS_MP__LIST_V_IN
+#undef ELT
+#undef ELTX
+#undef SEP
+    mp->in_src = NULL;
+  }
+  cheapAssert(!mp->in_ref_count);
+  
   bzero(mp, sizeof(*mp));
 }
 
@@ -109,24 +127,23 @@ static void MRISMP_makeDist(MRIS_MP* mp, int vno) {
 
 void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src, 
   bool only_inputs,
-  bool ignore_xyz) {    // NYI
+  bool no_need_to_copy_xyz) {    // NYI
   
   dst->underlyingMRIS = src->underlyingMRIS;
+
+  if (dst->in_src != src) {
+    if (dst->in_src) {
+      dst->in_src->in_ref_count--;              // no longer being referenced by dst
+      dst->in_src = NULL;
+    }
+    src->in_ref_count++;                        // stop src from destructing
+    dst->in_src = src;                          // remember so can decrement later
+  }
 
   // MRIS
   //
 #define SEP
-#define ELTX(C,T,N)
-  {
-    // hack because mrisurf doesn't have a FACE_TOPOLOGY yet
-    // When fixing, fix the dtr also!
-    //
-    FACE_TOPOLOGY* ft = (FACE_TOPOLOGY*)realloc((void*)dst->faces_topology, src->nfaces * sizeof(FACE_TOPOLOGY));
-    int i;
-    for (i = 0; i < src->nfaces; i++) memcpy(ft[i].v, src->faces_topology[i].v, sizeof(ft->v));
-    *(FACE_TOPOLOGY**)(&dst->faces_topology) = ft;
-  }
-
+#define ELTX(C,T,N) ELT(C,T,N)
 #define ELT(C,T,N) *(T*)&(dst->N) = src->N;                   // support initializing the const members
   MRIS_MP__LIST_MRIS_IN SEP MRIS_MP__LIST_MRIS_IN_OUT
   if (!only_inputs) MRIS_MP__LIST_MRIS_OUT
@@ -138,8 +155,16 @@ void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src,
   //
 #define SEP
 #define ELTX(C,T,N) ELT(C,T,N)
+#define ELT(C,T,N) dst->v_##N = src->v_##N;
+  MRIS_MP__LIST_V_IN 
+#undef ELT
+#undef ELTX
+#undef SEP
+
+#define SEP
+#define ELTX(C,T,N) ELT(C,T,N)
 #define ELT(C,T,N) T* v_##N = (T*)realloc((void*)dst->v_##N, dst->nvertices*sizeof(T)); dst->v_##N = v_##N;
-  MRIS_MP__LIST_V_IN SEP MRIS_MP__LIST_V_IN_OUT SEP MRIS_MP__LIST_V_OUT
+  MRIS_MP__LIST_V_IN_OUT SEP MRIS_MP__LIST_V_OUT
 #undef ELT
 #undef ELTX
 #undef SEP
@@ -150,11 +175,10 @@ void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src,
   for (vno = 0; vno < src->nvertices; vno++) {
 #define SEP
 #define ELTX(C,T,N) // these are the special cases dealt with here
-    v_dist_orig    [vno] = src->v_dist_orig[vno];       // NOTE - POINTS TO THE ORIGINAL MRIS TREE VECTOR!
-    v_VSize        [vno] = src->v_VSize[vno];           // not so special
     v_dist         [vno] = NULL;                        // will make when needed
 #define ELT(C,T,N) v_##N[vno] = src->v_##N[vno];
-    MRIS_MP__LIST_V_IN SEP MRIS_MP__LIST_V_IN_OUT
+    if (!no_need_to_copy_xyz) { MRIS_MP__LIST_V_IN_OUT_XYZ }
+    MRIS_MP__LIST_V_IN_OUT_NOXYZ
     if (!only_inputs) { 
       if (v_neg) v_neg[vno] = src->v_neg[vno];
       if (src->v_dist[vno]) {
@@ -173,28 +197,36 @@ void MRISMP_copy(MRIS_MP* dst, MRIS_MP* src,
 #define SEP
 #define ELTX(C,T,N) ELT(C,T,N)
 #define ELT(C,T,N) T* f_##N = (T*)realloc((void*)dst->f_##N, dst->nfaces*sizeof(T)); dst->f_##N = f_##N;
-  MRIS_MP__LIST_F_IN SEP MRIS_MP__LIST_F_OUT
+  MRIS_MP__LIST_F_OUT
 #undef ELT
 #undef ELTX
 #undef SEP
 
-  int fno;
-  for (fno = 0; fno < dst->nfaces; fno++) {
 #define SEP
-#define ELTX(C,T,N) // these are the special cases dealt with here
-    f_norm_orig_area [fno] = src->f_norm_orig_area [fno]; // not so special
-    copyAnglesPerTriangle(f_orig_angle[fno],src->f_orig_angle[fno]); // not so special
-#define ELT(C,T,N) f_##N[fno] = src->f_##N[fno];
-    MRIS_MP__LIST_F_IN
-  if (!only_inputs) {
-    f_normSet[fno] = src->f_normSet[fno];
-    f_norm   [fno] = src->f_norm   [fno];
-    copyAnglesPerTriangle(f_angle[fno],src->f_angle[fno]); // not so special
-    MRIS_MP__LIST_F_OUT 
-  }
+#define ELTX(C,T,N) ELT(C,T,N)
+#define ELT(C,T,N) dst->f_##N = src->f_##N;
+  MRIS_MP__LIST_F_IN 
 #undef ELT
 #undef ELTX
 #undef SEP
+
+#ifdef MRIS_MP__LIST_F_IN_OUT
+  move test inside the loop when there are MRIS_MP__LIST_F_OUT to process
+#endif
+  if (!only_inputs) {
+    int fno;
+    for (fno = 0; fno < dst->nfaces; fno++) {
+#define SEP
+#define ELTX(C,T,N) // these are the special cases dealt with here
+#define ELT(C,T,N) f_##N[fno] = src->f_##N[fno];
+      f_normSet[fno] = src->f_normSet[fno];
+      f_norm   [fno] = src->f_norm   [fno];
+      copyAnglesPerTriangle(f_angle[fno],src->f_angle[fno]); // not so special
+      MRIS_MP__LIST_F_OUT 
+#undef ELT
+#undef ELTX
+#undef SEP
+    }
   }
 }
 
