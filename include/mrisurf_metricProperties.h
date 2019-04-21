@@ -145,11 +145,11 @@ int mriSurfaceRASToVoxel(double xr, double yr, double zr, double *xv, double *yv
 #endif
 
 float  mrisSampleAshburnerTriangleEnergy    (MRIS * const mris, int const vno, INTEGRATION_PARMS * const parms, float cx, float cy, float cz);
-double mrisComputeThicknessSmoothnessEnergy (MRIS *mris, double l_tsmooth, INTEGRATION_PARMS *parms);
-float  mrisSampleMinimizationEnergy         (MRIS *mris, VERTEX *v,        INTEGRATION_PARMS *parms, float cx, float cy, float cz);
-float  mrisSampleParallelEnergyAtVertex     (MRIS *mris, int const vno, INTEGRATION_PARMS *parms);
-float  mrisSampleParallelEnergy             (MRIS *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz);
-float  mrisSampleNormalEnergy               (MRIS *mris, VERTEX *v,     INTEGRATION_PARMS *parms, float cx, float cy, float cz);
+double mrisComputeThicknessSmoothnessEnergy (MRIS *mris, double l_tsmooth,  INTEGRATION_PARMS *parms);
+float  mrisSampleMinimizationEnergy         (MRIS *mris, int const vno,     INTEGRATION_PARMS *parms, float cx, float cy, float cz);
+float  mrisSampleParallelEnergyAtVertex     (MRIS *mris, int const vno,     INTEGRATION_PARMS *parms);
+float  mrisSampleParallelEnergy             (MRIS *mris, int const vno,     INTEGRATION_PARMS *parms, float cx, float cy, float cz);
+float  mrisSampleNormalEnergy               (MRIS *mris, int const vno,     INTEGRATION_PARMS *parms, float cx, float cy, float cz);
 float  mrisSampleSpringEnergy               (MRIS *mris, int const vno, float cx, float cy, float cz, INTEGRATION_PARMS *parms);
 
 int mrisComputeOrigNormal (MRIS *mris, int vno, float norm[]);
@@ -174,3 +174,23 @@ void computeDefectFaceNormal_calculate(
 #define VERTEX_EDGE(vec, v0, v1)           VECTOR_LOAD(vec, v1->x     - v0->x,     v1->y     - v0->y,     v1->z     - v0->z)
 #define VERTEX_ORIG_EDGE(vec, v0, v1)      VECTOR_LOAD(vec, v1->origx - v0->origx, v1->origy - v0->origy, v1->origz - v0->origz)
 #define VERTEX_CANONICAL_EDGE(vec, v0, v1) VECTOR_LOAD(vec, v1->cx    - v0->cx,    v1->cy    - v0->cy,    v1->cz    - v0->cz)
+
+
+void MRISMP_translate_along_vertex_dxdydz(MRIS_MP* mris_src, MRIS_MP* mris_dst, 
+    double dt,
+    float const* dx, float const* dy, float const* dz);               // the dx,dy,dz[vno] for ripped[vno] should be zero
+
+int MRISMP_sampleFaceCoordsCanonical(
+    MHT *mht, MRIS_MP *mris, float x, float y, float z, int which, float *px, float *py, float *pz);
+ 
+int mrismp_sampleFaceCoords_PIAL_VERTICES_CANONICAL_VERTICES(
+    MRIS_MP *mris, int fno, double x, double y, double z, float *px, float *py, float *pz);   
+    
+float mrismp_SampleMinimizationEnergy    (MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz);
+float mrismp_SampleNormalEnergy          (MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz);
+float mrismp_SampleSpringEnergy          (MRIS_MP *mris, int const vno, float cx, float cy, float cz, INTEGRATION_PARMS *parms);
+float mrismp_SampleParallelEnergyAtVertex(MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms);
+float mrismp_SampleParallelEnergy        (MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz);
+    
+void MRISMP_computeMetricProperties(MRIS_MP* mris);
+void MRISMP_updateEllipsoidSurface(MRIS_MP* mris);

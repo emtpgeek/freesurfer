@@ -1,4 +1,5 @@
 #pragma once
+
 /**
  * @file  mrishash.h
  * @brief Implements a hash table mechanism to speed comparing vertices
@@ -32,8 +33,6 @@
 // define the following to get a single inclusion of non-renamed functions
 #define MRISHASH_VANILLA_FUNCS
 
-
-//--------------------------
 
 // Ad hoc test functions
 int MHT_gw_version(void);  // version of that unit
@@ -140,8 +139,8 @@ int MHTcheckSurface(MRIS const *mris,MRIS_HASH_TABLE *mht);
 //------------------------------------------------
 // utilities for finding closest face
 //------------------------------------------------
-int MHTfindClosestFaceGeneric(MRIS_HASH_TABLE *mht, 
-                              MRIS const *mris,
+int MHTfindClosestFaceGeneric2(MRIS_HASH_TABLE *mht, 
+                              MRISBaseConst mris,
                               //---------- inputs --------------
                               double probex, double probey, double probez,
                               // How far to search: set one or both
@@ -151,9 +150,12 @@ int MHTfindClosestFaceGeneric(MRIS_HASH_TABLE *mht,
                               // only faces that projection is interior to (Use -1 to ignore )
                               int    project_into_face, 
                               //---------- outputs -------------
-                              FACE **pface, 
                               int *pfno, 
                               double *pface_distance);
+                              
+
+int MHTfindClosestFaceGeneric(
+  MRIS_HASH_TABLE *p1, MRIS const *mris, double p3, double p4, double p5, double p6, int p7, int p8, FACE **pface, int *pfno, double *p11);
                               
 int mhtBruteForceClosestFace(MRIS const *mris, 
                              float x, float y, float z, 
@@ -166,4 +168,3 @@ int mhtBruteForceClosestFace(MRIS const *mris,
 
 void MHT_maybeParallel_begin();     // Note: Can be nested!
 void MHT_maybeParallel_end();
-

@@ -12,392 +12,6 @@
 // There is a lot of overlap between these two functions that needs to be rationalized
 
 
-// Just the information needed to compute the metric properties
-//
-typedef struct MRIS_MP {
-
-  // ATH - temporarily adding this constructor to avoid the 'uninitialized const member' errors in g++ > 4
-  MRIS_MP() :
-    status(MRIS_Status__end),
-    origxyz_status(MRIS_Status__end),
-    nvertices(0),
-    nfaces(0),
-    nsize(0),
-    radius(0),
-    vertices_topology(0),
-    faces_topology(0)
-    {};
-
-#define SEP
-#define ELTX(C,T,N) ELT(C,T,N)
-
-    MRIS* underlyingMRIS;  // allows access in a few rare cases where there is a real benefit 
-    
-  // MRIS
-  //
-  // In
-  //
-#define ELT(C,T,N) T C N;
-
-  #define MRIS_MP__LIST_MRIS_IN \
-    ELT(const,  MRIS_Status, status         ) SEP \
-    ELT(const,  MRIS_Status, origxyz_status ) SEP \
-    ELT(const,  int,         nvertices      ) SEP \
-    ELT(const,  int,         nfaces         ) SEP \
-    ELT(const,  int,         nsize          ) SEP \
-    ELT(const,  double,      radius         ) SEP \
-    ELT(const,  VERTEX_TOPOLOGY const *, vertices_topology) \
-    ELTX(const, FACE_TOPOLOGY   const *, faces_topology)
-
-    MRIS_MP__LIST_MRIS_IN
-    
-  // In out
-  #define MRIS_MP__LIST_MRIS_IN_OUT \
-    ELT(,       int,     dist_nsize  ) \
-
-    MRIS_MP__LIST_MRIS_IN_OUT
-  
-  // Out
-  #define MRIS_MP__LIST_MRIS_OUT \
-    ELT(,       float,   xlo        ) SEP   \
-    ELT(,       float,   xhi        ) SEP   \
-    ELT(,       float,   ylo        ) SEP   \
-    ELT(,       float,   yhi        ) SEP   \
-    ELT(,       float,   zlo        ) SEP   \
-    ELT(,       float,   zhi        ) SEP   \
-    ELT(,       float,   xctr       ) SEP   \
-    ELT(,       float,   yctr       ) SEP   \
-    ELT(,       float,   zctr       ) SEP   \
-    ELT(,       float,   total_area ) SEP   \
-    ELT(,       double,  avg_vertex_area ) SEP   \
-    ELTX(,      double,  avg_vertex_dist ) SEP   \
-    ELT(,       double,  std_vertex_dist ) SEP   \
-    ELT(,       float,   neg_orig_area   ) SEP   \
-    ELT(,       float,   neg_area        ) 
-
-    MRIS_MP__LIST_MRIS_OUT
-
-#undef ELT
-
-  // Vertices
-  //
-#define ELT(C,T,N) C T * v_##N;
-
-  // In
-  #define MRIS_MP__LIST_V_IN                \
-    ELT(const,  char,   ripflag     ) SEP   \
-    ELTX(const, int,    VSize       )
-    
-    MRIS_MP__LIST_V_IN
-
-  // In out
-  #define MRIS_MP__LIST_V_IN_OUT            \
-    ELTX(,      int,    dist_capacity) SEP  \
-    ELT(,       char,   border      ) SEP   \
-    ELT(,       float,  x           ) SEP   \
-    ELT(,       float,  y           ) SEP   \
-    ELT(,       float,  z           ) SEP   \
-    ELT(,       float,  origarea    ) 
-  
-    MRIS_MP__LIST_V_IN_OUT
-    
-  // Out
-  #define MRIS_MP__LIST_V_OUT               \
-    ELT(,       float,  area        ) SEP   \
-    ELT(,       float,  nx          ) SEP   \
-    ELT(,       float,  ny          ) SEP   \
-    ELT(,       float,  nz          ) SEP   \
-    ELTX(,      char,   neg         ) SEP   \
-    ELTX(,      float*, dist        )
-
-    MRIS_MP__LIST_V_OUT
-
-#undef ELT
-
-  // Faces
-  //
-#define ELT(C,T,N) C T * f_##N;
-  #define MRIS_MP__LIST_F_IN                                    \
-    ELT(const,  char,                   ripflag         ) SEP   \
-    ELTX(const, float,                  norm_orig_area  )
-    
-    MRIS_MP__LIST_F_IN
-
-  #define MRIS_MP__LIST_F_OUT                                   \
-    ELT(,       float,                  area            ) SEP   \
-    ELTX(,      char,                   normSet         ) SEP   \
-    ELTX(,      FloatXYZ,               norm            ) SEP   \
-    ELTX(,      angles_per_triangle_t,  angle)
-
-    MRIS_MP__LIST_F_OUT
-    
-#undef ELT
-
-#undef ELTX
-#undef SEP
-
-} MRIS_MP;
-
-static void MRISMP_ctr(MRIS_MP* mp) {
-  bzero(mp, sizeof(*mp));
-}
-
-static void MRISMP_dtr(MRIS_MP* mp) {
-  // Faces
-  //
-#define SEP
-#define ELTX(C,T,N) ELT(C,T,N)
-#define ELT(C,T,N) freeAndNULL(mp->f_##N);
-  MRIS_MP__LIST_F_IN SEP MRIS_MP__LIST_F_OUT
-#undef ELT
-#undef ELTX
-#undef SEP
-
-  // Vertices
-  //
-  if (mp->v_dist) {
-    int vno;
-    for (vno = 0; vno < mp->nvertices; vno++) {
-      freeAndNULL(mp->v_dist[vno]);
-    }
-  }
-    
-#define SEP
-#define ELTX(C,T,N) ELT(C,T,N)
-#define ELT(C,T,N) freeAndNULL(mp->v_##N);
-  MRIS_MP__LIST_V_IN SEP MRIS_MP__LIST_V_IN_OUT SEP MRIS_MP__LIST_V_OUT
-#undef ELT
-#undef ELTX
-#undef SEP
-
-  // MRIS
-  //
-  {
-    // hack because mrisurf doesn't have a FACE_TOPOLOGY yet
-    // When fixing, fix the dtr also!
-    //
-    free((void*)mp->faces_topology);
-    *(FACE_TOPOLOGY**)(&mp->faces_topology) = NULL;
-  }
-
-  bzero(mp, sizeof(*mp));
-}
-
-static void MRISMP_load(MRIS* mris, MRIS_MP* mp) {
-  MRISMP_dtr(mp);
-  MRISMP_ctr(mp);
-
-  mp->underlyingMRIS = mris;
-
-  // MRIS
-  //
-#define SEP
-#define ELTX(C,T,N)
-  {
-    // hack because mrisurf doesn't have a FACE_TOPOLOGY yet
-    // When fixing, fix the dtr also!
-    //
-    FACE_TOPOLOGY* ft = (FACE_TOPOLOGY*)malloc(mris->nfaces * sizeof(FACE_TOPOLOGY));
-    cheapAssert(sizeof(ft->v) == sizeof(mris->faces[0].v));
-    int i;
-    for (i = 0; i < mris->nfaces; i++) memcpy(ft[i].v, mris->faces[i].v, sizeof(ft->v));
-    *(FACE_TOPOLOGY**)(&mp->faces_topology) = ft;
-  }
-
-#define ELT(C,T,N) *(T*)&(mp->N) = mris->N;                   // support initializing the const members
-  MRIS_MP__LIST_MRIS_IN SEP MRIS_MP__LIST_MRIS_IN_OUT
-#undef ELT
-#undef ELTX
-#undef SEP
-
-  // Vertices
-  //
-#define SEP
-#define ELTX(C,T,N) ELT(C,T,N)
-#define ELT(C,T,N) T* v_##N = (T*)malloc(mris->nvertices*sizeof(T)); mp->v_##N = v_##N;
-  MRIS_MP__LIST_V_IN SEP MRIS_MP__LIST_V_IN_OUT SEP MRIS_MP__LIST_V_OUT
-#undef ELT
-#undef ELTX
-#undef SEP
-
-  if (mris->status != MRIS_PLANE) { freeAndNULL(mp->v_neg); v_neg = NULL; }
-
-  int vno;
-  for (vno = 0; vno < mris->nvertices; vno++) {
-    VERTEX const * const v = &mris->vertices[vno];
-#define SEP
-#define ELTX(C,T,N) // these are the special cases dealt with here
-    v_dist_capacity[vno] = v->dist_capacity;
-    v_VSize[vno] = mrisVertexVSize(mris, vno);
-    if (v_neg) v_neg[vno] = v->neg;
-    v_dist[vno] = NULL;
-#define ELT(C,T,N) v_##N[vno] = v->N;
-    MRIS_MP__LIST_V_IN SEP MRIS_MP__LIST_V_IN_OUT
-#undef ELT
-#undef ELTX
-#undef SEP
-  }
-    
-  // Faces
-  //
-#define SEP
-#define ELTX(C,T,N) ELT(C,T,N)
-#define ELT(C,T,N) T* f_##N = (T*)malloc(mris->nfaces*sizeof(T)); mp->f_##N = f_##N;
-  MRIS_MP__LIST_F_IN SEP MRIS_MP__LIST_F_OUT
-#undef ELT
-#undef ELTX
-#undef SEP
-
-  int fno;
-  for (fno = 0; fno < mris->nfaces; fno++) {
-    FACE const * const f = &mris->faces[fno];
-    FaceNormCacheEntry const * const fNorm = getFaceNorm(mris, fno);
-#define SEP
-#define ELTX(C,T,N) // these are the special cases dealt with here
-    f_norm_orig_area[fno] = fNorm->orig_area;
-#define ELT(C,T,N) f_##N[fno] = f->N;
-    MRIS_MP__LIST_F_IN
-#undef ELT
-#undef ELTX
-#undef SEP
-  }
-}
-
-
-#define comparison(NO,LHS,RHS) { comparisonWkr((NO), (LHS), (RHS), #LHS, __LINE__, &errorCount); }
-static void comparisonWkr(int vnoOrFno, double lhs, double rhs, const char* expr, int line, int* errorCount) {
-  if (lhs == rhs) {
-    // if (vnoOrFno < 1) fprintf(stdout, "%d %s matches\n", vnoOrFno,expr);
-    return;
-  }
-  if ((*errorCount)++ > 10) return;
-  
-  fprintf(stdout, "no:%d  %s  %f != %f  during count_MRIScomputeMetricProperties_calls:%d\n", 
-    vnoOrFno,expr,lhs,rhs,count_MRIScomputeMetricProperties_calls);
-    
-  static int count;
-  count++;
-  if (count == 1) fprintf(stdout, "b %s:%d  needed\n",__FILE__,__LINE__);
-}
-
-static void MRISMP_unload(MRIS* mris, MRIS_MP* mp, bool check) {
-  int errorCount = 0;
-  
-  // MRIS
-  //
-#define SEP
-#define ELTX(C,T,N)
-  if (check) {
-    // hack because mrisurf doesn't have a FACE_TOPOLOGY yet
-    // When fixing, fix the dtr also!
-    //
-    FACE_TOPOLOGY const * ft = mp->faces_topology;
-    int fno;
-    for (fno = 0; fno < mris->nfaces; fno++) {
-      comparison(fno, 0, memcmp(ft[fno].v, mris->faces[fno].v, sizeof(ft->v)));
-    }
-    comparison(-1, mris->avg_vertex_dist, mp->avg_vertex_dist);
-  } else {
-    mrisSetAvgInterVertexDist(mris, mp->avg_vertex_dist);
-  }
-  
-#define ELT(C,T,N) comparison(-1, 1, mris->N==mp->N);
-  MRIS_MP__LIST_MRIS_IN 
-#undef ELT
-#define ELT(C,T,N) if (check) comparison(-1,mris->N,mp->N) else mris->N = mp->N;
-  MRIS_MP__LIST_MRIS_IN_OUT SEP MRIS_MP__LIST_MRIS_OUT
-#undef ELT
-#undef ELTX
-#undef SEP
-
-  // Vertices
-  //
-  errorCount = 0;
-  int vno;
-  for (vno = 0; vno < mris->nvertices; vno++) {
-    VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
-    VERTEX                * const v  = &mris->vertices         [vno];
-    if (mp->v_ripflag[vno] && v->ripflag) continue;
-#define SEP
-#define ELTX(C,T,N) // these are the special cases dealt with here
-    if (mp->v_neg) { if (check) comparison(vno,v->neg,mp->v_neg[vno]) else v->neg = mp->v_neg[vno]; }
-    if (mp->v_dist[vno]) {
-      if (!check) {                                                         // this requires that the dist capacity match, not just the vtotal
-        mrisSetDist(mris,vno,mp->v_dist[vno],mp->v_dist_capacity[vno]);     // why assign and free when you can just move?
-        mp->v_dist[vno] = NULL;
-      } else {
-      
-        if (!check && !v->dist) 
-            MRISmakeDist(mris,vno);
-        
-        float* const mp_dist = mp->v_dist[vno];
-        float* const mris_dist = v->dist;
-        
-        int const vtotal = vt->vtotal;
-        cheapAssert(vtotal <= v->dist_capacity);
-
-        int n;
-        for (n = 0; n < vtotal; n++) {
-          if (check) comparison(vno,mris_dist[n],mp_dist[n]) else mris_dist[n] = mp_dist[n];
-        }
-      }
-    }
-    comparison(vno,v->dist_capacity,mp->v_dist_capacity[vno])   // must be after MRISmakeDist or mrisSetDist
-#define ELT(C,T,N) comparison(vno,v->N,mp->v_##N[vno]);
-    MRIS_MP__LIST_V_IN
-#undef ELT
-#define ELT(C,T,N) if (check) comparison(vno,v->N,mp->v_##N[vno]) else v->N = mp->v_##N[vno];
-    MRIS_MP__LIST_V_IN_OUT SEP MRIS_MP__LIST_V_OUT
-#undef ELT
-#undef ELTX
-#undef SEP
-  }
-    
-  // Faces
-  //
-  errorCount = 0;
-  int fno;
-  for (fno = 0; fno < mris->nfaces; fno++) {
-    FACE * const f = &mris->faces[fno];
-    if (mp->f_ripflag[fno] && mris->faces[fno].ripflag) continue;
-    FaceNormCacheEntry const * const fNorm = getFaceNorm(mris, fno);
-#define SEP
-#define ELTX(C,T,N) // these are the special cases dealt with here
-    if (check) comparison(fno,fNorm->orig_area,mp->f_norm_orig_area[fno]) else setFaceOrigArea(mris, fno, mp->f_norm_orig_area[fno]);
-    if (mp->f_normSet[fno]) { 
-      FloatXYZ* fn = &mp->f_norm[fno]; 
-      if (!check) {
-        setFaceNorm(mris, fno,  fn->x,fn->y,fn->z);
-      } else {
-        comparison(fno,fNorm->nx,fn->x);
-        comparison(fno,fNorm->ny,fn->y);
-        comparison(fno,fNorm->nz,fn->z);
-      }
-    }
-#define ELT(C,T,N) if (check) comparison(fno,f->N,mp->f_##N[fno]);
-    MRIS_MP__LIST_F_IN
-#undef ELT
-#define ELT(C,T,N) if (check) comparison(fno,f->N,mp->f_##N[fno]) else f->N = mp->f_##N[fno];
-    MRIS_MP__LIST_F_OUT
-#undef ELT
-#undef ELTX
-#undef SEP
-  }
-}
-
-#undef comparison
-
-
-static void MRISMP_makeDist(MRIS_MP* mp, int vno) {
-  int capacity = mp->v_dist_capacity[vno];
-  int vSize    = mp->v_VSize[vno];
-  if (capacity < vSize) capacity = vSize;
-  mp->v_dist         [vno] = mrisStealDistStore(mp->underlyingMRIS, vno, capacity);
-  mp->v_dist_capacity[vno] = capacity;
-}
-
-//
-//
 // These should become invalid when XYZ are changed - NYI
 //
 static void MRISMP_computeSurfaceDimensions(MRIS_MP* mris)
@@ -1003,7 +617,7 @@ static void mrismp_OrientEllipsoid(MRIS_MP *mris)
 
 
 
-static void MRISMP_updateEllipsoidSurface(MRIS_MP* mris)
+void MRISMP_updateEllipsoidSurface(MRIS_MP* mris)
 {
   if (mris->status != MRIS_UNORIENTED_SPHERE) {
     mrismp_OrientEllipsoid(mris); /* orient the normals and angles */
@@ -1102,7 +716,7 @@ int mrismp_OrientSurface(MRIS_MP *mris)
 }
 
 
-static void MRISMP_computeMetricProperties(MRIS_MP* mris) {
+void MRISMP_computeMetricProperties(MRIS_MP* mris) {
   // fprintf(stdout,"%s:%d %s\n",__FILE__,__LINE__,__MYFUNCTION__);
 
   MRISMP_computeNormals(mris, false);           // changes XYZ
@@ -1122,4 +736,291 @@ static void MRISMP_computeMetricProperties(MRIS_MP* mris) {
   }
 }
 
+
+float mrismp_SampleMinimizationEnergy(
+    MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
+{
+  project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
+  float const xw = mris->v_whitex[vno], yw = mris->v_whitey[vno], zw = mris->v_whitez[vno];
+
+  float xp, yp, zp;
+  MRISMP_sampleFaceCoordsCanonical((MHT *)(parms->mht), mris, cx, cy, cz, PIAL_VERTICES, &xp, &yp, &zp);
+
+  float dx = xp - xw;
+  float dy = yp - yw;
+  float dz = zp - zw;
+  float thick_sq = dx * dx + dy * dy + dz * dz;
+
+  return (thick_sq);
+}
+
+float mrismp_SampleNormalEnergy(
+    MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
+{
+  if (vno == Gdiag_no) DiagBreak();
+
+  project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
+  float 
+    xw = mris->v_whitex[vno], 
+    yw = mris->v_whitey[vno], 
+    zw = mris->v_whitez[vno];
+  // MRISvertexCoord2XYZ_float(v, WHITE_VERTICES, &xw, &yw, &zw);
+  
+  float xp, yp, zp;
+  MRISMP_sampleFaceCoordsCanonical((MHT *)(parms->mht), mris, cx, cy, cz, PIAL_VERTICES, &xp, &yp, &zp);
+
+  float dx = xp - xw;
+  float dy = yp - yw;
+  float dz = zp - zw;
+  float len = sqrt(dx * dx + dy * dy + dz * dz);    // This should have been double precision * and +.  Changing will affect results
+  if (len < 0.01)  // can't reliably estimate normal. Probably not in cortex
+  {
+    return (0.0);
+  }
+  float
+    wnx = mris->v_wnx[vno],
+    wny = mris->v_wny[vno],
+    wnz = mris->v_wnz[vno];
+  dx /= len;
+  dy /= len;
+  dz /= len;
+  len = dx * wnx + dy * wny + dz * wnz;  // dot product
+  len = 1 - len;
+  double sse = sqrt(len * len);
+  //  sse = SQR(dx-v->wnx) + SQR(dy-v->wny) + SQR(dz-v->wnz) ;
+
+  float pnx, pny, pnz;
+  MRISMP_sampleFaceCoordsCanonical((MHT *)(parms->mht), mris, cx, cy, cz, PIAL_NORMALS, &pnx, &pny, &pnz);
+  len = sqrt(pnx * pnx + pny * pny + pnz * pnz);
+  if (len < 0.01)  // can't reliably estimate normal. Probably not in cortex
+    return (0.0);
+  pnx /= len;
+  pny /= len;
+  pnz /= len;
+  len = dx * pnx + dy * pny + dz * pnz;  // dot product
+  len = 1 - len;
+  sse += sqrt(len * len);
+  //  sse += SQR(dx-pnx) + SQR(dy-pny) + SQR(dz-pnz) ;
+
+  if (!devFinite(sse)) DiagBreak();
+
+  return (sse);
+}
+
+float mrismp_SampleSpringEnergy(
+    MRIS_MP *mris, int const vno, float cx, float cy, float cz, INTEGRATION_PARMS *parms)
+{
+  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+  project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
+
+  MHT * const mht = (MHT *)(parms->mht);
+
+  double fdist;
+  int fno;
+  MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), cx, cy, cz, 4, 4, 1, &fno, &fdist);
+  if (fno < 0) MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), cx, cy, cz, 1000, -1, -1, &fno, &fdist);
+
+  float xp, yp, zp;
+  mrismp_sampleFaceCoords_PIAL_VERTICES_CANONICAL_VERTICES(mris, fno, cx, cy, cz, &xp, &yp, &zp);
+
+  float xc = 0.0f, yc = 0.0f, zc = 0.0f;
+  int num = 0;
+  int n;
+  for (n = 0; n < vt->vnum; n++) {
+    int const vno2 = vt->v[n];
+    if (mris->v_ripflag[vno2]) continue;
+    float
+      vnx = mris->v_x[vno2],
+      vny = mris->v_y[vno2],
+      vnz = mris->v_z[vno2];
+    float xn, yn, zn;
+    mrismp_sampleFaceCoords_PIAL_VERTICES_CANONICAL_VERTICES(mris, mris->v_assigned_fno[vno2], vnx, vny, vnz, &xn, &yn, &zn);
+
+    xc += xn;
+    yc += yn;
+    zc += zn;
+    num++;
+  }
+
+  if (num > 0) {
+    xc /= num;
+    yc /= num;
+    zc /= num;
+  }
+
+  double vdist = mris->avg_vertex_dist;
+  if (!vdist) vdist = 1.0;
+
+  double sse = (SQR(xc - xp) + SQR(yc - yp) + SQR(zc - zp)) / vdist;
+
+  if (!devFinite(sse)) DiagBreak();
+
+  return (sse);
+}
+
+static bool mrismp_SampleParallelEnergyAtVertex_oneVertex_alternateXYZ(
+  MRIS_MP *mris, INTEGRATION_PARMS *parms, 
+  int const vno, 
+  int const moved_vno, float const moved_x, float const moved_y, float const moved_z, int moved_assigned_fno,
+  float* pdx, float* pdy, float* pdz)
+{
+  float const
+    x = (vno == moved_vno) ? moved_x : mris->v_x[vno], 
+    y = (vno == moved_vno) ? moved_y : mris->v_y[vno], 
+    z = (vno == moved_vno) ? moved_z : mris->v_z[vno];
+
+  float const
+    xw = mris->v_whitex[vno], yw = mris->v_whitey[vno], zw = mris->v_whitez[vno];
+
+  int const 
+    assigned_fno = (vno == moved_vno) ? moved_assigned_fno : mris->v_assigned_fno[vno];
+    
+  float xp, yp, zp;
+  if (assigned_fno >= 0) {
+    mrismp_sampleFaceCoords_PIAL_VERTICES_CANONICAL_VERTICES(mris, assigned_fno, x, y, z, &xp, &yp, &zp);
+  } else {
+    MRISMP_sampleFaceCoordsCanonical((MHT *)(parms->mht), mris, x, y, z, PIAL_VERTICES, &xp, &yp, &zp);
+  }
+
+  float dx = xp - xw;
+  float dy = yp - yw;
+  float dz = zp - zw;
+  float len = sqrt(dx * dx + dy * dy + dz * dz);
+  if (FZERO(len)) return false;
+
+  *pdx = dx/len;
+  *pdy = dy/len;
+  *pdz = dz/len;
+  
+  return true;
+}
+
+static float mrismp_SampleParallelEnergyAtVertex_alternateXYZ(
+  MRIS_MP *mris, int const vno, 
+  int const moved_vno, float const moved_x, float const moved_y, float const moved_z, int moved_assigned_fno,
+  INTEGRATION_PARMS *parms)
+{
+  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+
+  float dx, dy, dz;
+  if (!mrismp_SampleParallelEnergyAtVertex_oneVertex_alternateXYZ(mris, parms, vno, moved_vno,moved_x,moved_y,moved_z,moved_assigned_fno, &dx, &dy, &dz)) return 0.0f;
+
+  // compute average of neighboring vectors connecting white and pial surface, store it in d[xyz]n_total
+  //
+  float dxn_total = 0.0f, dyn_total = 0.0f, dzn_total = 0.0f;
+  double sse = 0.0;
+  int num = 0;
+  int n;
+  for (n = 0; n < vt->vnum; n++) {
+    int const vno2 = vt->v[n];
+    if (mris->v_ripflag[vno2]) continue;
+
+    float dxn, dyn, dzn;
+    if (!mrismp_SampleParallelEnergyAtVertex_oneVertex_alternateXYZ(mris, parms, vno2, moved_vno,moved_x,moved_y,moved_z,moved_assigned_fno, &dxn, &dyn, &dzn)) continue;
+    
+    dxn_total += dxn;
+    dyn_total += dyn;
+    dzn_total += dzn;
+    
+#if 0
+    sse += SQR(dxn-dx) + SQR(dyn-dy) + SQR(dzn-dz) ;
+#else
+    float len = dx * dxn + dy * dyn + dz * dzn;  // dot product
+    len = 1 - len;
+    sse += sqrt(len * len);
+#endif
+
+    num++;
+  }
+
+#if 0
+  float len = sqrt(dxn_total*dxn_total + dyn_total*dyn_total + dzn_total*dzn_total) ;
+  if (len > 0)
+  {
+    dxn_total /= len ; dyn_total /= len ; dzn_total /= len ;
+    sse = SQR(dxn_total-dx) + SQR(dyn_total-dy) + SQR(dzn_total-dz) ;
+    //    sse /= num ;
+  }
+#else
+  if (num > 0) sse /= num;
+#endif
+
+  return (sse);
+}
+
+float mrismp_SampleParallelEnergyAtVertex(MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms) {
+  return mrismp_SampleParallelEnergyAtVertex_alternateXYZ(mris, vno, -1,0.0f,0.0f,0.0f,-1, parms);
+}
+
+float mrismp_SampleParallelEnergy(
+  MRIS_MP *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
+{
+  MHT* const mht = (MHT *)(parms->mht);
+
+  project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
+
+  VERTEX_TOPOLOGY const * const vt = &mris->vertices_topology[vno];
+
+  int assigned_fno;
+  double fdist;
+  MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), cx, cy, cz, 4, 4, 1, &assigned_fno, &fdist);
+  if (assigned_fno < 0) {
+    MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), cx, cy, cz, 1000, -1, -1, &assigned_fno, &fdist);
+  }
+
+  double sse = mrismp_SampleParallelEnergyAtVertex_alternateXYZ(mris, vno, vno,cx,cy,cz,assigned_fno, parms);
+
+#if 1
+  int num = 1;
+  int n;
+  for (num = 1, n = 0; n < vt->vnum; n++) {
+    int const vno2 = vt->v[n];
+    if (mris->v_ripflag[vno2]) continue;
+
+    sse += mrismp_SampleParallelEnergyAtVertex_alternateXYZ(mris, vno2, vno,cx,cy,cz,assigned_fno, parms);
+    num++;
+  }
+  sse /= (num);
+#endif
+
+  return (sse);
+}
+
+
+int MRISMP_sampleFaceCoordsCanonical(
+    MHT *mht, MRIS_MP *mris, float x, float y, float z, int which, float *px, float *py, float *pz)
+{
+  double norm = sqrt(x * x + y * y + z * z);
+  if (!FEQUAL(norm, mris->radius))  // project point onto sphere
+  {
+    DiagBreak();
+    project_point_onto_sphere(x, y, z, mris->radius, &x, &y, &z);
+  }
+
+  double lambda[3], fdist;
+  int   fno;
+  MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), x, y, z, 8, 8, 1, &fno, &fdist);
+  if (fno < 0) {
+    DiagBreak();
+    MHTfindClosestFaceGeneric2(mht, MRISBaseConstCtr(mris,NULL), x, y, z, 1000, -1, -1, &fno, &fdist);
+    lambda[0] = lambda[1] = lambda[2] = 1.0 / 3.0;
+  }
+  else {
+    face_barycentric_coords2(MRISBaseConstCtr(mris,NULL), fno, CANONICAL_VERTICES, x, y, z, &lambda[0], &lambda[1], &lambda[2]);
+  }
+
+  FACE_TOPOLOGY const * const ft = &mris->faces_topology[fno];
+
+  *px = *py = *pz = 0;
+  int n;
+  for (n = 0; n < VERTICES_PER_FACE; n++) {
+    float xv, yv, zv;
+    MRISBase_getWhichXYZ(MRISBaseConstCtr(mris,NULL), ft->v[n], which, &xv, &yv, &zv);
+    *px += lambda[n] * xv;
+    *py += lambda[n] * yv;
+    *pz += lambda[n] * zv;
+  }
+
+  return NO_ERROR;
+}
 #undef COMPILING_MRIS_MP
