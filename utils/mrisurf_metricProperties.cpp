@@ -62,9 +62,9 @@ void MRISsetXYZwkr(MRIS *mris, int vno, float x, float y, float z, const char * 
 
 void MRISmemalignNFloats(size_t n, float** ppx, float** ppy, float** ppz) {
   // cache aligned to improve the performance of loops that use the vectors
-  if (ppx) posix_memalign((void**)ppx, 64, n*sizeof(float));
-  if (ppy) posix_memalign((void**)ppy, 64, n*sizeof(float));
-  if (ppz) posix_memalign((void**)ppz, 64, n*sizeof(float));
+  if (ppx) cheapAssert(0 == posix_memalign((void**)ppx, 64, n*sizeof(float)));
+  if (ppy) cheapAssert(0 == posix_memalign((void**)ppy, 64, n*sizeof(float)));
+  if (ppz) cheapAssert(0 == posix_memalign((void**)ppz, 64, n*sizeof(float)));
 }
 
 void MRISexportXYZ(MRIS *mris, float** ppx, float** ppy, float** ppz) {
@@ -672,7 +672,7 @@ MRIS* MRIStalairachTransform(MRIS* mris_src, MRIS* mris)
 }
 
 
-MRIS* MRISrotate(MRIS *mris_src, MRIS *mris_dst, float alpha, float beta, float gamma)
+MRIS* MRISrotate(MRIS* mris_src, MRIS* mris_dst, float alpha, float beta, float gamma)
 {
   if (!mris_dst) {
     mris_dst = MRISclone(mris_src);
@@ -2594,7 +2594,7 @@ int MRISnonmaxSuppress(MRIS *mris)
     x = v->x;
     y = v->y;
     z = v->z;
-    src = MRISPfunctionVal(mrisp, mris, x, y, z, 0);
+    src = MRISPfunctionVal(mrisp, mris->radius, x, y, z, 0);
 
     /* now compute gradient of template w.r.t. a change in vertex position */
 
@@ -2616,10 +2616,10 @@ int MRISnonmaxSuppress(MRIS *mris)
     vz = e2z * d_dist;
 
     /* compute gradient usnig blurred image */
-    up1 = MRISPfunctionVal(mrisp_blur, mris, x + ux, y + uy, z + uz, 0);
-    um1 = MRISPfunctionVal(mrisp_blur, mris, x - ux, y - uy, z - uz, 0);
-    vp1 = MRISPfunctionVal(mrisp_blur, mris, x + vx, y + vy, z + vz, 0);
-    vm1 = MRISPfunctionVal(mrisp_blur, mris, x - vx, y - vy, z - vz, 0);
+    up1 = MRISPfunctionVal(mrisp_blur, mris->radius, x + ux, y + uy, z + uz, 0);
+    um1 = MRISPfunctionVal(mrisp_blur, mris->radius, x - ux, y - uy, z - uz, 0);
+    vp1 = MRISPfunctionVal(mrisp_blur, mris->radius, x + vx, y + vy, z + vz, 0);
+    vm1 = MRISPfunctionVal(mrisp_blur, mris->radius, x - vx, y - vy, z - vz, 0);
     du = (up1 - um1) / (2 * d_dist);
     dv = (vp1 - vm1) / (2 * d_dist);
 
@@ -2638,8 +2638,8 @@ int MRISnonmaxSuppress(MRIS *mris)
       dy = dy / mag;
       dz = dz / mag;
     }
-    fp1 = MRISPfunctionVal(mrisp, mris, x + dx, y + dy, z + dz, 0);
-    fm1 = MRISPfunctionVal(mrisp, mris, x - dx, y - dy, z - dz, 0);
+    fp1 = MRISPfunctionVal(mrisp, mris->radius, x + dx, y + dy, z + dz, 0);
+    fm1 = MRISPfunctionVal(mrisp, mris->radius, x - dx, y - dy, z - dz, 0);
 
     if ((src >= fp1) && (src >= fm1)) /* local max */
     {
@@ -3003,7 +3003,7 @@ int MRISstoreMeanCurvature(MRIS *mris)
   ------------------------------------------------------*/
 int MRISstoreMetricProperties(MRIS *mris)
 {
-  int vno, nvertices, fno, ano, n;
+  int vno, nvertices, fno, n;
   FACE *f;
 
 #if 0
@@ -3037,9 +3037,7 @@ int MRISstoreMetricProperties(MRIS *mris)
       continue;
     }
     setFaceOrigArea(mris, fno, f->area);
-    for (ano = 0; ano < ANGLES_PER_TRIANGLE; ano++) {
-      f->orig_angle[ano] = f->angle[ano];
-    }
+    copyAnglesPerTriangle(f->orig_angle,f->angle);
   }
   mris->orig_area = mris->total_area;
   return (NO_ERROR);
@@ -3054,7 +3052,7 @@ int MRISstoreMetricProperties(MRIS *mris)
   ------------------------------------------------------*/
 int MRISrestoreMetricProperties(MRIS *mris)
 {
-  int vno, nvertices, fno, ano, n;
+  int vno, nvertices, fno, n;
   FACE *f;
 
   nvertices = mris->nvertices;
@@ -3075,9 +3073,7 @@ int MRISrestoreMetricProperties(MRIS *mris)
       continue;
     }
     f->area = getFaceOrigArea(mris, fno);
-    for (ano = 0; ano < ANGLES_PER_TRIANGLE; ano++) {
-      f->angle[ano] = f->orig_angle[ano];
-    }
+    copyAnglesPerTriangle(f->angle,f->orig_angle);
   }
   mris->total_area = mris->orig_area;
   return (NO_ERROR);
@@ -3695,7 +3691,7 @@ int MRIScomputeCanonicalCoordinates(MRIS *mris)
   return (NO_ERROR);
 }
 
-int MRISvertexCoord2XYZ_float(VERTEX const *v, int which, float *x, float *y, float *z)
+int MRISvertexCoord2XYZ_float(VERTEX const * const v, int const which, float * const x, float * const y, float * const z)
 {
   switch (which) {
     case ORIGINAL_VERTICES:
@@ -3766,7 +3762,7 @@ int MRISvertexCoord2XYZ_float(VERTEX const *v, int which, float *x, float *y, fl
   return (NO_ERROR);
 }
 
-int MRISvertexCoord2XYZ_double(VERTEX const *v, int which, double *x, double *y, double *z)
+int MRISvertexCoord2XYZ_double(VERTEX const * const v, int const which, double * const x, double * const y, double * const z)
 {
   switch (which) {
     default:

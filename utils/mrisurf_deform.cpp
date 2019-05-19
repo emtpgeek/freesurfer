@@ -19,6 +19,8 @@
  *
  */
 #include "mrisurf_deform.h"
+#include "mrisurf_project.h"
+#include "mrisurf_sseTerms.h"
 #include "mrisurf_io.h"
 
 
@@ -2890,8 +2892,8 @@ int mrisComputeCorrelationTerm(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
 #else
     src = v->curv;
 #endif
-    target = MRISPfunctionVal(parms->mrisp_template, mris, x, y, z, parms->frame_no);
-    std = MRISPfunctionVal(parms->mrisp_template, mris, x, y, z, parms->frame_no + 1);
+    target = MRISPfunctionVal(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no);
+    std    = MRISPfunctionVal(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no + 1);
     std = sqrt(std);
     if (FZERO(std)) {
       std = DEFAULT_STD /*FSMALL*/;
@@ -2932,10 +2934,10 @@ int mrisComputeCorrelationTerm(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
 #endif
 
     /* compute target term */
-    up1 = MRISPfunctionVal(parms->mrisp_template, mris, x + ux, y + uy, z + uz, fno);
-    um1 = MRISPfunctionVal(parms->mrisp_template, mris, x - ux, y - uy, z - uz, fno);
-    vp1 = MRISPfunctionVal(parms->mrisp_template, mris, x + vx, y + vy, z + vz, fno);
-    vm1 = MRISPfunctionVal(parms->mrisp_template, mris, x - vx, y - vy, z - vz, fno);
+    up1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x + ux, y + uy, z + uz, fno);
+    um1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x - ux, y - uy, z - uz, fno);
+    vp1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x + vx, y + vy, z + vz, fno);
+    vm1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x - vx, y - vy, z - vz, fno);
     du = (up1 - um1) / (2 * d_dist);
     dv = (vp1 - vm1) / (2 * d_dist);
     v->dx -= coef * (du * e1x + dv * e2x);
@@ -3255,8 +3257,8 @@ int mrisComputePolarCorrelationTerm(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
 #else
     src = v->curv;
 #endif
-    target = MRISPfunctionVal(parms->mrisp_template, mris, x, y, z, parms->frame_no);
-    std = MRISPfunctionVal(parms->mrisp_template, mris, x, y, z, parms->frame_no + 1);
+    target = MRISPfunctionVal(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no);
+    std    = MRISPfunctionVal(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no + 1);
     std = sqrt(std);
     if (FZERO(std)) {
       std = DEFAULT_STD /*FSMALL*/;
@@ -3278,24 +3280,24 @@ int mrisComputePolarCorrelationTerm(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
     dx = y * D_ANGLE;
     dy = -x * D_ANGLE;
     dz = 0;
-    am1 = MRISPfunctionVal(parms->mrisp_template, mris, x - dx, y - dy, z - dz, 0);
-    ap1 = MRISPfunctionVal(parms->mrisp_template, mris, x + dx, y + dy, z + dz, 0);
+    am1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x - dx, y - dy, z - dz, 0);
+    ap1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x + dx, y + dy, z + dz, 0);
     da = (ap1 - am1) / (2 * D_ANGLE);
 
     /* compute beta term - differential rotation around y axis */
     dx = -z * D_ANGLE;
     dy = 0;
     dz = x * D_ANGLE;
-    bm1 = MRISPfunctionVal(parms->mrisp_template, mris, x - dx, y - dy, z - dz, 0);
-    bp1 = MRISPfunctionVal(parms->mrisp_template, mris, x + dx, y + dy, z + dz, 0);
+    bm1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x - dx, y - dy, z - dz, 0);
+    bp1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x + dx, y + dy, z + dz, 0);
     db = (bp1 - bm1) / (2 * D_ANGLE);
 
     /* compute gamma term - differential rotation around x axis */
     dx = 0;
     dy = -z * D_ANGLE;
     dz = y * D_ANGLE;
-    gm1 = MRISPfunctionVal(parms->mrisp_template, mris, x - dx, y - dy, z - dz, 0);
-    gp1 = MRISPfunctionVal(parms->mrisp_template, mris, x + dx, y + dy, z + dz, 0);
+    gm1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x - dx, y - dy, z - dz, 0);
+    gp1 = MRISPfunctionVal(parms->mrisp_template, mris->radius, x + dx, y + dy, z + dz, 0);
     dg = (gp1 - gm1) / (2 * D_ANGLE);
 
     mris->gamma -= coef * dg; /* around x-axis */
@@ -4239,10 +4241,9 @@ int mrisComputeThicknessMinimizationTerm(MRI_SURFACE *mris, double l_thick_min, 
     
     float dE_de1, dE_de2, e1p, e1m, e2p, e2m;
     float e1x, e1y, e1z, e2x, e2y, e2z, norm, dx, dy, dz, E0, E1;
-    VERTEX *v;
     double d_dist = D_DIST * mris->avg_vertex_dist;
 
-    v = &mris->vertices[vno];
+    VERTEX * const v = &mris->vertices[vno];
     if (v->ripflag) ROMP_PF_continue;
 
     if (vno == Gdiag_no) DiagBreak();
@@ -4258,10 +4259,10 @@ int mrisComputeThicknessMinimizationTerm(MRI_SURFACE *mris, double l_thick_min, 
       sample the coordinate functions along the tangent plane axes and
       compute the derivates using them.
     */
-    e1p = mrisSampleMinimizationEnergy(mris, v, parms, v->x + d_dist * e1x, v->y + d_dist * e1y, v->z + d_dist * e1z);
-    e1m = mrisSampleMinimizationEnergy(mris, v, parms, v->x - d_dist * e1x, v->y - d_dist * e1y, v->z - d_dist * e1z);
-    e2p = mrisSampleMinimizationEnergy(mris, v, parms, v->x + d_dist * e2x, v->y + d_dist * e2y, v->z + d_dist * e2z);
-    e2m = mrisSampleMinimizationEnergy(mris, v, parms, v->x - d_dist * e2x, v->y - d_dist * e2y, v->z - d_dist * e2z);
+    e1p = mrisSampleMinimizationEnergy(mris, vno, parms, v->x + d_dist * e1x, v->y + d_dist * e1y, v->z + d_dist * e1z);
+    e1m = mrisSampleMinimizationEnergy(mris, vno, parms, v->x - d_dist * e1x, v->y - d_dist * e1y, v->z - d_dist * e1z);
+    e2p = mrisSampleMinimizationEnergy(mris, vno, parms, v->x + d_dist * e2x, v->y + d_dist * e2y, v->z + d_dist * e2z);
+    e2m = mrisSampleMinimizationEnergy(mris, vno, parms, v->x - d_dist * e2x, v->y - d_dist * e2y, v->z - d_dist * e2z);
     dE_de1 = (e1p - e1m) / (2 * d_dist);
     dE_de2 = (e2p - e2m) / (2 * d_dist);
 
@@ -4274,9 +4275,9 @@ int mrisComputeThicknessMinimizationTerm(MRI_SURFACE *mris, double l_thick_min, 
     dx = -l_thick_min * (dE_de1 * e1x + dE_de2 * e2x);
     dy = -l_thick_min * (dE_de1 * e1y + dE_de2 * e2y);
     dz = -l_thick_min * (dE_de1 * e1z + dE_de2 * e2z);
-    E0 = mrisSampleMinimizationEnergy(mris, v, parms, v->x, v->y, v->z);
+    E0 = mrisSampleMinimizationEnergy(mris, vno, parms, v->x, v->y, v->z);
     E1 = mrisSampleMinimizationEnergy(
-        mris, v, parms, v->x + parms->dt * dx, v->y + parms->dt * dy, v->z + parms->dt * dz);
+        mris, vno, parms, v->x + parms->dt * dx, v->y + parms->dt * dy, v->z + parms->dt * dz);
 
     if (E1 > E0) {
       double E2;
@@ -4286,7 +4287,7 @@ int mrisComputeThicknessMinimizationTerm(MRI_SURFACE *mris, double l_thick_min, 
         DiagBreak();
       }
       E2 = mrisSampleMinimizationEnergy(
-          mris, v, parms, v->x - parms->dt * dx, v->y - parms->dt * dy, v->z - parms->dt * dz);
+          mris, vno, parms, v->x - parms->dt * dx, v->y - parms->dt * dy, v->z - parms->dt * dz);
       if (E2 < E0) {
         dx *= -1;
         dy *= -1;
@@ -4455,10 +4456,9 @@ int mrisComputeThicknessNormalTerm(MRI_SURFACE *mris, double l_thick_normal, INT
     float dE_de1, dE_de2, e1p, e1m, e2p, e2m, cx, cy, cz;
     float E0, E1, dx, dy, dz;
     float e1x, e1y, e1z, e2x, e2y, e2z, norm;
-    VERTEX *v;
     double d_dist = D_DIST * mris->avg_vertex_dist;
 
-    v = &mris->vertices[vno];
+    VERTEX * const v = &mris->vertices[vno];
     if (vno == Gdiag_no) DiagBreak();
 
     if (v->ripflag) continue;
@@ -4473,10 +4473,10 @@ int mrisComputeThicknessNormalTerm(MRI_SURFACE *mris, double l_thick_normal, INT
       sample the coordinate functions along the tangent plane axes and
       compute the derivates using them.
     */
-    e1p = mrisSampleNormalEnergy(mris, v, parms, v->x + d_dist * e1x, v->y + d_dist * e1y, v->z + d_dist * e1z);
-    e1m = mrisSampleNormalEnergy(mris, v, parms, v->x - d_dist * e1x, v->y - d_dist * e1y, v->z - d_dist * e1z);
-    e2p = mrisSampleNormalEnergy(mris, v, parms, v->x + d_dist * e2x, v->y + d_dist * e2y, v->z + d_dist * e2z);
-    e2m = mrisSampleNormalEnergy(mris, v, parms, v->x - d_dist * e2x, v->y - d_dist * e2y, v->z - d_dist * e2z);
+    e1p = mrisSampleNormalEnergy(mris, vno, parms, v->x + d_dist * e1x, v->y + d_dist * e1y, v->z + d_dist * e1z);
+    e1m = mrisSampleNormalEnergy(mris, vno, parms, v->x - d_dist * e1x, v->y - d_dist * e1y, v->z - d_dist * e1z);
+    e2p = mrisSampleNormalEnergy(mris, vno, parms, v->x + d_dist * e2x, v->y + d_dist * e2y, v->z + d_dist * e2z);
+    e2m = mrisSampleNormalEnergy(mris, vno, parms, v->x - d_dist * e2x, v->y - d_dist * e2y, v->z - d_dist * e2z);
     dE_de1 = (e1p - e1m) / (2 * d_dist);
     dE_de2 = (e2p - e2m) / (2 * d_dist);
     norm = sqrt(dE_de1 * dE_de1 + dE_de2 * dE_de2);
@@ -4491,15 +4491,15 @@ int mrisComputeThicknessNormalTerm(MRI_SURFACE *mris, double l_thick_normal, INT
     cx = v->x + parms->dt * dx;
     cy = v->y + parms->dt * dy;
     cz = v->z + parms->dt * dz;
-    E0 = mrisSampleNormalEnergy(mris, v, parms, v->x, v->y, v->z);
-    E1 = mrisSampleNormalEnergy(mris, v, parms, cx, cy, cz);
+    E0 = mrisSampleNormalEnergy(mris, vno, parms, v->x, v->y, v->z);
+    E1 = mrisSampleNormalEnergy(mris, vno, parms, cx, cy, cz);
     if (E1 > E0) {
       double E2;
       if (vno == Gdiag_no) {
         DiagBreak();
       }
       DiagBreak();
-      E2 = mrisSampleNormalEnergy(mris, v, parms, v->x - parms->dt * dx, v->y - parms->dt * dy, v->z - parms->dt * dz);
+      E2 = mrisSampleNormalEnergy(mris, vno, parms, v->x - parms->dt * dx, v->y - parms->dt * dy, v->z - parms->dt * dz);
       if (E2 < E0) {
         dx *= -1;
         dy *= -1;
@@ -7757,7 +7757,7 @@ int mrisComputePosterior2DTerm(MRI_SURFACE *mris, INTEGRATION_PARMS *parms)
   ------------------------------------------------------*/
 #include "mrisurf_deform_computeSSE.h"
 
-double MRIScomputeSSEExternal(MRI_SURFACE *mris, INTEGRATION_PARMS *parms, double *ext_sse)
+double MRIScomputeSSEExternal(MRIS* mris, INTEGRATION_PARMS *parms, double *ext_sse)
 {
   double sse;
 
@@ -7817,6 +7817,7 @@ double mrisComputeError(MRI_SURFACE *mris,
   }
 
   sse_corr = mrisComputeCorrelationError(mris, parms, 1);
+  
   if (!DZERO(parms->l_dist)) {
     sse_dist = mrisComputeDistanceError(mris, parms);
   }
@@ -8504,7 +8505,7 @@ int mrisApplyGradientPositiveAreaMaximizing(MRI_SURFACE *mris, double dt)
   return mrisApplyGradientPositiveAreaPreserving(mris, dt);
 }
 
-int MRISapplyGradient(MRI_SURFACE *mris, double dt)
+int MRISapplyGradient(MRIS* mris, double dt)
 {
   int vno, nvertices;
 
