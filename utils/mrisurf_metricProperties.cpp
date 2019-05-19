@@ -9242,8 +9242,9 @@ double mrisComputeThicknessSmoothnessEnergy(MRIS *mris, double l_tsmooth, INTEGR
 }
 
 float mrisSampleMinimizationEnergy(
-    MRIS *mris, VERTEX *v, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
+    MRIS *mris, int const vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
 {
+  VERTEX* v = &mris->vertices[vno];
   float xw, yw, zw, dx, dy, dz, thick_sq, xp, yp, zp;
 
   project_point_onto_sphere(cx, cy, cz, mris->radius, &cx, &cy, &cz);
@@ -9383,8 +9384,9 @@ float mrisSampleParallelEnergy(
 }
 
 float mrisSampleNormalEnergy(
-    MRIS *mris, VERTEX *v, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
+    MRIS *mris, int vno, INTEGRATION_PARMS *parms, float cx, float cy, float cz)
 {
+  VERTEX * const v = &mris->vertices[vno];
   float dx, dy, dz, len, xw, yw, zw, xp, yp, zp, pnx, pny, pnz;
   double sse;
 
@@ -9505,11 +9507,10 @@ double mrisComputeThicknessMinimizationEnergy(MRIS *mris, double l_thick_min, IN
     ROMP_PFLB_begin
     
     float thick_sq;
-    VERTEX *v;
-    v = &mris->vertices[vno];
+    VERTEX * const v = &mris->vertices[vno];
     if (v->ripflag) continue;
 
-    thick_sq = mrisSampleMinimizationEnergy(mris, v, parms, v->x, v->y, v->z);
+    thick_sq = mrisSampleMinimizationEnergy(mris, vno, parms, v->x, v->y, v->z);
 
     if (vno < MAXVERTICES && thick_sq > last_sse[vno] && cno > 1 && vno == Gdiag_no) DiagBreak();
 
@@ -9791,14 +9792,12 @@ double mrisComputeThicknessNormalEnergy(MRIS *mris, double l_thick_normal, INTEG
     ROMP_PFLB_begin
     
     double sse;
-    VERTEX *v;
-
-    v = &mris->vertices[vno];
+    VERTEX * const v = &mris->vertices[vno];
     if (vno == Gdiag_no) DiagBreak();
 
     if (v->ripflag) continue;
 
-    sse = mrisSampleNormalEnergy(mris, v, parms, v->x, v->y, v->z);
+    sse = mrisSampleNormalEnergy(mris, vno, parms, v->x, v->y, v->z);
     if (sse > big_sse) DiagBreak();
 
     if (vno < MAXVERTICES && ((sse > last_sse[vno] && cno > 1 && vno == Gdiag_no) || (sse > last_sse[vno] && cno > 1)))
@@ -9813,7 +9812,7 @@ double mrisComputeThicknessNormalEnergy(MRIS *mris, double l_thick_normal, INTEG
       cx = v->x;
       cy = v->y;
       cz = v->z;
-      E = mrisSampleNormalEnergy(mris, v, parms, v->x, v->y, v->z);
+      E = mrisSampleNormalEnergy(mris, vno, parms, v->x, v->y, v->z);
       MRISvertexCoord2XYZ_float(v, WHITE_VERTICES, &xw, &yw, &zw);
       MRISsampleFaceCoordsCanonical((MHT *)(parms->mht), mris, cx, cy, cz, PIAL_VERTICES, &xp, &yp, &zp);
       dx = xp - xw;

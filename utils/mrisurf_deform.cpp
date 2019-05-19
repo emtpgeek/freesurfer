@@ -108,7 +108,7 @@ static void sphericalProjection(float xs, float ys, float zs, float *xd, float *
 }
 
 
-static int mrisSphericalProjection(MRIS *mris)
+void mrisSphericalProjection(MRIS *mris)
 {
   int n;
   VERTEX *v;
@@ -151,7 +151,6 @@ static int mrisSphericalProjection(MRIS *mris)
       fprintf(stderr,"af 2 sp: nvertex %d (%f,%f,%f)\n",n,v->x,v->y,v->z);
     */
   }
-  return NO_ERROR;
 }
 
 static int mris_project_point_into_face(
@@ -402,7 +401,7 @@ int MRISsmoothOnSphere(MRIS *mris, int niters)
 }
 
 
-static int mrisAssignFaces(MRI_SURFACE *mris, MHT *mht, int which_vertices)
+void mrisAssignFaces(MRI_SURFACE *mris, MHT *mht, int which_vertices)
 {
   int vno;
 
@@ -432,8 +431,6 @@ static int mrisAssignFaces(MRI_SURFACE *mris, MHT *mht, int which_vertices)
     ROMP_PFLB_end
   }
   ROMP_PF_end
-  
-  return (NO_ERROR);
 }
 
 
@@ -2652,13 +2649,13 @@ double mrisComputeCorrelationErrorTraceable(MRI_SURFACE *mris, INTEGRATION_PARMS
 #else
     src = v->curv;
 #endif
-    target = MRISPfunctionValTraceable(parms->mrisp_template, mris, x, y, z, parms->frame_no, vertexTrace);
+    target = MRISPfunctionValTraceable(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no, vertexTrace);
 #define DEFAULT_STD 4.0f
 #define DISABLE_STDS 0
 #if DISABLE_STDS
     std = 1.0f;
 #else
-    std = MRISPfunctionValTraceable(parms->mrisp_template, mris, x, y, z, parms->frame_no + 1, vertexTrace);
+    std = MRISPfunctionValTraceable(parms->mrisp_template, mris->radius, x, y, z, parms->frame_no + 1, vertexTrace);
     std = sqrt(std);
     if (FZERO(std)) {
       std = DEFAULT_STD /*FSMALL*/;
@@ -6520,7 +6517,7 @@ int MRIScomputeDistanceErrors(MRI_SURFACE *mris, int nbhd_size, int max_nbrs)
 
   Description
   ------------------------------------------------------*/
-static double mrisComputeNonlinearAreaSSE(MRI_SURFACE *mris)
+double mrisComputeNonlinearAreaSSE(MRI_SURFACE *mris)
 {
   double area_scale;
 
